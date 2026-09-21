@@ -43,7 +43,17 @@ export default function DivisionsPage() {
   }
 
   async function deleteDivision(divisionId) {
-    if (!confirm('Delete this division? Fixtures already generated under it will be deleted too. This cannot be undone.')) return;
+    const { count, error: countError } = await supabase
+      .from('team_seasons')
+      .select('id', { count: 'exact', head: true })
+      .eq('division_id', divisionId);
+    if (countError) { alert(countError.message); return; }
+    if (count > 0) {
+      alert(`This division has ${count} team${count === 1 ? '' : 's'} placed in it. Remove or reassign them first.`);
+      return;
+    }
+
+    if (!confirm('Delete this division? This cannot be undone.')) return;
     const { error } = await supabase.from('divisions').delete().eq('id', divisionId);
     if (error) { alert(error.message); return; }
     refresh();
