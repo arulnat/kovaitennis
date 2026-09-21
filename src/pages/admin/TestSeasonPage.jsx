@@ -3,11 +3,12 @@
 // Req 17: a sandbox season, fully excluded from public/real data, where
 // score entry is not date-restricted (17.7) so the whole pipeline can be
 // exercised end-to-end. Purge permanently deletes everything under it.
-
+import { useSeason } from '../../lib/seasonContext.jsx';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 
 export default function TestSeasonPage() {
+  const { refresh: refreshGlobalSeasons } = useSeason(); // keeps the nav bar's dropdown in sync
   const [testSeasons, setTestSeasons] = useState([]);
   const [name, setName] = useState('Test Season');
   const [startWeekend, setStartWeekend] = useState('');
@@ -17,6 +18,7 @@ export default function TestSeasonPage() {
   async function refresh() {
     const { data } = await supabase.from('seasons').select('*').eq('is_test', true).order('created_at', { ascending: false });
     setTestSeasons(data || []);
+    refreshGlobalSeasons(); // keeps the nav bar's season/division picker in sync too
   }
 
   async function createTestSeason() {
