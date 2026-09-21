@@ -206,40 +206,77 @@ test('highlightBands: top 2 and bottom 2 flagged correctly in a group of 6', () 
 
 console.log('\n== bulkUpload.js ==');
 
-test('bulk upload: valid rows group into teams with rosters', () => {
+test('bulk upload: valid single team block parses into a team with roster', () => {
   const rows = [
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Ravi', player_gender: 'male' },
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Sunil', player_gender: 'male' },
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Meena', player_gender: 'female' },
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Kumar', player_gender: 'male' },
+    ['Aces', 'Ravi', '9876543210', 4],
+    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
   assert.equal(result.teams.length, 1);
+  assert.equal(result.teams[0].teamName, 'Aces');
   assert.equal(result.teams[0].players.length, 4);
+  assert.deepEqual(result.teams[0].players[0], { name: 'Ravi', gender: null });
 });
 
-test('bulk upload: whole file rejected if ANY row has an error (all-or-nothing, Req 2.1)', () => {
+test('bulk upload: multiple team blocks in one file all parse', () => {
   const rows = [
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Ravi', player_gender: 'male' },
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Sunil', player_gender: 'male' },
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Meena', player_gender: 'female' },
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Kumar', player_gender: 'male' },
-    { team_name: 'Smashers', captain_name: 'Anita', captain_phone: 'not-a-phone', player_name: 'Anita', player_gender: 'female' },
+    ['Aces', 'Ravi', '9876543210', 4],
+    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
+    ['Smashers', 'Anita', '9123456780', 5],
+    ['Anita', 'Rahul', 'Sneha', 'Vikram', 'Lakshmi'],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, true);
+  assert.equal(result.teams.length, 2);
+  assert.equal(result.teams[1].teamName, 'Smashers');
+  assert.equal(result.teams[1].players.length, 5);
+});
+
+test('bulk upload: whole file rejected if ANY block has an error (all-or-nothing, Req 2.1)', () => {
+  const rows = [
+    ['Aces', 'Ravi', '9876543210', 4],
+    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
+    ['Smashers', 'Anita', 'not-a-phone', 4],
+    ['Anita', 'Rahul', 'Sneha', 'Vikram'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
-  assert.ok(result.errors.some((e) => e.includes('captain_phone')));
+  assert.ok(result.errors.some((e) => e.includes('captain phone')));
+  // all-or-nothing: even the valid "Aces" block is not returned
+  assert.equal(result.teams, undefined);
 });
 
 test('bulk upload: team with fewer than 4 players is rejected (Req 1.5)', () => {
   const rows = [
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Ravi', player_gender: 'male' },
-    { team_name: 'Aces', captain_name: 'Ravi', captain_phone: '9876543210', player_name: 'Sunil', player_gender: 'male' },
+    ['Aces', 'Ravi', '9876543210', 2],
+    ['Ravi', 'Sunil'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((e) => e.includes('minimum is 4')));
+});
+
+test('bulk upload: roster row with fewer names than the declared count is caught', () => {
+  const rows = [
+    ['Aces', 'Ravi', '9876543210', 4],
+    ['Ravi', 'Sunil', 'Meena'], // only 3 names, but row 1 says 4
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('expected 4 player name(s)') && e.includes('found 3')));
+});
+
+test('bulk upload: duplicate team name across blocks is caught', () => {
+  const rows = [
+    ['Aces', 'Ravi', '9876543210', 4],
+    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
+    ['Aces', 'Deepak', '9123456780', 4],
+    ['Deepak', 'Farah', 'Gita', 'Hari'],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('duplicate team name')));
 });
 
 test('generateLoginId: team name -> lowercase dash-separated slug', () => {

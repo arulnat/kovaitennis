@@ -1,11 +1,11 @@
 // src/pages/admin/BulkUploadPage.jsx
 //
-// Req 2.1 (MVP-extended): admin uploads one CSV file with team +
-// full-roster rows. All-or-nothing validation — any bad row rejects the
-// whole file, nothing is imported (v6 decision).
+// Req 2.1 (MVP-extended): admin uploads one CSV file with a 2-row block
+// per team (team info, then roster). All-or-nothing validation — any bad
+// block rejects the whole file, nothing is imported (v6 decision).
 
 import { useState } from 'react';
-import { parseWorkbook, validateBulkUpload, generateLoginId, generateDefaultPassword } from '../../lib/bulkUpload.js';
+import { parseWorkbook, validateBulkUpload, generateLoginId, generateDefaultPassword, downloadSampleTemplate } from '../../lib/bulkUpload.js';
 import { supabase } from '../../lib/supabaseClient.js';
 
 export default function BulkUploadPage({ seasonId }) {
@@ -85,40 +85,25 @@ export default function BulkUploadPage({ seasonId }) {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-xl font-semibold mb-1">Bulk Team &amp; Roster Upload</h1>
+      <p className="text-sm text-gray-600 mb-2">
+        CSV file, no header row — two rows per team, one block after another:
+      </p>
+      <ul className="text-sm text-gray-600 mb-4 list-disc pl-5 space-y-1">
+        <li><strong>Row 1</strong> (team info): team name, captain name, captain phone, number of players (excluding the captain)</li>
+        <li><strong>Row 2</strong> (roster): that many player names, one per column</li>
+      </ul>
       <p className="text-sm text-gray-600 mb-4">
-        CSV columns: <code>team_name, captain_name, captain_phone, player_name, player_gender</code> —
-        one row per player. Photos, ID proof, and date of birth are not collected here (Req 1.7/1.6 deferred).
-        If any row has a problem, nothing is imported — fix the file and re-upload.
+        Repeat for each additional team — a 2-team file is 4 rows total. Gender, photos, ID proof, and date of
+        birth are not collected here (Req 1.7/1.6 deferred). If any block has a problem, nothing is imported —
+        fix the file and re-upload.
       </p>
 
-      <div className="mb-4 border rounded p-3 bg-gray-50 overflow-x-auto">
-        <p className="text-xs font-medium text-gray-600 mb-2">Expected CSV format:</p>
-        <table className="text-xs border-collapse">
-          <thead>
-            <tr>
-              {['team_name', 'captain_name', 'captain_phone', 'player_name', 'player_gender'].map((h) => (
-                <th key={h} className="text-left pr-4 font-mono font-medium text-gray-700">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="text-gray-500 font-mono">
-            <tr>
-              <td className="pr-4">Aces</td>
-              <td className="pr-4">Priya Kumar</td>
-              <td className="pr-4">9876543210</td>
-              <td className="pr-4">Priya Kumar</td>
-              <td className="pr-4">female</td>
-            </tr>
-            <tr>
-              <td className="pr-4">Aces</td>
-              <td className="pr-4">Priya Kumar</td>
-              <td className="pr-4">9876543210</td>
-              <td className="pr-4">Arjun Rao</td>
-              <td className="pr-4">male</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <button
+        onClick={downloadSampleTemplate}
+        className="mb-4 text-sm text-teal-700 underline"
+      >
+        Download a sample CSV template
+      </button>
 
       {status === 'idle' || status === 'parsing' || status === 'error' ? (
         <input type="file" accept=".csv" onChange={handleFile} disabled={status === 'parsing'} />
