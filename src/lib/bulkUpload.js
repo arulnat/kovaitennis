@@ -1,16 +1,16 @@
 // src/lib/bulkUpload.js
 //
-// Admin bulk Excel upload (Req 2.1), MVP-scoped: teams + full player
+// Admin bulk CSV upload (Req 2.1), MVP-scoped: teams + full player
 // rosters, names/gender only — no photo, DOB, or ID proof (those are
 // nullable columns, populated later under the deferred MP registration
 // flow). All-or-nothing validation (v6 decision): any row error rejects
-// the whole file.
+// the whole file. CSV only — not a general Excel importer.
 //
-// Expected sheet shape (one row per PLAYER, team columns repeated):
+// Expected CSV shape (one row per PLAYER, team columns repeated):
 //   team_name | captain_name | captain_phone | player_name | player_gender
 //
-// Uses SheetJS (`xlsx`) to parse — parsing itself is kept separate from
-// validation (and the `xlsx` import is dynamic, inside parseWorkbook
+// Uses SheetJS (`xlsx`) to parse the CSV — parsing itself is kept separate
+// from validation (and the `xlsx` import is dynamic, inside parseWorkbook
 // only) so validation logic can be unit-tested with plain Node, without
 // requiring the `xlsx` package to be installed.
 
