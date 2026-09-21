@@ -1,6 +1,7 @@
 // src/App.jsx — top-level routing for the MVP (HP-priority) screens.
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth, RequireRole } from './lib/auth.jsx';
+import { SeasonProvider, useSeason, SeasonSelector } from './lib/seasonContext.jsx';
 
 import BulkUploadPage from './pages/admin/BulkUploadPage.jsx';
 import FixtureGenerationPage from './pages/admin/FixtureGenerationPage.jsx';
@@ -14,26 +15,28 @@ import LoginPage from './pages/LoginPage.jsx';
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Nav />
-        <Routes>
-          <Route path="/" element={<Navigate to="/standings" replace />} />
-          <Route path="/login" element={<LoginPage />} />
+      <SeasonProvider>
+        <BrowserRouter>
+          <Nav />
+          <Routes>
+            <Route path="/" element={<Navigate to="/standings" replace />} />
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* Public (Req 10.5 — no login required) */}
-          <Route path="/standings" element={<StandingsPageWrapper />} />
+            {/* Public (Req 10.5 — no login required) */}
+            <Route path="/standings" element={<StandingsRouteWrapper />} />
 
-          {/* Team (captain login required) */}
-          <Route path="/score/:fixtureId" element={<RequireRole roles={['team']}><ScoreEntryRouteWrapper /></RequireRole>} />
+            {/* Team (captain login required) */}
+            <Route path="/score/:fixtureId" element={<RequireRole roles={['team']}><ScoreEntryRouteWrapper /></RequireRole>} />
 
-          {/* Admin */}
-          <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
-          <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
-          <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
-          <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
-          <Route path="/admin/test-season" element={<RequireRole roles={['tournament_admin', 'super_admin']}><TestSeasonPage /></RequireRole>} />
-        </Routes>
-      </BrowserRouter>
+            {/* Admin */}
+            <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
+            <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
+            <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
+            <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
+            <Route path="/admin/test-season" element={<RequireRole roles={['tournament_admin', 'super_admin']}><TestSeasonPage /></RequireRole>} />
+          </Routes>
+        </BrowserRouter>
+      </SeasonProvider>
     </AuthProvider>
   );
 }
@@ -41,7 +44,7 @@ export default function App() {
 function Nav() {
   const { role, signOut } = useAuth();
   return (
-    <nav className="border-b p-3 flex gap-4 text-sm items-center">
+    <nav className="border-b p-3 flex flex-wrap gap-4 text-sm items-center">
       <Link to="/standings" className="font-semibold">Tennis League</Link>
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
@@ -52,6 +55,7 @@ function Nav() {
           <Link to="/admin/test-season">Test Season</Link>
         </>
       )}
+      <SeasonSelector />
       <div className="ml-auto">
         {role ? <button onClick={signOut} className="text-gray-500">Sign out</button> : <Link to="/login">Login</Link>}
       </div>
@@ -59,27 +63,66 @@ function Nav() {
   );
 }
 
-// --- Wrapper components pull IDs from context/URL in a real router setup.
-// These are left as simple examples wiring a hardcoded/selected season —
-// swap in useParams()/a season-selector context as the app grows beyond MVP.
+// --- Wrapper components pull the active season/division from context
+// (set via the picker in the nav bar) rather than a hardcoded global.
+// A missing selection shows a clear message instead of a broken query.
 
-function StandingsPageWrapper() {
-  // TODO: replace with a real season/division selector
-  return <StandingsPage seasonId={window.__ACTIVE_SEASON_ID__} divisionId={window.__ACTIVE_DIVISION_ID__} />;
+function NeedsSeason({ children }) {
+  const { seasonId, loading } = useSeason();
+  if (loading) return <p className="p-6 text-gray-500">Loading…</p>;
+  if (!seasonId) return <p className="p-6 text-gray-500">No season yet — create one under Test Season or ask an admin to create the live season first.</p>;
+  return children;
+}
+
+function NeedsDivision({ children }) {
+  const { seasonId, divisionId, loading } = useSeason();
+  if (loading) return <p className="p-6 text-gray-500">Loading…</p>;
+  if (!seasonId) return <p className="p-6 text-gray-500">No season yet — create one under Test Season first.</p>;
+  if (!divisionId) return <p className="p-6 text-gray-500">This season has no divisions yet — create one first (Req 4.1).</p>;
+  return children;
+}
+
+function StandingsRouteWrapper() {
+  const { seasonId, divisionId } = useSeason();
+  return (
+    <NeedsDivision>
+      <StandingsPage seasonId={seasonId} divisionId={divisionId} />
+    </NeedsDivision>
+  );
 }
 function ScoreEntryRouteWrapper() {
   const fixtureId = window.location.pathname.split('/').pop();
   return <ScoreEntryPage fixtureId={fixtureId} />;
 }
 function BulkUploadRouteWrapper() {
-  return <BulkUploadPage seasonId={window.__ACTIVE_SEASON_ID__} />;
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <BulkUploadPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
 }
 function FixtureRouteWrapper() {
-  return <FixtureGenerationPage seasonId={window.__ACTIVE_SEASON_ID__} divisionId={window.__ACTIVE_DIVISION_ID__} startWeekend={window.__SEASON_START_WEEKEND__} />;
+  const { seasonId, divisionId, activeSeason } = useSeason();
+  return (
+    <NeedsDivision>
+      <FixtureGenerationPage seasonId={seasonId} divisionId={divisionId} startWeekend={activeSeason?.start_weekend} />
+    </NeedsDivision>
+  );
 }
 function MissingScoresRouteWrapper() {
-  return <MissingScoresReportPage seasonId={window.__ACTIVE_SEASON_ID__} />;
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <MissingScoresReportPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
 }
 function ContentRouteWrapper() {
-  return <ContentManagementPage seasonId={window.__ACTIVE_SEASON_ID__} />;
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <ContentManagementPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
 }
