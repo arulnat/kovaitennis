@@ -4,6 +4,7 @@ import { AuthProvider, useAuth, RequireRole } from './lib/auth.jsx';
 import { SeasonProvider, useSeason, SeasonSelector } from './lib/seasonContext.jsx';
 
 import BulkUploadPage from './pages/admin/BulkUploadPage.jsx';
+import DivisionsPage from './pages/admin/DivisionsPage.jsx';
 import FixtureGenerationPage from './pages/admin/FixtureGenerationPage.jsx';
 import MissingScoresReportPage from './pages/admin/MissingScoresReportPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
@@ -30,6 +31,7 @@ export default function App() {
 
             {/* Admin */}
             <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
+            <Route path="/admin/divisions" element={<RequireRole roles={['tournament_admin', 'super_admin']}><DivisionsPage /></RequireRole>} />
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
             <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
@@ -49,6 +51,7 @@ function Nav() {
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <Link to="/admin/bulk-upload">Bulk Upload</Link>
+          <Link to="/admin/divisions">Divisions</Link>
           <Link to="/admin/fixtures">Fixtures</Link>
           <Link to="/admin/missing-scores">Missing Scores</Link>
           <Link to="/admin/content">Content</Link>
