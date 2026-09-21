@@ -28,20 +28,27 @@ export function SeasonProvider({ children }) {
 
   useEffect(() => { loadSeasons(); }, [loadSeasons]);
 
-  useEffect(() => {
+  const loadDivisions = useCallback(async () => {
     if (!seasonId) { setDivisions([]); setDivisionId(null); return; }
-    supabase.from('divisions').select('*').eq('season_id', seasonId).order('name').then(({ data }) => {
-      setDivisions(data || []);
-      setDivisionId((current) =>
-        data?.some((d) => d.id === current) ? current : (data?.[0]?.id ?? null)
-      );
-    });
+    const { data } = await supabase.from('divisions').select('*').eq('season_id', seasonId).order('name');
+    setDivisions(data || []);
+    setDivisionId((current) =>
+      data?.some((d) => d.id === current) ? current : (data?.[0]?.id ?? null)
+    );
   }, [seasonId]);
+
+  useEffect(() => { loadDivisions(); }, [loadDivisions]);
+
+  const refresh = useCallback(async () => {
+    await loadSeasons();
+    await loadDivisions();
+  }, [loadSeasons, loadDivisions]);
 
   const value = {
     seasons, divisions, seasonId, divisionId,
     setSeasonId, setDivisionId, loading,
-    refresh: loadSeasons,
+    refresh,
+    refreshDivisions: loadDivisions,
     activeSeason: seasons.find((s) => s.id === seasonId) ?? null,
   };
 
