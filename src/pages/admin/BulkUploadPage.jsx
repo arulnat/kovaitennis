@@ -5,7 +5,7 @@
 // block rejects the whole file, nothing is imported (v6 decision).
 
 import { useState } from 'react';
-import { parseWorkbook, validateBulkUpload, generateLoginId, generateDefaultPassword, downloadSampleTemplate } from '../../lib/bulkUpload.js';
+import { parseWorkbook, validateBulkUpload, generateLoginId, generateDefaultPassword, downloadSampleTemplate, downloadCredentialsSheet } from '../../lib/bulkUpload.js';
 import { supabase } from '../../lib/supabaseClient.js';
 
 export default function BulkUploadPage({ seasonId }) {
@@ -163,9 +163,15 @@ export default function BulkUploadPage({ seasonId }) {
               ))}
             </tbody>
           </table>
+          <button
+            onClick={() => downloadCredentialsSheet(importResult.created)}
+            className="mt-3 text-sm text-teal-700 underline"
+          >
+            Download login ID &amp; password sheet (CSV)
+          </button>
           <p className="text-xs text-gray-500 mt-2">
             Circulate these credentials to captains (Req 2.2, 10.2). SMS/WhatsApp delivery is a follow-on —
-            export this table for now.
+            download the CSV above for now.
           </p>
         </div>
       )}

@@ -120,21 +120,41 @@ export function sampleTemplateRows() {
   ];
 }
 
-/** Builds a CSV from sampleTemplateRows() and triggers a browser download. Requires `xlsx`. */
-export async function downloadSampleTemplate() {
+/** Builds a CSV from rows (array of arrays) and triggers a browser download. Requires `xlsx`. */
+async function downloadCsv(rows, filename) {
   const XLSX = await import('xlsx');
-  const sheet = XLSX.utils.aoa_to_sheet(sampleTemplateRows());
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
   const csv = XLSX.utils.sheet_to_csv(sheet);
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'team-upload-template.csv';
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/** Downloads sampleTemplateRows() as team-upload-template.csv. */
+export async function downloadSampleTemplate() {
+  await downloadCsv(sampleTemplateRows(), 'team-upload-template.csv');
+}
+
+/**
+ * Downloads the just-created team login credentials (Req 2.2) as a CSV so
+ * the admin can circulate them to captains without retyping the on-screen
+ * table.
+ *
+ * @param {{teamName: string, loginId: string, defaultPassword: string}[]} created
+ */
+export async function downloadCredentialsSheet(created) {
+  const rows = [
+    ['Team', 'Login ID', 'Default Password'],
+    ...created.map((c) => [c.teamName, c.loginId, c.defaultPassword]),
+  ];
+  await downloadCsv(rows, 'team-login-credentials.csv');
 }
 
 /** Generate a login ID from a team name (Req 2.2): lowercase, alnum + dashes, deduped by caller if needed. */
