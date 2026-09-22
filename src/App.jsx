@@ -4,13 +4,14 @@ import { AuthProvider, useAuth, RequireRole } from './lib/auth.jsx';
 import { SeasonProvider, useSeason, SeasonSelector } from './lib/seasonContext.jsx';
 
 import BulkUploadPage from './pages/admin/BulkUploadPage.jsx';
+import LoginCredentialsPage from './pages/admin/LoginCredentialsPage.jsx';
 import TeamsPage from './pages/admin/TeamsPage.jsx';
 import DivisionsPage from './pages/admin/DivisionsPage.jsx';
 import GroupingPage from './pages/admin/GroupingPage.jsx';
 import FixtureGenerationPage from './pages/admin/FixtureGenerationPage.jsx';
 import MissingScoresReportPage from './pages/admin/MissingScoresReportPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
-import TestSeasonPage from './pages/admin/TestSeasonPage.jsx';
+import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
@@ -33,13 +34,14 @@ export default function App() {
 
             {/* Admin */}
             <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
+            <Route path="/admin/login-credentials" element={<RequireRole roles={['tournament_admin', 'super_admin']}><LoginCredentialsPage /></RequireRole>} />
             <Route path="/admin/teams" element={<RequireRole roles={['tournament_admin', 'super_admin']}><TeamsRouteWrapper /></RequireRole>} />
             <Route path="/admin/divisions" element={<RequireRole roles={['tournament_admin', 'super_admin']}><DivisionsPage /></RequireRole>} />
             <Route path="/admin/grouping" element={<RequireRole roles={['tournament_admin', 'super_admin']}><GroupingRouteWrapper /></RequireRole>} />
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
             <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
-            <Route path="/admin/test-season" element={<RequireRole roles={['tournament_admin', 'super_admin']}><TestSeasonPage /></RequireRole>} />
+            <Route path="/admin/seasons" element={<RequireRole roles={['tournament_admin', 'super_admin']}><SeasonsPage /></RequireRole>} />
           </Routes>
         </BrowserRouter>
       </SeasonProvider>
@@ -55,13 +57,14 @@ function Nav() {
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <Link to="/admin/bulk-upload">Bulk Upload</Link>
+          <Link to="/admin/login-credentials">Login Credentials</Link>
           <Link to="/admin/teams">Teams</Link>
           <Link to="/admin/divisions">Divisions</Link>
           <Link to="/admin/grouping">Grouping</Link>
           <Link to="/admin/fixtures">Fixtures</Link>
           <Link to="/admin/missing-scores">Missing Scores</Link>
           <Link to="/admin/content">Content</Link>
-          <Link to="/admin/test-season">Test Season</Link>
+          <Link to="/admin/seasons">Seasons</Link>
         </>
       )}
       <SeasonSelector />
@@ -79,14 +82,14 @@ function Nav() {
 function NeedsSeason({ children }) {
   const { seasonId, loading } = useSeason();
   if (loading) return <p className="p-6 text-gray-500">Loading…</p>;
-  if (!seasonId) return <p className="p-6 text-gray-500">No season yet — create one under Test Season or ask an admin to create the live season first.</p>;
+  if (!seasonId) return <p className="p-6 text-gray-500">No season yet — create one under Seasons first.</p>;
   return children;
 }
 
 function NeedsDivision({ children }) {
   const { seasonId, divisionId, loading } = useSeason();
   if (loading) return <p className="p-6 text-gray-500">Loading…</p>;
-  if (!seasonId) return <p className="p-6 text-gray-500">No season yet — create one under Test Season first.</p>;
+  if (!seasonId) return <p className="p-6 text-gray-500">No season yet — create one under Seasons first.</p>;
   if (!divisionId) return <p className="p-6 text-gray-500">This season has no divisions yet — create one first (Req 4.1).</p>;
   return children;
 }

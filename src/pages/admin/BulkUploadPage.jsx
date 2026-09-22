@@ -3,9 +3,17 @@
 // Req 2.1 (MVP-extended): admin uploads one CSV file with a 2-row block
 // per team (team info, then roster). All-or-nothing validation — any bad
 // block rejects the whole file, nothing is imported (v6 decision).
+//
+// The actual team/player/login creation happens server-side in the
+// bulk-create-teams Edge Function (service_role key required to create
+// real Supabase Auth accounts — that can't run from the browser). Newly
+// created teams land in team_seasons with no division_id, so they start
+// out in Grouping's "Unassigned pool" ready to be placed. Login IDs and
+// passwords are no longer shown here — see the Login Credentials page.
 
 import { useState } from 'react';
-import { parseWorkbook, validateBulkUpload, generateLoginId, generateDefaultPassword, downloadSampleTemplate, downloadCredentialsSheet } from '../../lib/bulkUpload.js';
+import { Link } from 'react-router-dom';
+import { parseWorkbook, validateBulkUpload, downloadSampleTemplate } from '../../lib/bulkUpload.js';
 import { supabase } from '../../lib/supabaseClient.js';
 
 export default function BulkUploadPage({ seasonId }) {
@@ -38,47 +46,15 @@ export default function BulkUploadPage({ seasonId }) {
 
   async function handleImport() {
     setStatus('importing');
-    const created = [];
-    const failures = [];
-
-    for (const team of teams) {
-      const loginId = generateLoginId(team.teamName);
-      const defaultPassword = generateDefaultPassword();
-
-      // 1. Create the auth user (Edge Function recommended in production
-      //    so the service-role key never touches the browser — this
-      //    inline call is illustrative of the flow).
-      const { data: teamRow, error: teamErr } = await supabase
-        .from('teams')
-        .insert({
-          name: team.teamName,
-          login_id: loginId,
-          captain_name: team.captainName,
-          captain_phone: team.captainPhone,
-        })
-        .select()
-        .single();
-
-      if (teamErr) { failures.push({ team: team.teamName, error: teamErr.message }); continue; }
-
-      const { error: playersErr } = await supabase.from('players').insert(
-        team.players.map((p) => ({ team_id: teamRow.id, name: p.name, gender: p.gender }))
-      );
-      if (playersErr) { failures.push({ team: team.teamName, error: playersErr.message }); continue; }
-
-      const { data: playerRows } = await supabase.from('players').select('id').eq('team_id', teamRow.id);
-      if (playerRows) {
-        await supabase.from('team_players').insert(
-          playerRows.map((p) => ({ season_id: seasonId, team_id: teamRow.id, player_id: p.id }))
-        );
-      }
-
-      await supabase.from('team_seasons').insert({ season_id: seasonId, team_id: teamRow.id, status: 'new' });
-
-      created.push({ teamName: team.teamName, loginId, defaultPassword });
+    const { data, error } = await supabase.functions.invoke('bulk-create-teams', {
+      body: { seasonId, teams },
+    });
+    if (error) {
+      setErrors([`Import failed: ${error.message}`]);
+      setStatus('error');
+      return;
     }
-
-    setImportResult({ created, failures });
+    setImportResult(data);
     setStatus('done');
   }
 
@@ -147,31 +123,21 @@ export default function BulkUploadPage({ seasonId }) {
         <div className="mt-4">
           <p className="font-medium text-green-800 mb-2">
             {importResult.created.length} team(s) created.
-            {importResult.failures.length > 0 && ` ${importResult.failures.length} failed.`}
+            {importResult.failures?.length > 0 && ` ${importResult.failures.length} failed.`}
           </p>
-          <table className="w-full text-sm border">
-            <thead className="bg-gray-50">
-              <tr><th className="text-left p-2">Team</th><th className="text-left p-2">Login ID</th><th className="text-left p-2">Default Password</th></tr>
-            </thead>
-            <tbody>
-              {importResult.created.map((c) => (
-                <tr key={c.loginId} className="border-t">
-                  <td className="p-2">{c.teamName}</td>
-                  <td className="p-2 font-mono">{c.loginId}</td>
-                  <td className="p-2 font-mono">{c.defaultPassword}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button
-            onClick={() => downloadCredentialsSheet(importResult.created)}
-            className="mt-3 text-sm text-teal-700 underline"
-          >
-            Download login ID &amp; password sheet (CSV)
-          </button>
-          <p className="text-xs text-gray-500 mt-2">
-            Circulate these credentials to captains (Req 2.2, 10.2). SMS/WhatsApp delivery is a follow-on —
-            download the CSV above for now.
+          <ul className="border rounded divide-y">
+            {importResult.created.map((c) => (
+              <li key={c.loginId} className="p-3 text-sm">{c.teamName}</li>
+            ))}
+          </ul>
+          {importResult.failures?.length > 0 && (
+            <ul className="mt-2 text-sm text-red-700 list-disc pl-5">
+              {importResult.failures.map((f, i) => <li key={i}>{f.team}: {f.error}</li>)}
+            </ul>
+          )}
+          <p className="text-sm text-gray-600 mt-3">
+            New teams start out unassigned — place them into a division under Grouping. Their login IDs and
+            passwords are on the <Link to="/admin/login-credentials" className="text-teal-700 underline">Login Credentials</Link> page.
           </p>
         </div>
       )}

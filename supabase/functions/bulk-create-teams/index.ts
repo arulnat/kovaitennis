@@ -17,7 +17,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
+// The browser calls this cross-origin (app origin -> *.supabase.co), so it
+// needs its own CORS handling — Supabase's gateway doesn't add this for you.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
     const callerClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -104,6 +114,14 @@ Deno.serve(async (req) => {
         });
         if (appUserErr) throw appUserErr;
 
+        // 5. Persist the default password (Login Credentials admin page
+        // reads this back later) — in its own RLS-locked table, never on
+        // `teams` itself, which is publicly selectable (Req 10.5).
+        const { error: credErr } = await admin
+          .from('team_credentials')
+          .insert({ team_id: teamRow.id, default_password: defaultPassword });
+        if (credErr) throw credErr;
+
         created.push({ teamName: team.teamName, loginId, defaultPassword });
       } catch (err) {
         failures.push({ team: team.teamName, error: err.message ?? String(err) });
@@ -119,7 +137,7 @@ Deno.serve(async (req) => {
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 }
 
