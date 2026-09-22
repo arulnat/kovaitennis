@@ -6,6 +6,7 @@
 // own expiry is the hard backstop server-side).
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient.js';
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000; // Req 10.7
@@ -87,8 +88,12 @@ export function useAuth() {
 
 /** Route guard: redirect/deny unless the role check passes. Use as a wrapper component. */
 export function RequireRole({ roles, children, fallback = <p>You don't have access to this page.</p> }) {
-  const { role, loading } = useAuth();
+  const { session, role, loading } = useAuth();
   if (loading) return <p>Loading…</p>;
+  // Not logged in at all -> send to the login page rather than the
+  // "you don't have access" message, which reads as a permissions
+  // problem when the real issue is just "you're not signed in yet".
+  if (!session) return <Navigate to="/login" replace />;
   if (!role || !roles.includes(role)) return fallback;
   return children;
 }
