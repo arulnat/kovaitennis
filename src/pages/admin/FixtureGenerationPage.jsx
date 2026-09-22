@@ -15,9 +15,11 @@
 //
 // Switching divisions keeps the previously-shown schedule on screen
 // until the new one has loaded (instead of flashing to a "Loading…"
-// placeholder), and the content area has a min-height — both to stop the
-// jarring layout jump a highly variable-length schedule would otherwise
-// cause when switching between divisions of very different sizes.
+// placeholder), and scrolls the content area's top edge into a fixed
+// viewport position on every switch — a min-height alone only stops the
+// page collapsing when a shorter division follows a taller one; it does
+// nothing for the reverse (many rounds down to none), which is what
+// produced the jarring jump this anchoring fixes in both directions.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
@@ -45,10 +47,21 @@ export default function FixtureGenerationPage({ seasonId }) {
   const [teams, setTeams] = useState([]);
   const [fixtures, setFixtures] = useState(null); // null = never loaded yet (first load only)
   const requestId = useRef(0);
+  const contentRef = useRef(null);
 
   useEffect(() => {
     if (!selectedDivisionId && divisions.length > 0) setSelectedDivisionId(divisions[0].id);
   }, [divisions, selectedDivisionId]);
+
+  // A min-height only stops the page collapsing when a shorter division
+  // follows a taller one — it does nothing when the reverse happens (a
+  // division with many rounds followed by one with none). Anchoring
+  // scroll to the top of the content area on every switch, before the
+  // new data even arrives, keeps a fixed reference point regardless of
+  // how much the content's height changes either way.
+  useEffect(() => {
+    contentRef.current?.scrollIntoView({ block: 'start' });
+  }, [selectedDivisionId]);
 
   const loadFixtures = useCallback(async () => {
     if (!selectedDivisionId) return;
@@ -123,7 +136,7 @@ export default function FixtureGenerationPage({ seasonId }) {
         )}
       </div>
 
-      <div style={{ minHeight: '16rem' }}>
+      <div ref={contentRef} style={{ minHeight: '16rem' }}>
         {fixtures === null && <p className="text-gray-500 text-sm">Loading…</p>}
 
         {fixtures !== null && fixtures.length === 0 && (
