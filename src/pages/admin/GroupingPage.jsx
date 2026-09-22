@@ -21,7 +21,7 @@ function randomSeed() {
 }
 
 export default function GroupingPage({ seasonId }) {
-  const { divisions, refreshDivisions, activeSeason, refresh: refreshSeasons, setDivisionId } = useSeason();
+  const { divisions, refreshDivisions, activeSeason, refresh: refreshSeasons } = useSeason();
   const navigate = useNavigate();
 
   const [teamSeasons, setTeamSeasons] = useState([]);
@@ -130,9 +130,8 @@ export default function GroupingPage({ seasonId }) {
     refreshSeasons();
   }
 
-  function goGenerateFixtures(divisionId) {
+  function goGenerateFixtures() {
     if (!activeSeason?.start_weekend) { alert('Set the tournament start date above first.'); return; }
-    setDivisionId(divisionId);
     navigate('/admin/fixtures');
   }
 
@@ -211,6 +210,9 @@ export default function GroupingPage({ seasonId }) {
             <span className="text-xs text-gray-500">Currently set to {activeSeason.start_weekend}</span>
           )}
         </div>
+        <button onClick={goGenerateFixtures} className="mt-3 text-sm text-teal-700 underline">
+          Go to Fixture Generation
+        </button>
       </div>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${divisions.length + 1}, minmax(220px, 1fr))` }}>
@@ -228,7 +230,6 @@ export default function GroupingPage({ seasonId }) {
             divisions={divisions}
             currentDivisionId={d.id}
             onMove={assignDivision}
-            onGenerateFixtures={() => goGenerateFixtures(d.id)}
           />
         ))}
       </div>
@@ -236,18 +237,13 @@ export default function GroupingPage({ seasonId }) {
   );
 }
 
-function GroupColumn({ title, teams, divisions, currentDivisionId, onMove, onGenerateFixtures }) {
+function GroupColumn({ title, teams, divisions, currentDivisionId, onMove }) {
   return (
     <div className="border rounded overflow-hidden">
       <div className="bg-gray-100 px-3 py-2 flex items-center justify-between">
         <span className="font-medium text-sm">{title}</span>
         <span className="text-xs text-gray-500">{teams.length}</span>
       </div>
-      {onGenerateFixtures && (
-        <button onClick={onGenerateFixtures} className="w-full text-xs text-teal-700 underline py-1 border-b">
-          Generate Fixtures
-        </button>
-      )}
       <div className="divide-y">
         {teams.length === 0 && <p className="p-2 text-xs text-gray-400">No teams</p>}
         {teams.map((ts) => (

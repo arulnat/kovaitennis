@@ -131,11 +131,11 @@ function GroupingRouteWrapper() {
   );
 }
 function FixtureRouteWrapper() {
-  const { seasonId, divisionId, activeSeason } = useSeason();
+  const { seasonId } = useSeason();
   return (
-    <NeedsDivision>
-      <FixtureGenerationPage seasonId={seasonId} divisionId={divisionId} startWeekend={activeSeason?.start_weekend} />
-    </NeedsDivision>
+    <NeedsSeason>
+      <FixtureGenerationPage seasonId={seasonId} />
+    </NeedsSeason>
   );
 }
 function MissingScoresRouteWrapper() {

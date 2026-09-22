@@ -12,10 +12,11 @@
  * naturally gives one real team a bye each round (Req 4.5).
  *
  * @param {string[]} teamIds
- * @returns {{round: number, pairs: [string, string][]}[]}
+ * @returns {{round: number, pairs: [string, string][], bye: string|null}[]}
  *   pairs are [teamA, teamB] with NO home/away decided yet — that's a
  *   separate step (assignHomeAway) so scheduling and fairness can be
- *   reasoned about independently.
+ *   reasoned about independently. bye is the resting team's id for that
+ *   round (Req 4.5), or null when the team count is even.
  */
 export function generateRoundRobin(teamIds) {
   if (teamIds.length < 2) {
@@ -37,13 +38,14 @@ export function generateRoundRobin(teamIds) {
   for (let round = 0; round < numRounds; round++) {
     const roundTeams = [ids[0], ...rotating];
     const pairs = [];
+    let bye = null;
     for (let i = 0; i < half; i++) {
       const a = roundTeams[i];
       const b = roundTeams[n - 1 - i];
-      if (a === BYE || b === BYE) continue; // the bye team sits this round out
+      if (a === BYE || b === BYE) { bye = a === BYE ? b : a; continue; } // the bye team sits this round out
       pairs.push([a, b]);
     }
-    rounds.push({ round: round + 1, pairs });
+    rounds.push({ round: round + 1, pairs, bye });
 
     // rotate: keep first fixed, rotate the remaining n-1 elements by one
     rotating.unshift(rotating.pop());
@@ -60,19 +62,19 @@ export function generateRoundRobin(teamIds) {
  *   - Req 4.6: each team's home vs away count differs by at most 1
  *     across the season.
  *
- * @param {{round:number, pairs:[string,string][]}[]} rounds
+ * @param {{round:number, pairs:[string,string][], bye?:string|null}[]} rounds
  * @param {Map<string,string>} priorMeetingHomeTeam
  *   Map keyed by a stable pair-key (see pairKey) -> the team ID that was
  *   HOME last time these two teams met (any division), if they met.
  * @param {() => number} [rng] - injectable RNG for deterministic tests
- * @returns {{round:number, ties:{home:string, away:string, swapped:boolean}[]}[]}
+ * @returns {{round:number, ties:{home:string, away:string, swapped:boolean}[], bye:string|null}[]}
  */
 export function assignHomeAway(rounds, priorMeetingHomeTeam = new Map(), rng = Math.random) {
   const homeCount = new Map();
   const awayCount = new Map();
   const bump = (map, id) => map.set(id, (map.get(id) || 0) + 1);
 
-  const result = rounds.map(({ round, pairs }) => {
+  const result = rounds.map(({ round, pairs, bye = null }) => {
     const ties = pairs.map(([a, b]) => {
       const key = pairKey(a, b);
       const priorHome = priorMeetingHomeTeam.get(key);
@@ -101,7 +103,7 @@ export function assignHomeAway(rounds, priorMeetingHomeTeam = new Map(), rng = M
       bump(awayCount, away);
       return { home, away, swapped };
     });
-    return { round, ties };
+    return { round, ties, bye };
   });
 
   return result;

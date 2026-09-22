@@ -48,6 +48,21 @@ test('round robin: 5 teams (odd) -> each round has exactly one bye', () => {
   const playedCount = Object.fromEntries(['A','B','C','D','E'].map(t => [t, 0]));
   for (const { pairs } of rounds) for (const [a,b] of pairs) { playedCount[a]++; playedCount[b]++; }
   for (const t of ['A','B','C','D','E']) assert.equal(playedCount[t], 4); // played all 4 others
+
+  // the bye field names exactly the team sitting out that round, and each
+  // team gets exactly one bye across the 5 rounds (Req 4.5)
+  const byeCount = Object.fromEntries(['A','B','C','D','E'].map(t => [t, 0]));
+  for (const { pairs, bye } of rounds) {
+    assert.notEqual(bye, null);
+    assert.ok(!pairs.flat().includes(bye), `bye team ${bye} should not also appear in a pair`);
+    byeCount[bye]++;
+  }
+  for (const t of ['A','B','C','D','E']) assert.equal(byeCount[t], 1);
+});
+
+test('round robin: 4 teams (even) -> bye is null every round', () => {
+  const rounds = generateRoundRobin(['A', 'B', 'C', 'D']);
+  for (const { bye } of rounds) assert.equal(bye, null);
 });
 
 test('home/away: prior-season meeting triggers an automatic swap (Req 4.9)', () => {
