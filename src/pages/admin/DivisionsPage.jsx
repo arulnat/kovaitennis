@@ -1,9 +1,13 @@
 // src/pages/admin/DivisionsPage.jsx
 //
 // Req 4.1 — an admin needs at least one division under a season before
-// fixtures/standings can be generated. This lets them create, rename, and
-// remove divisions and see what already exists for the currently selected
-// season.
+// fixtures/standings can be generated. This lets them create, rename,
+// reorder, and remove divisions and see what already exists for the
+// currently selected season.
+//
+// Order is a deliberate rank, not alphabetical (Req 3.5.5): the first
+// division in the list is the "highest" division, both for display and
+// as the starting point when Grouping auto-generates groups.
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -16,11 +20,24 @@ export default function DivisionsPage() {
 
   async function createDivision() {
     if (!name.trim()) return;
+    const nextOrder = divisions.length > 0 ? Math.max(...divisions.map((d) => d.order_index)) + 1 : 0;
     const { error } = await supabase.from('divisions').insert({
-      season_id: seasonId, name: name.trim(),
+      season_id: seasonId, name: name.trim(), order_index: nextOrder,
     });
     if (error) { alert(error.message); return; }
     setName('');
+    refresh();
+  }
+
+  async function moveDivision(index, direction) {
+    const other = index + direction;
+    if (other < 0 || other >= divisions.length) return;
+    const a = divisions[index];
+    const b = divisions[other];
+    const { error } = await supabase.from('divisions').update({ order_index: b.order_index }).eq('id', a.id);
+    if (error) { alert(error.message); return; }
+    const { error: error2 } = await supabase.from('divisions').update({ order_index: a.order_index }).eq('id', b.id);
+    if (error2) { alert(error2.message); return; }
     refresh();
   }
 
@@ -64,6 +81,8 @@ export default function DivisionsPage() {
       <h1 className="text-xl font-semibold mb-1">Divisions</h1>
       <p className="text-sm text-gray-600 mb-4">
         Divisions for the currently selected season. Create one (e.g. "Division A") before setting up fixtures.
+        Order here is a rank, not alphabetical — the top row is the highest division, used as the starting
+        point when Grouping auto-generates groups.
       </p>
 
       <div className="border rounded p-4 mb-4">
@@ -81,11 +100,36 @@ export default function DivisionsPage() {
 
       <table className="w-full text-sm border">
         <thead className="bg-gray-50">
-          <tr><th className="text-left p-2">Name</th><th className="p-2"></th></tr>
+          <tr>
+            <th className="p-2 w-16">Rank</th>
+            <th className="text-left p-2">Name</th>
+            <th className="p-2"></th>
+          </tr>
         </thead>
         <tbody>
-          {divisions.map((d) => (
+          {divisions.map((d, i) => (
             <tr key={d.id} className="border-t">
+              <td className="p-2 text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <button
+                    onClick={() => moveDivision(i, -1)}
+                    disabled={i === 0}
+                    title="Move up (higher rank)"
+                    className="text-gray-500 disabled:opacity-25 disabled:cursor-not-allowed"
+                  >
+                    ▲
+                  </button>
+                  <span className="text-xs text-gray-500">{i + 1}</span>
+                  <button
+                    onClick={() => moveDivision(i, 1)}
+                    disabled={i === divisions.length - 1}
+                    title="Move down (lower rank)"
+                    className="text-gray-500 disabled:opacity-25 disabled:cursor-not-allowed"
+                  >
+                    ▼
+                  </button>
+                </div>
+              </td>
               <td className="p-2">
                 {editingId === d.id ? (
                   <input
@@ -95,7 +139,10 @@ export default function DivisionsPage() {
                     autoFocus
                   />
                 ) : (
-                  d.name
+                  <>
+                    {d.name}
+                    {i === 0 && <span className="ml-2 text-xs text-teal-700">(highest)</span>}
+                  </>
                 )}
               </td>
               <td className="p-2 text-right whitespace-nowrap">

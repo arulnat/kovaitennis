@@ -37,7 +37,8 @@ export function SeasonProvider({ children }) {
 
   const loadDivisions = useCallback(async () => {
     if (!seasonId) { setDivisions([]); setDivisionId(null); return; }
-    const { data } = await supabase.from('divisions').select('*').eq('season_id', seasonId).order('name');
+    // order_index ranks divisions highest-first (Req 3.5.5) — NOT alphabetical.
+    const { data } = await supabase.from('divisions').select('*').eq('season_id', seasonId).order('order_index');
     setDivisions(data || []);
     setDivisionId((current) =>
       data?.some((d) => d.id === current) ? current : (data?.[0]?.id ?? null)

@@ -17,6 +17,7 @@ import {
   computeTeamStandings, computeIndividualStandings, highlightBands,
 } from '../standings.js';
 import { validateBulkUpload, generateLoginId } from '../bulkUpload.js';
+import { seededShuffle, planAutoGroup } from '../grouping.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -283,6 +284,79 @@ test('bulk upload: duplicate team name across blocks is caught', () => {
 
 test('generateLoginId: team name -> lowercase dash-separated slug', () => {
   assert.equal(generateLoginId('Chennai Tennis Club!'), 'chennai-tennis-club');
+});
+
+console.log('\n== grouping.js ==');
+
+test('seededShuffle: same seed always produces the same order', () => {
+  const items = ['a', 'b', 'c', 'd', 'e', 'f'];
+  assert.deepEqual(seededShuffle(items, 42), seededShuffle(items, 42));
+});
+
+test('seededShuffle: different seeds produce different orders, same elements', () => {
+  const items = ['a', 'b', 'c', 'd', 'e', 'f'];
+  const shuffled42 = seededShuffle(items, 42);
+  const shuffled7 = seededShuffle(items, 7);
+  assert.notDeepEqual(shuffled42, shuffled7);
+  assert.deepEqual([...shuffled42].sort(), [...items].sort());
+  assert.deepEqual([...shuffled7].sort(), [...items].sort());
+});
+
+test('planAutoGroup: fills the highest division\'s remaining capacity first, in order', () => {
+  const plan = planAutoGroup({
+    poolIds: ['t1', 't2', 't3', 't4', 't5', 't6', 't7'],
+    divisions: [{ id: 'divA', currentCount: 1 }, { id: 'divB', currentCount: 0 }], // divA is highest
+    groupSize: 4,
+    seed: 42,
+  });
+  assert.equal(plan.assignments.length, 2);
+  assert.equal(plan.assignments[0].divisionId, 'divA');
+  assert.equal(plan.assignments[0].teamIds.length, 3); // divA needed 3 more to reach 4
+  assert.equal(plan.assignments[1].divisionId, 'divB');
+  assert.equal(plan.assignments[1].teamIds.length, 4); // divB was empty, needed all 4
+  assert.equal(plan.newGroups.length, 0); // pool exactly fit existing divisions
+});
+
+test('planAutoGroup: a division already at or above group size is skipped', () => {
+  const plan = planAutoGroup({
+    poolIds: ['t1', 't2'],
+    divisions: [{ id: 'divA', currentCount: 4 }, { id: 'divB', currentCount: 0 }],
+    groupSize: 4,
+    seed: 1,
+  });
+  assert.equal(plan.assignments.length, 1);
+  assert.equal(plan.assignments[0].divisionId, 'divB');
+  assert.equal(plan.assignments[0].teamIds.length, 2);
+});
+
+test('planAutoGroup: overflow beyond existing divisions creates new groups, last one smaller', () => {
+  const poolIds = Array.from({ length: 10 }, (_, i) => `t${i + 1}`);
+  const plan = planAutoGroup({
+    poolIds,
+    divisions: [{ id: 'divA', currentCount: 2 }, { id: 'divB', currentCount: 4 }], // divB already full
+    groupSize: 4,
+    seed: 42,
+  });
+  assert.equal(plan.assignments.length, 1);
+  assert.equal(plan.assignments[0].divisionId, 'divA');
+  assert.equal(plan.assignments[0].teamIds.length, 2); // divA needed 2 more
+  assert.equal(plan.newGroups.length, 2); // 8 leftover teams -> two new groups of 4
+  assert.equal(plan.newGroups[0].length, 4);
+  assert.equal(plan.newGroups[1].length, 4);
+
+  // every pool id is accounted for exactly once
+  const allAssigned = [...plan.assignments.flatMap((a) => a.teamIds), ...plan.newGroups.flat()];
+  assert.deepEqual([...allAssigned].sort(), [...poolIds].sort());
+});
+
+test('planAutoGroup: no existing divisions -> everything becomes new groups, last one smaller', () => {
+  const poolIds = Array.from({ length: 7 }, (_, i) => `t${i + 1}`);
+  const plan = planAutoGroup({ poolIds, divisions: [], groupSize: 3, seed: 5 });
+  assert.equal(plan.assignments.length, 0);
+  assert.equal(plan.newGroups.length, 3);
+  assert.equal(plan.newGroups[0].length, 3);
+  assert.equal(plan.newGroups[1].length, 3);
+  assert.equal(plan.newGroups[2].length, 1); // the last group is smaller
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

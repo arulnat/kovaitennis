@@ -2,17 +2,23 @@
 //
 // Req 3.5.5 — one screen to take a season from "teams uploaded" to "ready
 // for fixtures": a board of the unassigned-teams pool plus one column per
-// division, manual move/remove per team, auto-grouping of whatever's left
-// unassigned (chunked by a chosen group size — the last group may be
-// smaller), and a jump into Fixture Generation once a tournament start
-// date is set. Every action writes straight to Supabase (no local-only
-// draft state) so the admin can leave and come back to exactly where they
-// left off.
+// division (divisions.order_index ranks them highest-first — see
+// DivisionsPage — NOT alphabetical), manual move/remove per team,
+// auto-grouping of whatever's left unassigned via a seeded random draw
+// (see grouping.js), and a jump into Fixture Generation once a tournament
+// start date is set. Every action writes straight to Supabase (no
+// local-only draft state) so the admin can leave and come back to exactly
+// where they left off.
 
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
+import { planAutoGroup } from '../../lib/grouping.js';
+
+function randomSeed() {
+  return Math.floor(Math.random() * 1_000_000_000);
+}
 
 export default function GroupingPage({ seasonId }) {
   const { divisions, refreshDivisions, activeSeason, refresh: refreshSeasons, setDivisionId } = useSeason();
@@ -21,6 +27,7 @@ export default function GroupingPage({ seasonId }) {
   const [teamSeasons, setTeamSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [groupSize, setGroupSize] = useState(4);
+  const [seed, setSeed] = useState(randomSeed);
   const [startDateDraft, setStartDateDraft] = useState('');
 
   const load = useCallback(async () => {
@@ -48,14 +55,36 @@ export default function GroupingPage({ seasonId }) {
     const size = Number(groupSize);
     if (!Number.isInteger(size) || size < 1) { alert('Enter a positive whole number for teams per group.'); return; }
 
+    const seedValue = Number(seed);
+    if (!Number.isFinite(seedValue)) { alert('Enter a numeric random seed.'); return; }
+
     const pool = teamSeasons.filter((ts) => !ts.division_id);
     if (pool.length === 0) { alert('No unassigned teams to group.'); return; }
 
-    const groupCount = Math.ceil(pool.length / size);
-    if (!confirm(`Create ${groupCount} new division(s) for ${pool.length} unassigned team(s), ${size} per group (last group may have fewer)?`)) return;
+    // divisions is already ordered highest-first (order_index) — fill it
+    // top-down before creating anything new (Req: "always start from
+    // higher division to allocate").
+    const divisionsWithCounts = divisions.map((d) => ({
+      id: d.id,
+      currentCount: teamSeasons.filter((ts) => ts.division_id === d.id).length,
+    }));
 
-    const chunks = [];
-    for (let i = 0; i < pool.length; i += size) chunks.push(pool.slice(i, i + size));
+    const plan = planAutoGroup({
+      poolIds: pool.map((ts) => ts.id),
+      divisions: divisionsWithCounts,
+      groupSize: size,
+      seed: seedValue,
+    });
+
+    if (!confirm(
+      `Randomly draw ${pool.length} unassigned team(s) into groups of ${size} (seed ${seedValue}), filling the ` +
+      `highest division down first${plan.newGroups.length > 0 ? `, creating ${plan.newGroups.length} new division(s) for the rest` : ''}?`
+    )) return;
+
+    for (const { divisionId, teamIds } of plan.assignments) {
+      const { error } = await supabase.from('team_seasons').update({ division_id: divisionId }).in('id', teamIds);
+      if (error) { alert(error.message); return; }
+    }
 
     const existingNames = new Set(divisions.map((d) => d.name));
     let letterIndex = 0;
@@ -70,23 +99,28 @@ export default function GroupingPage({ seasonId }) {
       existingNames.add(name);
       return name;
     };
+    // New divisions rank below every existing one — they're only created
+    // once all existing divisions (highest down) are already full.
+    let nextOrderIndex = divisions.length > 0 ? Math.max(...divisions.map((d) => d.order_index)) + 1 : 0;
 
-    for (const chunk of chunks) {
+    for (const chunk of plan.newGroups) {
       const { data: newDivision, error: divErr } = await supabase
         .from('divisions')
-        .insert({ season_id: seasonId, name: nextName() })
+        .insert({ season_id: seasonId, name: nextName(), order_index: nextOrderIndex })
         .select()
         .single();
       if (divErr) { alert(divErr.message); return; }
+      nextOrderIndex++;
 
       const { error: assignErr } = await supabase
         .from('team_seasons')
         .update({ division_id: newDivision.id })
-        .in('id', chunk.map((ts) => ts.id));
+        .in('id', chunk);
       if (assignErr) { alert(assignErr.message); return; }
     }
 
     await Promise.all([load(), refreshDivisions()]);
+    setSeed(randomSeed()); // fresh seed ready for the next draw
   }
 
   async function saveStartDate() {
@@ -117,17 +151,37 @@ export default function GroupingPage({ seasonId }) {
       <div className="border rounded p-4 mb-6 bg-gray-50">
         <h2 className="font-medium mb-2">Auto-generate groups</h2>
         <p className="text-sm text-gray-600 mb-2">
-          Splits the {unassigned.length} unassigned team(s) into new divisions of this size (the last group may
-          have fewer):
+          Randomly draws the {unassigned.length} unassigned team(s) into groups of this size, filling the
+          highest division's remaining spots first and working down, before creating any new (lower-ranked)
+          division for what's left — the last group may have fewer.
         </p>
-        <div className="flex gap-2 items-center">
-          <input
-            type="number"
-            min="1"
-            value={groupSize}
-            onChange={(e) => setGroupSize(e.target.value)}
-            className="border rounded px-2 py-1 text-sm w-24"
-          />
+        <div className="flex gap-2 items-center flex-wrap">
+          <label className="text-xs text-gray-600">
+            Teams per group
+            <input
+              type="number"
+              min="1"
+              value={groupSize}
+              onChange={(e) => setGroupSize(e.target.value)}
+              className="border rounded px-2 py-1 text-sm w-20 ml-1"
+            />
+          </label>
+          <label className="text-xs text-gray-600">
+            Random seed
+            <input
+              type="number"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value)}
+              className="border rounded px-2 py-1 text-sm w-32 ml-1"
+            />
+          </label>
+          <button
+            onClick={() => setSeed(randomSeed())}
+            title="Pick a new random seed"
+            className="text-xs text-teal-700 underline"
+          >
+            New seed
+          </button>
           <button
             onClick={autoGenerate}
             disabled={unassigned.length === 0}
