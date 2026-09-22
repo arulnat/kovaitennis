@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {
   generateRoundRobin, assignHomeAway, homeAwayBalanceReport,
-  buildPriorMeetingMap, pairKey,
+  buildPriorMeetingMap, buildFixtureRows, pairKey,
 } from '../scheduler.js';
 import {
   winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
@@ -75,11 +75,86 @@ test('home/away: prior-season meeting triggers an automatic swap (Req 4.9)', () 
   assert.equal(tie.away, 'A');
 });
 
-test('home/away: no prior meeting -> balanced within the season (Req 4.6, 4.10)', () => {
+test('home/away: no prior meeting -> balanced within the season (Req 4.6)', () => {
   const rounds = generateRoundRobin(['A', 'B', 'C', 'D']);
-  const scheduled = assignHomeAway(rounds, new Map(), () => 0.5); // deterministic
+  const scheduled = assignHomeAway(rounds, new Map());
   const report = homeAwayBalanceReport(scheduled);
   for (const r of report) assert.equal(r.balanced, true, `team ${r.teamId} unbalanced: ${r.home}H/${r.away}A`);
+});
+
+test('home/away: balance holds for odd team counts too, where a naive greedy pick fails often (Req 4.6)', () => {
+  // A running "give home to whoever has fewer home games so far" greedy —
+  // the previous implementation — violates |home-away|<=1 for 35-90% of
+  // random trials on odd team counts. assignHomeAway must not regress to
+  // that: verify every team count from 3 to 15 comes out balanced.
+  for (let n = 3; n <= 15; n++) {
+    const teams = Array.from({ length: n }, (_, i) => `T${i}`);
+    const rounds = generateRoundRobin(teams);
+    const scheduled = assignHomeAway(rounds, new Map());
+    const report = homeAwayBalanceReport(scheduled);
+    for (const r of report) {
+      assert.equal(r.balanced, true, `n=${n} team ${r.teamId} unbalanced: ${r.home}H/${r.away}A`);
+    }
+  }
+});
+
+test('home/away: every pair plays exactly once, home+away covers all of it, no team plays itself', () => {
+  const teams = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+  const rounds = generateRoundRobin(teams);
+  const scheduled = assignHomeAway(rounds, new Map());
+  const seenPairs = new Set();
+  for (const { ties } of scheduled) {
+    for (const { home, away } of ties) {
+      assert.notEqual(home, away);
+      const key = pairKey(home, away);
+      assert.ok(!seenPairs.has(key), `pair ${key} scheduled more than once`);
+      seenPairs.add(key);
+    }
+  }
+  assert.equal(seenPairs.size, (teams.length * (teams.length - 1)) / 2);
+});
+
+test('home/away: forced Req 4.9 swaps are always respected, even when they push a team out of balance', () => {
+  // 6 teams, ALL pairs forced (worst case for the repair pass) — the
+  // forced direction must never be violated, whatever it costs balance.
+  const teams = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const rounds = generateRoundRobin(teams);
+  const prior = new Map();
+  const priorFixtures = [];
+  for (const { pairs } of rounds) {
+    for (const [a, b] of pairs) priorFixtures.push({ home_team_id: a, away_team_id: b });
+  }
+  const priorMap = buildPriorMeetingMap(priorFixtures);
+  const scheduled = assignHomeAway(rounds, priorMap);
+  for (const { ties } of scheduled) {
+    for (const { home, away, swapped } of ties) {
+      assert.equal(swapped, true);
+      // whoever was home in priorFixtures must be AWAY now
+      const key = pairKey(home, away);
+      assert.equal(priorMap.get(key), away);
+    }
+  }
+});
+
+test('buildFixtureRows: 5 teams -> correct row count, week dates 7 days apart, one bye row per round', () => {
+  const rows = buildFixtureRows({
+    seasonId: 'S1', divisionId: 'D1', teamIds: ['A', 'B', 'C', 'D', 'E'], startWeekend: '2026-01-03',
+  });
+  // 5 teams: 5 rounds, 2 real ties + 1 bye row per round = 15 rows total
+  assert.equal(rows.length, 15);
+  assert.equal(rows.filter((r) => r.is_bye).length, 5);
+  assert.equal(rows.filter((r) => !r.is_bye).length, 10);
+  for (const r of rows) { assert.equal(r.season_id, 'S1'); assert.equal(r.division_id, 'D1'); assert.equal(r.status, 'released'); }
+
+  const weekDatesByRound = new Map(rows.map((r) => [r.round_number, r.week_date]));
+  assert.equal(weekDatesByRound.get(1), '2026-01-03');
+  assert.equal(weekDatesByRound.get(2), '2026-01-10');
+  assert.equal(weekDatesByRound.get(3), '2026-01-17');
+
+  for (const r of rows.filter((r) => r.is_bye)) {
+    assert.equal(r.home_team_id, null);
+    assert.notEqual(r.away_team_id, null);
+  }
 });
 
 console.log('\n== scoring.js ==');

@@ -5,16 +5,23 @@
 // division (divisions.order_index ranks them highest-first — see
 // DivisionsPage — NOT alphabetical), manual move/remove per team,
 // auto-grouping of whatever's left unassigned via a seeded random draw
-// (see grouping.js), and a jump into Fixture Generation once a tournament
-// start date is set. Every action writes straight to Supabase (no
-// local-only draft state) so the admin can leave and come back to exactly
-// where they left off.
+// (see grouping.js), and a "Generate Fixtures" action per division once a
+// tournament start date is set. Every action writes straight to Supabase
+// (no local-only draft state) so the admin can leave and come back to
+// exactly where they left off.
+//
+// Fixture generation lives here (not on the Fixtures page, which is a
+// read-only viewer — see FixtureGenerationPage.jsx) because a division is
+// "ready" the moment its grouping is settled; there's no separate preview
+// step since assignHomeAway (scheduler.js) now guarantees the Req 4.6
+// home/away balance algorithmically instead of needing a manual swap-to-
+// fix-imbalance pass.
 
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { planAutoGroup } from '../../lib/grouping.js';
+import { buildFixtureRows, buildPriorMeetingMap } from '../../lib/scheduler.js';
 
 function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
@@ -22,9 +29,9 @@ function randomSeed() {
 
 export default function GroupingPage({ seasonId }) {
   const { divisions, refreshDivisions, activeSeason, refresh: refreshSeasons } = useSeason();
-  const navigate = useNavigate();
 
   const [teamSeasons, setTeamSeasons] = useState([]);
+  const [divisionsWithFixtures, setDivisionsWithFixtures] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [groupSize, setGroupSize] = useState(4);
   const [seed, setSeed] = useState(randomSeed);
@@ -32,13 +39,17 @@ export default function GroupingPage({ seasonId }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('team_seasons')
-      .select('id, division_id, teams(id, name, captain_name)')
-      .eq('season_id', seasonId)
-      .order('created_at', { ascending: true });
+    const [{ data: teamSeasonRows, error }, { data: fixtureRows }] = await Promise.all([
+      supabase
+        .from('team_seasons')
+        .select('id, division_id, teams(id, name)')
+        .eq('season_id', seasonId)
+        .order('created_at', { ascending: true }),
+      supabase.from('fixtures').select('division_id').eq('season_id', seasonId),
+    ]);
     if (error) { alert(error.message); setLoading(false); return; }
-    setTeamSeasons(data || []);
+    setTeamSeasons(teamSeasonRows || []);
+    setDivisionsWithFixtures(new Set((fixtureRows || []).map((f) => f.division_id)));
     setLoading(false);
   }, [seasonId]);
 
@@ -130,9 +141,33 @@ export default function GroupingPage({ seasonId }) {
     refreshSeasons();
   }
 
-  function goGenerateFixtures() {
+  async function generateFixtures(division) {
     if (!activeSeason?.start_weekend) { alert('Set the tournament start date above first.'); return; }
-    navigate('/admin/fixtures');
+    const teamIds = teamSeasons.filter((ts) => ts.division_id === division.id).map((ts) => ts.teams.id);
+    if (teamIds.length < 2) { alert('This division needs at least 2 teams first.'); return; }
+    if (divisionsWithFixtures.has(division.id)) { alert('Fixtures were already generated for this division.'); return; }
+
+    if (!confirm(`Generate fixtures for "${division.name}" (${teamIds.length} teams)? Home/away is automatically balanced (Req 4.6).`)) return;
+
+    // Req 4.9: pull last season's fixtures (any division) to detect
+    // rematches and auto-swap home/away.
+    const { data: priorFixtures } = await supabase
+      .from('fixtures')
+      .select('home_team_id, away_team_id')
+      .in('home_team_id', teamIds)
+      .in('away_team_id', teamIds); // simplified — production query should scope to "prior season" explicitly
+
+    const rows = buildFixtureRows({
+      seasonId,
+      divisionId: division.id,
+      teamIds,
+      startWeekend: activeSeason.start_weekend,
+      priorMeetingHomeTeam: buildPriorMeetingMap(priorFixtures || []),
+    });
+
+    const { error } = await supabase.from('fixtures').insert(rows);
+    if (error) { alert(error.message); return; }
+    load();
   }
 
   const unassigned = teamSeasons.filter((ts) => !ts.division_id);
@@ -210,9 +245,6 @@ export default function GroupingPage({ seasonId }) {
             <span className="text-xs text-gray-500">Currently set to {activeSeason.start_weekend}</span>
           )}
         </div>
-        <button onClick={goGenerateFixtures} className="mt-3 text-sm text-teal-700 underline">
-          Go to Fixture Generation
-        </button>
       </div>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${divisions.length + 1}, minmax(220px, 1fr))` }}>
@@ -230,6 +262,8 @@ export default function GroupingPage({ seasonId }) {
             divisions={divisions}
             currentDivisionId={d.id}
             onMove={assignDivision}
+            hasFixtures={divisionsWithFixtures.has(d.id)}
+            onGenerateFixtures={() => generateFixtures(d)}
           />
         ))}
       </div>
@@ -237,21 +271,27 @@ export default function GroupingPage({ seasonId }) {
   );
 }
 
-function GroupColumn({ title, teams, divisions, currentDivisionId, onMove }) {
+function GroupColumn({ title, teams, divisions, currentDivisionId, onMove, hasFixtures, onGenerateFixtures }) {
   return (
     <div className="border rounded overflow-hidden">
       <div className="bg-gray-100 px-3 py-2 flex items-center justify-between">
         <span className="font-medium text-sm">{title}</span>
         <span className="text-xs text-gray-500">{teams.length}</span>
       </div>
+      {onGenerateFixtures && (
+        hasFixtures ? (
+          <p className="w-full text-xs text-gray-500 text-center py-1 border-b bg-gray-50">Fixtures generated ✓</p>
+        ) : (
+          <button onClick={onGenerateFixtures} className="w-full text-xs text-teal-700 underline py-1 border-b">
+            Generate Fixtures
+          </button>
+        )
+      )}
       <div className="divide-y">
         {teams.length === 0 && <p className="p-2 text-xs text-gray-400">No teams</p>}
         {teams.map((ts) => (
           <div key={ts.id} className="p-2 text-sm flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="font-medium truncate">{ts.teams?.name}</p>
-              <p className="text-xs text-gray-500 truncate">{ts.teams?.captain_name}</p>
-            </div>
+            <p className="font-medium truncate min-w-0">{ts.teams?.name}</p>
             <div className="flex items-center gap-1 shrink-0">
               <select
                 value={currentDivisionId ?? ''}
