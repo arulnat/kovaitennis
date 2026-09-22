@@ -6,6 +6,7 @@ import { SeasonProvider, useSeason, SeasonSelector } from './lib/seasonContext.j
 import BulkUploadPage from './pages/admin/BulkUploadPage.jsx';
 import TeamsPage from './pages/admin/TeamsPage.jsx';
 import DivisionsPage from './pages/admin/DivisionsPage.jsx';
+import GroupingPage from './pages/admin/GroupingPage.jsx';
 import FixtureGenerationPage from './pages/admin/FixtureGenerationPage.jsx';
 import MissingScoresReportPage from './pages/admin/MissingScoresReportPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
             <Route path="/admin/teams" element={<RequireRole roles={['tournament_admin', 'super_admin']}><TeamsRouteWrapper /></RequireRole>} />
             <Route path="/admin/divisions" element={<RequireRole roles={['tournament_admin', 'super_admin']}><DivisionsPage /></RequireRole>} />
+            <Route path="/admin/grouping" element={<RequireRole roles={['tournament_admin', 'super_admin']}><GroupingRouteWrapper /></RequireRole>} />
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
             <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
@@ -55,6 +57,7 @@ function Nav() {
           <Link to="/admin/bulk-upload">Bulk Upload</Link>
           <Link to="/admin/teams">Teams</Link>
           <Link to="/admin/divisions">Divisions</Link>
+          <Link to="/admin/grouping">Grouping</Link>
           <Link to="/admin/fixtures">Fixtures</Link>
           <Link to="/admin/missing-scores">Missing Scores</Link>
           <Link to="/admin/content">Content</Link>
@@ -113,6 +116,14 @@ function TeamsRouteWrapper() {
   return (
     <NeedsSeason>
       <TeamsPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
+}
+function GroupingRouteWrapper() {
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <GroupingPage seasonId={seasonId} />
     </NeedsSeason>
   );
 }
