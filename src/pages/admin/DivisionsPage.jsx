@@ -8,15 +8,29 @@
 // Order is a deliberate rank, not alphabetical (Req 3.5.5): the first
 // division in the list is the "highest" division, both for display and
 // as the starting point when Grouping auto-generates groups.
+//
+// Ordering can be locked (seasons.divisions_locked) once finalized, so the
+// move up/down controls can't accidentally reshuffle ranks fixtures may
+// already depend on. Default is unlocked, and a season with zero
+// divisions is always treated as unlocked — there's nothing to protect.
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 
 export default function DivisionsPage() {
-  const { seasonId, divisions, refresh } = useSeason();
+  const { seasonId, divisions, activeSeason, refresh } = useSeason();
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
+
+  const locked = divisions.length > 0 && !!activeSeason?.divisions_locked;
+
+  async function toggleLock() {
+    if (divisions.length === 0) return;
+    const { error } = await supabase.from('seasons').update({ divisions_locked: !locked }).eq('id', seasonId);
+    if (error) { alert(error.message); return; }
+    refresh();
+  }
 
   async function createDivision() {
     if (!name.trim()) return;
@@ -30,6 +44,7 @@ export default function DivisionsPage() {
   }
 
   async function moveDivision(index, direction) {
+    if (locked) { alert('Division order is locked. Unlock it first to reorder.'); return; }
     const other = index + direction;
     if (other < 0 || other >= divisions.length) return;
     const a = divisions[index];
@@ -96,6 +111,20 @@ export default function DivisionsPage() {
           />
         </div>
         <button onClick={createDivision} className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm">Create</button>
+      </div>
+
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`text-xs font-medium px-2 py-1 rounded ${locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+          {locked ? 'Locked' : 'Unlocked'}
+        </span>
+        <button
+          onClick={toggleLock}
+          disabled={divisions.length === 0}
+          title={divisions.length === 0 ? 'Add a division first' : undefined}
+          className="text-xs text-teal-700 underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+        >
+          {locked ? 'Unlock ordering' : 'Lock ordering'}
+        </button>
       </div>
 
       <table className="w-full text-sm border">
