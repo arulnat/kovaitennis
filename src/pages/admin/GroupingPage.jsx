@@ -2,13 +2,13 @@
 //
 // Req 3.5.5 — one screen to take a season from "teams uploaded" to "ready
 // for fixtures": a board of the unassigned-teams pool plus one column per
-// division (divisions.order_index ranks them highest-first — see
-// DivisionsPage — NOT alphabetical), manual move/remove per team,
-// auto-grouping of whatever's left unassigned via a seeded random draw
-// (see grouping.js), and a "Generate Fixtures" action per division once a
-// tournament start date is set. Every action writes straight to Supabase
-// (no local-only draft state) so the admin can leave and come back to
-// exactly where they left off.
+// division (divisions.order_index ranks divisions themselves highest-first
+// — see DivisionsPage — NOT alphabetical), manual move/remove/rank per
+// team, auto-grouping of whatever's left unassigned via a seeded random
+// draw (see grouping.js), and a "Generate Fixtures" action per division
+// once a tournament start date is set. Every action writes straight to
+// Supabase (no local-only draft state) so the admin can leave and come
+// back to exactly where they left off.
 //
 // Fixture generation lives here (not on the Fixtures page, which is a
 // read-only viewer — see FixtureGenerationPage.jsx) because a division is
@@ -16,6 +16,14 @@
 // step since assignHomeAway (scheduler.js) now guarantees the Req 4.6
 // home/away balance algorithmically instead of needing a manual swap-to-
 // fix-imbalance pass.
+//
+// Each division also has its own grouping_locked flag: once locked, its
+// roster (which teams belong to it) and each team's order_index (rank
+// within the division, e.g. for seeding) are frozen, and Generate
+// Fixtures refuses to run — the intended flow is arrange teams, set
+// ranking, generate fixtures, THEN lock to protect it all from further
+// changes. Locking is always a manual toggle (never an automatic side
+// effect of generating), consistent with every other lock in this app.
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
@@ -42,9 +50,9 @@ export default function GroupingPage({ seasonId }) {
     const [{ data: teamSeasonRows, error }, { data: fixtureRows }] = await Promise.all([
       supabase
         .from('team_seasons')
-        .select('id, division_id, teams(id, name)')
+        .select('id, division_id, order_index, teams(id, name)')
         .eq('season_id', seasonId)
-        .order('created_at', { ascending: true }),
+        .order('order_index', { ascending: true }),
       supabase.from('fixtures').select('division_id').eq('season_id', seasonId),
     ]);
     if (error) { alert(error.message); setLoading(false); return; }
@@ -56,10 +64,59 @@ export default function GroupingPage({ seasonId }) {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setStartDateDraft(activeSeason?.start_weekend || ''); }, [activeSeason?.start_weekend]);
 
-  async function assignDivision(teamSeasonId, divisionId) {
-    const { error } = await supabase.from('team_seasons').update({ division_id: divisionId || null }).eq('id', teamSeasonId);
+  const findDivision = (id) => divisions.find((d) => d.id === id) ?? null;
+
+  async function assignDivision(teamSeasonId, newDivisionId) {
+    const ts = teamSeasons.find((t) => t.id === teamSeasonId);
+    const currentDivision = ts?.division_id ? findDivision(ts.division_id) : null;
+    if (currentDivision?.grouping_locked) {
+      alert(`"${currentDivision.name}" is locked. Unlock it first to move teams out of it.`);
+      return;
+    }
+
+    const targetDivisionId = newDivisionId || null;
+    const targetDivision = targetDivisionId ? findDivision(targetDivisionId) : null;
+    if (targetDivision?.grouping_locked) {
+      alert(`"${targetDivision.name}" is locked. Unlock it first to move teams into it.`);
+      return;
+    }
+
+    // append at the end of the destination's current ranking
+    const nextOrder = targetDivisionId ? teamSeasons.filter((t) => t.division_id === targetDivisionId).length : 0;
+    const { error } = await supabase
+      .from('team_seasons')
+      .update({ division_id: targetDivisionId, order_index: nextOrder })
+      .eq('id', teamSeasonId);
     if (error) { alert(error.message); return; }
     load();
+  }
+
+  async function moveTeamRank(teamSeasonId, direction) {
+    const ts = teamSeasons.find((t) => t.id === teamSeasonId);
+    if (!ts?.division_id) return;
+    const division = findDivision(ts.division_id);
+    if (division?.grouping_locked) {
+      alert(`"${division.name}" is locked. Unlock it first to change team ranking.`);
+      return;
+    }
+
+    const siblings = teamSeasons.filter((t) => t.division_id === ts.division_id).sort((a, b) => a.order_index - b.order_index);
+    const index = siblings.findIndex((t) => t.id === teamSeasonId);
+    const otherIndex = index + direction;
+    if (otherIndex < 0 || otherIndex >= siblings.length) return;
+
+    const a = siblings[index], b = siblings[otherIndex];
+    const { error } = await supabase.from('team_seasons').update({ order_index: b.order_index }).eq('id', a.id);
+    if (error) { alert(error.message); return; }
+    const { error: error2 } = await supabase.from('team_seasons').update({ order_index: a.order_index }).eq('id', b.id);
+    if (error2) { alert(error2.message); return; }
+    load();
+  }
+
+  async function toggleGroupingLock(division) {
+    const { error } = await supabase.from('divisions').update({ grouping_locked: !division.grouping_locked }).eq('id', division.id);
+    if (error) { alert(error.message); return; }
+    refreshDivisions();
   }
 
   async function autoGenerate() {
@@ -74,11 +131,14 @@ export default function GroupingPage({ seasonId }) {
 
     // divisions is already ordered highest-first (order_index) — fill it
     // top-down before creating anything new (Req: "always start from
-    // higher division to allocate").
-    const divisionsWithCounts = divisions.map((d) => ({
-      id: d.id,
-      currentCount: teamSeasons.filter((ts) => ts.division_id === d.id).length,
-    }));
+    // higher division to allocate"). Locked divisions are frozen, so
+    // they're excluded entirely rather than topped up.
+    const divisionsWithCounts = divisions
+      .filter((d) => !d.grouping_locked)
+      .map((d) => ({
+        id: d.id,
+        currentCount: teamSeasons.filter((ts) => ts.division_id === d.id).length,
+      }));
 
     const plan = planAutoGroup({
       poolIds: pool.map((ts) => ts.id),
@@ -89,12 +149,19 @@ export default function GroupingPage({ seasonId }) {
 
     if (!confirm(
       `Randomly draw ${pool.length} unassigned team(s) into groups of ${size} (seed ${seedValue}), filling the ` +
-      `highest division down first${plan.newGroups.length > 0 ? `, creating ${plan.newGroups.length} new division(s) for the rest` : ''}?`
+      `highest unlocked division down first${plan.newGroups.length > 0 ? `, creating ${plan.newGroups.length} new division(s) for the rest` : ''}?`
     )) return;
 
     for (const { divisionId, teamIds } of plan.assignments) {
-      const { error } = await supabase.from('team_seasons').update({ division_id: divisionId }).in('id', teamIds);
-      if (error) { alert(error.message); return; }
+      // append each drawn team after whatever's already ranked in that division
+      const baseOrder = teamSeasons.filter((ts) => ts.division_id === divisionId).length;
+      for (let i = 0; i < teamIds.length; i++) {
+        const { error } = await supabase
+          .from('team_seasons')
+          .update({ division_id: divisionId, order_index: baseOrder + i })
+          .eq('id', teamIds[i]);
+        if (error) { alert(error.message); return; }
+      }
     }
 
     const existingNames = new Set(divisions.map((d) => d.name));
@@ -111,7 +178,7 @@ export default function GroupingPage({ seasonId }) {
       return name;
     };
     // New divisions rank below every existing one — they're only created
-    // once all existing divisions (highest down) are already full.
+    // once all existing (unlocked) divisions are already full.
     let nextOrderIndex = divisions.length > 0 ? Math.max(...divisions.map((d) => d.order_index)) + 1 : 0;
 
     for (const chunk of plan.newGroups) {
@@ -123,11 +190,13 @@ export default function GroupingPage({ seasonId }) {
       if (divErr) { alert(divErr.message); return; }
       nextOrderIndex++;
 
-      const { error: assignErr } = await supabase
-        .from('team_seasons')
-        .update({ division_id: newDivision.id })
-        .in('id', chunk);
-      if (assignErr) { alert(assignErr.message); return; }
+      for (let i = 0; i < chunk.length; i++) {
+        const { error: assignErr } = await supabase
+          .from('team_seasons')
+          .update({ division_id: newDivision.id, order_index: i })
+          .eq('id', chunk[i]);
+        if (assignErr) { alert(assignErr.message); return; }
+      }
     }
 
     await Promise.all([load(), refreshDivisions()]);
@@ -142,8 +211,12 @@ export default function GroupingPage({ seasonId }) {
   }
 
   async function generateFixtures(division) {
+    if (division.grouping_locked) { alert(`"${division.name}" is locked. Unlock it first to generate fixtures.`); return; }
     if (!activeSeason?.start_weekend) { alert('Set the tournament start date above first.'); return; }
-    const teamIds = teamSeasons.filter((ts) => ts.division_id === division.id).map((ts) => ts.teams.id);
+    const teamIds = teamSeasons
+      .filter((ts) => ts.division_id === division.id)
+      .sort((a, b) => a.order_index - b.order_index)
+      .map((ts) => ts.teams.id);
     if (teamIds.length < 2) { alert('This division needs at least 2 teams first.'); return; }
     if (divisionsWithFixtures.has(division.id)) { alert('Fixtures were already generated for this division.'); return; }
 
@@ -178,16 +251,16 @@ export default function GroupingPage({ seasonId }) {
     <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-xl font-semibold mb-1">Grouping</h1>
       <p className="text-sm text-gray-600 mb-4">
-        Move teams into divisions — manually, or auto-generate groups for whatever's left unassigned. Every
-        change saves immediately, so you can come back and pick up where you left off.
+        Move teams into divisions and rank them within it — manually, or auto-generate groups for whatever's
+        left unassigned. Every change saves immediately, so you can come back and pick up where you left off.
       </p>
 
       <div className="border rounded p-4 mb-6 bg-gray-50">
         <h2 className="font-medium mb-2">Auto-generate groups</h2>
         <p className="text-sm text-gray-600 mb-2">
           Randomly draws the {unassigned.length} unassigned team(s) into groups of this size, filling the
-          highest division's remaining spots first and working down, before creating any new (lower-ranked)
-          division for what's left — the last group may have fewer.
+          highest unlocked division's remaining spots first and working down, before creating any new
+          (lower-ranked) division for what's left — the last group may have fewer.
         </p>
         <div className="flex gap-2 items-center flex-wrap">
           <label className="text-xs text-gray-600">
@@ -258,10 +331,13 @@ export default function GroupingPage({ seasonId }) {
           <GroupColumn
             key={d.id}
             title={d.name}
-            teams={teamSeasons.filter((ts) => ts.division_id === d.id)}
+            teams={teamSeasons.filter((ts) => ts.division_id === d.id).sort((a, b) => a.order_index - b.order_index)}
             divisions={divisions}
             currentDivisionId={d.id}
             onMove={assignDivision}
+            onMoveRank={moveTeamRank}
+            locked={d.grouping_locked}
+            onToggleLock={() => toggleGroupingLock(d)}
             hasFixtures={divisionsWithFixtures.has(d.id)}
             onGenerateFixtures={() => generateFixtures(d)}
           />
@@ -271,27 +347,70 @@ export default function GroupingPage({ seasonId }) {
   );
 }
 
-function GroupColumn({ title, teams, divisions, currentDivisionId, onMove, hasFixtures, onGenerateFixtures }) {
+function GroupColumn({
+  title, teams, divisions, currentDivisionId, onMove, onMoveRank,
+  locked, onToggleLock, hasFixtures, onGenerateFixtures,
+}) {
+  const isDivision = currentDivisionId != null;
+
   return (
     <div className="border rounded overflow-hidden">
       <div className="bg-gray-100 px-3 py-2 flex items-center justify-between">
         <span className="font-medium text-sm">{title}</span>
         <span className="text-xs text-gray-500">{teams.length}</span>
       </div>
+
+      {isDivision && (
+        <div className="flex items-center justify-between gap-2 px-2 py-1 border-b bg-gray-50">
+          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+            {locked ? 'Locked' : 'Unlocked'}
+          </span>
+          <button onClick={onToggleLock} className="text-xs text-teal-700 underline">
+            {locked ? 'Unlock' : 'Lock'}
+          </button>
+        </div>
+      )}
+
       {onGenerateFixtures && (
         hasFixtures ? (
           <p className="w-full text-xs text-gray-500 text-center py-1 border-b bg-gray-50">Fixtures generated ✓</p>
         ) : (
-          <button onClick={onGenerateFixtures} className="w-full text-xs text-teal-700 underline py-1 border-b">
+          <button
+            onClick={onGenerateFixtures}
+            disabled={locked}
+            title={locked ? 'Unlock this division first' : undefined}
+            className="w-full text-xs text-teal-700 underline py-1 border-b disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+          >
             Generate Fixtures
           </button>
         )
       )}
+
       <div className="divide-y">
         {teams.length === 0 && <p className="p-2 text-xs text-gray-400">No teams</p>}
-        {teams.map((ts) => (
-          <div key={ts.id} className="p-2 text-sm flex items-center justify-between gap-2">
-            <p className="font-medium truncate min-w-0">{ts.teams?.name}</p>
+        {teams.map((ts, i) => (
+          <div key={ts.id} className="p-2 text-sm flex items-center gap-2">
+            {isDivision && (
+              <div className="flex flex-col leading-none shrink-0">
+                <button
+                  onClick={() => onMoveRank(ts.id, -1)}
+                  disabled={i === 0}
+                  title="Move up (higher rank)"
+                  className="text-[10px] text-gray-500 disabled:opacity-25 disabled:cursor-not-allowed"
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => onMoveRank(ts.id, 1)}
+                  disabled={i === teams.length - 1}
+                  title="Move down (lower rank)"
+                  className="text-[10px] text-gray-500 disabled:opacity-25 disabled:cursor-not-allowed"
+                >
+                  ▼
+                </button>
+              </div>
+            )}
+            <p className="font-medium truncate min-w-0 flex-1">{ts.teams?.name}</p>
             <div className="flex items-center gap-1 shrink-0">
               <select
                 value={currentDivisionId ?? ''}
