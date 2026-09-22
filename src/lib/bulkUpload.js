@@ -20,6 +20,8 @@
 // downloadSampleTemplate only) so validation logic can be unit-tested with
 // plain Node, without requiring the `xlsx` package to be installed.
 
+import { downloadCsv } from './csv.js';
+
 const PHONE_RE = /^[0-9+\-\s()]{7,15}$/;
 
 /** Parse a workbook (ArrayBuffer) into raw rows of cell values (no header row in this format). Requires `xlsx` (npm install xlsx). */
@@ -118,23 +120,6 @@ export function sampleTemplateRows() {
     ['Smashers', 'Anita Menon', '9123456780', 4],
     ['Rahul Verma', 'Sneha Pillai', 'Vikram Singh', 'Lakshmi Narayan'],
   ];
-}
-
-/** Builds a CSV from rows (array of arrays) and triggers a browser download. Requires `xlsx`. */
-async function downloadCsv(rows, filename) {
-  const XLSX = await import('xlsx');
-  const sheet = XLSX.utils.aoa_to_sheet(rows);
-  const csv = XLSX.utils.sheet_to_csv(sheet);
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 /** Downloads sampleTemplateRows() as team-upload-template.csv. */

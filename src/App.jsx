@@ -15,6 +15,7 @@ import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
 import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
+import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
 
             {/* Public (Req 10.5 — no login required) */}
             <Route path="/standings" element={<StandingsRouteWrapper />} />
+            <Route path="/fixtures-calendar" element={<FixturesCalendarRouteWrapper />} />
 
             {/* Score entry — either captain, or an admin doing it on their behalf (Req 5.2) */}
             <Route path="/score/:fixtureId" element={<RequireRole roles={['team', 'tournament_admin', 'super_admin']}><ScoreEntryRouteWrapper /></RequireRole>} />
@@ -56,6 +58,7 @@ function Nav() {
   return (
     <nav className="border-b p-3 flex flex-wrap gap-4 text-sm items-center">
       <Link to="/standings" className="font-semibold">Tennis League</Link>
+      <Link to="/fixtures-calendar">Fixtures Calendar</Link>
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <Link to="/admin/bulk-upload">Bulk Upload</Link>
@@ -103,6 +106,14 @@ function StandingsRouteWrapper() {
     <NeedsDivision>
       <StandingsPage seasonId={seasonId} divisionId={divisionId} />
     </NeedsDivision>
+  );
+}
+function FixturesCalendarRouteWrapper() {
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <FixturesCalendarPage seasonId={seasonId} />
+    </NeedsSeason>
   );
 }
 function ScoreEntryRouteWrapper() {
