@@ -206,39 +206,41 @@ test('highlightBands: top 2 and bottom 2 flagged correctly in a group of 6', () 
 
 console.log('\n== bulkUpload.js ==');
 
-test('bulk upload: valid single team block parses into a team with roster', () => {
+test('bulk upload: captain is added to the roster, so player_count of 3 meets the 4-player minimum (Req 1.5)', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 4],
-    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
+    ['Aces', 'Ravi', '9876543210', 3],
+    ['Sunil', 'Meena', 'Kumar'], // 3 OTHER players, not counting captain Ravi
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
   assert.equal(result.teams.length, 1);
   assert.equal(result.teams[0].teamName, 'Aces');
-  assert.equal(result.teams[0].players.length, 4);
-  assert.deepEqual(result.teams[0].players[0], { name: 'Ravi', gender: null });
+  assert.equal(result.teams[0].players.length, 4); // 3 + captain
+  assert.deepEqual(result.teams[0].players[0], { name: 'Ravi', gender: null }); // captain listed first
+  assert.deepEqual(result.teams[0].players.slice(1).map((p) => p.name), ['Sunil', 'Meena', 'Kumar']);
 });
 
 test('bulk upload: multiple team blocks in one file all parse', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 4],
-    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
-    ['Smashers', 'Anita', '9123456780', 5],
-    ['Anita', 'Rahul', 'Sneha', 'Vikram', 'Lakshmi'],
+    ['Aces', 'Ravi', '9876543210', 3],
+    ['Sunil', 'Meena', 'Kumar'],
+    ['Smashers', 'Anita', '9123456780', 4],
+    ['Rahul', 'Sneha', 'Vikram', 'Lakshmi'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
   assert.equal(result.teams.length, 2);
+  assert.equal(result.teams[0].players.length, 4); // 3 + captain Ravi
   assert.equal(result.teams[1].teamName, 'Smashers');
-  assert.equal(result.teams[1].players.length, 5);
+  assert.equal(result.teams[1].players.length, 5); // 4 + captain Anita
 });
 
 test('bulk upload: whole file rejected if ANY block has an error (all-or-nothing, Req 2.1)', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 4],
-    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
-    ['Smashers', 'Anita', 'not-a-phone', 4],
-    ['Anita', 'Rahul', 'Sneha', 'Vikram'],
+    ['Aces', 'Ravi', '9876543210', 3],
+    ['Sunil', 'Meena', 'Kumar'],
+    ['Smashers', 'Anita', 'not-a-phone', 3],
+    ['Rahul', 'Sneha', 'Vikram'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
@@ -247,10 +249,10 @@ test('bulk upload: whole file rejected if ANY block has an error (all-or-nothing
   assert.equal(result.teams, undefined);
 });
 
-test('bulk upload: team with fewer than 4 players is rejected (Req 1.5)', () => {
+test('bulk upload: team with fewer than 4 players including the captain is rejected (Req 1.5)', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 2],
-    ['Ravi', 'Sunil'],
+    ['Aces', 'Ravi', '9876543210', 2], // 2 others + captain = 3 total, below the minimum of 4
+    ['Sunil', 'Meena'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
@@ -260,19 +262,19 @@ test('bulk upload: team with fewer than 4 players is rejected (Req 1.5)', () => 
 test('bulk upload: roster row with fewer names than the declared count is caught', () => {
   const rows = [
     ['Aces', 'Ravi', '9876543210', 4],
-    ['Ravi', 'Sunil', 'Meena'], // only 3 names, but row 1 says 4
+    ['Sunil', 'Meena'], // only 2 names, but row 1 says 4
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
-  assert.ok(result.errors.some((e) => e.includes('expected 4 player name(s)') && e.includes('found 3')));
+  assert.ok(result.errors.some((e) => e.includes('expected 4 player name(s)') && e.includes('found 2')));
 });
 
 test('bulk upload: duplicate team name across blocks is caught', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 4],
-    ['Ravi', 'Sunil', 'Meena', 'Kumar'],
-    ['Aces', 'Deepak', '9123456780', 4],
-    ['Deepak', 'Farah', 'Gita', 'Hari'],
+    ['Aces', 'Ravi', '9876543210', 3],
+    ['Sunil', 'Meena', 'Kumar'],
+    ['Aces', 'Deepak', '9123456780', 3],
+    ['Farah', 'Gita', 'Hari'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);

@@ -10,7 +10,10 @@
 // Expected CSV shape — NO header row; two rows per team, repeated:
 //   Row 1 (team info): team_name | captain_name | captain_phone | player_count
 //   Row 2 (roster):    player_name_1 | player_name_2 | ... | player_name_N
-// where N is the player_count given in Row 1. A 2-team file is 4 rows total.
+// where N is the player_count given in Row 1 — OTHER players, not counting
+// the captain. The captain is added to the roster automatically (Req 1.5's
+// 4-player minimum includes the captain), so player_count must be at least
+// 3. A 2-team file is 4 rows total.
 //
 // Uses SheetJS (`xlsx`) to parse the CSV — parsing itself is kept separate
 // from validation (and the `xlsx` import is dynamic, inside parseWorkbook and
@@ -29,9 +32,11 @@ export async function parseWorkbook(arrayBuffer) {
 
 /**
  * Validate raw rows (array of arrays) in the 2-row-per-team block format.
- * Returns either {ok:true, teams:[...]} or {ok:false, errors:[...]} — in
- * which case NONE of the file should be imported (all-or-nothing, Req 2.1).
- * Every problem found is reported, not just the first one.
+ * Returns either {ok:true, teams:[...]} — each team's `players` includes the
+ * captain (prepended) alongside the roster row's names — or {ok:false,
+ * errors:[...]}, in which case NONE of the file should be imported
+ * (all-or-nothing, Req 2.1). Every problem found is reported, not just the
+ * first one.
  *
  * @param {any[][]} rows
  */
@@ -57,8 +62,8 @@ export function validateBulkUpload(rows) {
 
     if (!countIsValid) {
       errors.push(`Row ${infoLineNo}: player count "${playerCountRaw}" must be a positive whole number`);
-    } else if (playerCount < 4) {
-      errors.push(`Row ${infoLineNo}: team "${teamName || '(unnamed)'}" has ${playerCount} player(s) — minimum is 4 (Req 1.5)`);
+    } else if (playerCount < 3) {
+      errors.push(`Row ${infoLineNo}: team "${teamName || '(unnamed)'}" has ${playerCount + 1} player(s) including the captain — minimum is 4 (Req 1.5)`);
     }
 
     if (teamName) {
@@ -83,10 +88,13 @@ export function validateBulkUpload(rows) {
       errors.push(`Row ${rosterLineNo}: expected ${playerCount} player name(s) for team "${teamName || '(unnamed)'}", found ${playerNames.length}`);
     }
 
-    if (teamName && countIsValid && playerNames.length === playerCount) {
+    if (teamName && captainName && countIsValid && playerNames.length === playerCount) {
       teams.push({
         teamName, captainName, captainPhone,
-        players: playerNames.map((name) => ({ name, gender: null })),
+        players: [
+          { name: captainName, gender: null },
+          ...playerNames.map((name) => ({ name, gender: null })),
+        ],
       });
     }
   }
@@ -97,13 +105,18 @@ export function validateBulkUpload(rows) {
   return { ok: true, teams };
 }
 
-/** A small 2-team example matching the expected block format, for downloadSampleTemplate(). */
+/**
+ * A small 2-team example matching the expected block format, for
+ * downloadSampleTemplate(). The roster row lists OTHER players only — the
+ * captain (named in the info row) is added automatically, so "Aces" here
+ * shows the minimum allowed: 3 other players + the captain = 4 total.
+ */
 export function sampleTemplateRows() {
   return [
-    ['Aces', 'Priya Kumar', '9876543210', 4],
-    ['Priya Kumar', 'Arjun Rao', 'Divya Shah', 'Karthik Iyer'],
-    ['Smashers', 'Anita Menon', '9123456780', 5],
-    ['Anita Menon', 'Rahul Verma', 'Sneha Pillai', 'Vikram Singh', 'Lakshmi Narayan'],
+    ['Aces', 'Priya Kumar', '9876543210', 3],
+    ['Arjun Rao', 'Divya Shah', 'Karthik Iyer'],
+    ['Smashers', 'Anita Menon', '9123456780', 4],
+    ['Rahul Verma', 'Sneha Pillai', 'Vikram Singh', 'Lakshmi Narayan'],
   ];
 }
 

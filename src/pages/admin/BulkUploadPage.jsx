@@ -89,13 +89,14 @@ export default function BulkUploadPage({ seasonId }) {
         CSV file, no header row — two rows per team, one block after another:
       </p>
       <ul className="text-sm text-gray-600 mb-4 list-disc pl-5 space-y-1">
-        <li><strong>Row 1</strong> (team info): team name, captain name, captain phone, number of players (excluding the captain)</li>
+        <li><strong>Row 1</strong> (team info): team name, captain name, captain phone, number of other players (not counting the captain)</li>
         <li><strong>Row 2</strong> (roster): that many player names, one per column</li>
       </ul>
       <p className="text-sm text-gray-600 mb-4">
-        Repeat for each additional team — a 2-team file is 4 rows total. Gender, photos, ID proof, and date of
-        birth are not collected here (Req 1.7/1.6 deferred). If any block has a problem, nothing is imported —
-        fix the file and re-upload.
+        The captain is added to the roster automatically, so a team needs at least 3 other players (4 total
+        including the captain — Req 1.5). Repeat for each additional team — a 2-team file is 4 rows total.
+        Gender, photos, ID proof, and date of birth are not collected here (Req 1.7/1.6 deferred). If any block
+        has a problem, nothing is imported — fix the file and re-upload.
       </p>
 
       <button
