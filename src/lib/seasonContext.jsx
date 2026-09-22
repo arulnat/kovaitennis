@@ -8,10 +8,13 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
+import { useAuth } from './auth.jsx';
 
 const SeasonContext = createContext(null);
 
 export function SeasonProvider({ children }) {
+  const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
   const [seasons, setSeasons] = useState([]);
   const [divisions, setDivisions] = useState([]);
   const [seasonId, setSeasonId] = useState(null);
@@ -22,11 +25,15 @@ export function SeasonProvider({ children }) {
     const { data, error } = await supabase.from('seasons').select('*').order('created_at', { ascending: false });
     if (error) { console.error('Failed to load seasons', error); setLoading(false); return; }
     setSeasons(data || []);
-    setSeasonId((current) => current ?? data?.[0]?.id ?? null);
+    setSeasonId((current) => (data?.some((s) => s.id === current) ? current : (data?.[0]?.id ?? null)));
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadSeasons(); }, [loadSeasons]);
+  // Re-fetch whenever the auth session changes (login/logout), not just once
+  // on initial mount — otherwise a season list fetched before login (as an
+  // unauthenticated visitor, before RLS grants admin visibility) never picks
+  // up test seasons or anything else gated by is_admin() after signing in.
+  useEffect(() => { loadSeasons(); }, [loadSeasons, userId]);
 
   const loadDivisions = useCallback(async () => {
     if (!seasonId) { setDivisions([]); setDivisionId(null); return; }
