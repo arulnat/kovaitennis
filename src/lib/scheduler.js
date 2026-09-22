@@ -367,6 +367,35 @@ export function buildPriorMeetingMap(lastSeasonFixtures) {
 }
 
 /**
+ * Lays out `numRounds` weekly match weekends starting from `startWeekend`,
+ * skipping any date in `holidayDates` and moving to the following weekend
+ * instead — no matches are held on a holiday, so that round just shifts
+ * one week later, and every round after it shifts with it. Rounds already
+ * landed on a non-holiday date before a later-added holiday is reached
+ * are untouched, which is what makes this safe to re-run after a holiday
+ * is added retroactively (e.g. a rain-out): only the affected round
+ * onward moves, nothing already scheduled earlier does.
+ *
+ * @param {string} startWeekend - ISO date of round 1's weekend (Req 4.2)
+ * @param {number} numRounds
+ * @param {string[]} [holidayDates] - ISO dates with no matches
+ * @returns {string[]} ISO dates, one per round, in round order
+ */
+export function computeMatchWeekends(startWeekend, numRounds, holidayDates = []) {
+  const holidays = new Set(holidayDates);
+  const weekends = [];
+  const cursor = new Date(startWeekend);
+
+  while (weekends.length < numRounds) {
+    const iso = cursor.toISOString().slice(0, 10);
+    if (!holidays.has(iso)) weekends.push(iso);
+    cursor.setDate(cursor.getDate() + 7);
+  }
+
+  return weekends;
+}
+
+/**
  * Composes generateRoundRobin + assignHomeAway into ready-to-insert
  * `fixtures` table rows for one division, including a bye row per round
  * that has one (Req 4.5: home_team_id null, away_team_id the resting
@@ -378,22 +407,19 @@ export function buildPriorMeetingMap(lastSeasonFixtures) {
  * @param {string} opts.divisionId
  * @param {string[]} opts.teamIds
  * @param {string} opts.startWeekend - ISO date; round 1 is this week (Req 4.2)
+ * @param {string[]} [opts.holidays] - ISO dates to skip (see computeMatchWeekends)
  * @param {Map<string,string>} [opts.priorMeetingHomeTeam]
  * @param {string} [opts.releasedAt] - ISO timestamp, defaults to now
  * @returns {object[]} rows shaped for `fixtures` table insert
  */
 export function buildFixtureRows({
-  seasonId, divisionId, teamIds, startWeekend,
+  seasonId, divisionId, teamIds, startWeekend, holidays = [],
   priorMeetingHomeTeam = new Map(), releasedAt = new Date().toISOString(),
 }) {
   const rounds = generateRoundRobin(teamIds);
   const scheduled = assignHomeAway(rounds, priorMeetingHomeTeam);
-
-  const weekOf = (roundNumber) => {
-    const d = new Date(startWeekend);
-    d.setDate(d.getDate() + (roundNumber - 1) * 7); // Req 4.2 — 7-day intervals
-    return d.toISOString().slice(0, 10);
-  };
+  const weekends = computeMatchWeekends(startWeekend, scheduled.length, holidays);
+  const weekOf = (roundNumber) => weekends[roundNumber - 1];
 
   return scheduled.flatMap(({ round, ties, bye }) => {
     const rows = ties.map(({ home, away }) => ({

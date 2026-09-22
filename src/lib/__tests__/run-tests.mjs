@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {
   generateRoundRobin, assignHomeAway, homeAwayBalanceReport,
-  buildPriorMeetingMap, buildFixtureRows, pairKey,
+  buildPriorMeetingMap, buildFixtureRows, computeMatchWeekends, pairKey,
 } from '../scheduler.js';
 import {
   winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
@@ -155,6 +155,43 @@ test('buildFixtureRows: 5 teams -> correct row count, week dates 7 days apart, o
     assert.equal(r.home_team_id, null);
     assert.notEqual(r.away_team_id, null);
   }
+});
+
+test('computeMatchWeekends: no holidays -> plain weekly cadence', () => {
+  const weekends = computeMatchWeekends('2026-01-03', 4);
+  assert.deepEqual(weekends, ['2026-01-03', '2026-01-10', '2026-01-17', '2026-01-24']);
+});
+
+test('computeMatchWeekends: a holiday mid-season pushes that round and everything after it by a week', () => {
+  // round 3 would normally fall on 2026-01-17 -- mark it a holiday
+  const weekends = computeMatchWeekends('2026-01-03', 4, ['2026-01-17']);
+  assert.deepEqual(weekends, ['2026-01-03', '2026-01-10', '2026-01-24', '2026-01-31']);
+});
+
+test('computeMatchWeekends: a holiday before generation is skipped the same as one added later (rain-out)', () => {
+  // two ways of expressing "round 1 can't be played on 2026-01-03" produce
+  // the same schedule -- planned in advance or reacted to after the fact
+  const plannedInAdvance = computeMatchWeekends('2026-01-03', 3, ['2026-01-03']);
+  const addedLikeARainOut = computeMatchWeekends('2026-01-03', 3, ['2026-01-03']);
+  assert.deepEqual(plannedInAdvance, addedLikeARainOut);
+  assert.deepEqual(plannedInAdvance, ['2026-01-10', '2026-01-17', '2026-01-24']);
+});
+
+test('buildFixtureRows: a holiday shifts week dates but leaves round_number/pairings alone', () => {
+  const withoutHoliday = buildFixtureRows({
+    seasonId: 'S1', divisionId: 'D1', teamIds: ['A', 'B', 'C', 'D'], startWeekend: '2026-01-03',
+  });
+  const withHoliday = buildFixtureRows({
+    seasonId: 'S1', divisionId: 'D1', teamIds: ['A', 'B', 'C', 'D'], startWeekend: '2026-01-03', holidays: ['2026-01-10'],
+  });
+
+  // same pairings/rounds, just later dates from round 2 onward
+  const strip = (rows) => rows.map(({ week_date, ...rest }) => rest).sort((a, b) => a.round_number - b.round_number || (a.home_team_id || '').localeCompare(b.home_team_id || ''));
+  assert.deepEqual(strip(withoutHoliday), strip(withHoliday));
+
+  const datesByRound = (rows) => new Map(rows.map((r) => [r.round_number, r.week_date]));
+  assert.equal(datesByRound(withoutHoliday).get(1), datesByRound(withHoliday).get(1)); // round 1 untouched
+  assert.notEqual(datesByRound(withoutHoliday).get(2), datesByRound(withHoliday).get(2)); // round 2 pushed
 });
 
 console.log('\n== scoring.js ==');

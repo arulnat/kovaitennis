@@ -24,12 +24,20 @@
 // ranking, generate fixtures, THEN lock to protect it all from further
 // changes. Locking is always a manual toggle (never an automatic side
 // effect of generating), consistent with every other lock in this app.
+//
+// Holiday weekends (season_holidays) are dates with no matches — set up
+// front, or added later for a rain-out. Generate Fixtures always uses the
+// current list (computeMatchWeekends, scheduler.js) to skip them.
+// Whenever the list changes, every division that already has fixtures
+// gets its week_dates recomputed from the same season start date and the
+// new holiday list — round_number/pairings/scores are never touched,
+// only which calendar weekend each round falls on shifts.
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { planAutoGroup } from '../../lib/grouping.js';
-import { buildFixtureRows, buildPriorMeetingMap } from '../../lib/scheduler.js';
+import { buildFixtureRows, buildPriorMeetingMap, computeMatchWeekends } from '../../lib/scheduler.js';
 
 function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
@@ -40,6 +48,8 @@ export default function GroupingPage({ seasonId }) {
 
   const [teamSeasons, setTeamSeasons] = useState([]);
   const [divisionsWithFixtures, setDivisionsWithFixtures] = useState(new Set());
+  const [holidays, setHolidays] = useState([]); // [{id, holiday_date}]
+  const [newHolidayDate, setNewHolidayDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [groupSize, setGroupSize] = useState(4);
   const [seed, setSeed] = useState(randomSeed);
@@ -47,17 +57,19 @@ export default function GroupingPage({ seasonId }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: teamSeasonRows, error }, { data: fixtureRows }] = await Promise.all([
+    const [{ data: teamSeasonRows, error }, { data: fixtureRows }, { data: holidayRows }] = await Promise.all([
       supabase
         .from('team_seasons')
         .select('id, division_id, order_index, teams(id, name)')
         .eq('season_id', seasonId)
         .order('order_index', { ascending: true }),
       supabase.from('fixtures').select('division_id').eq('season_id', seasonId),
+      supabase.from('season_holidays').select('id, holiday_date').eq('season_id', seasonId).order('holiday_date'),
     ]);
     if (error) { alert(error.message); setLoading(false); return; }
     setTeamSeasons(teamSeasonRows || []);
     setDivisionsWithFixtures(new Set((fixtureRows || []).map((f) => f.division_id)));
+    setHolidays(holidayRows || []);
     setLoading(false);
   }, [seasonId]);
 
@@ -210,6 +222,64 @@ export default function GroupingPage({ seasonId }) {
     refreshSeasons();
   }
 
+  /**
+   * Recomputes week_date for every already-generated fixture in the
+   * season from the current holiday list — round_number, pairings, and
+   * scores are never touched, only which weekend each round falls on.
+   * Safe to call after any holiday add/remove: a round already scheduled
+   * before a later holiday it doesn't overlap keeps its date; only the
+   * affected round onward shifts.
+   */
+  async function rescheduleAroundHolidays(holidayDates) {
+    if (!activeSeason?.start_weekend) return;
+
+    const { data: allFixtures, error } = await supabase
+      .from('fixtures')
+      .select('id, division_id, round_number, week_date')
+      .eq('season_id', seasonId);
+    if (error) { alert(error.message); return; }
+    if (!allFixtures || allFixtures.length === 0) return;
+
+    const byDivision = new Map();
+    for (const f of allFixtures) {
+      if (!byDivision.has(f.division_id)) byDivision.set(f.division_id, []);
+      byDivision.get(f.division_id).push(f);
+    }
+
+    let updated = 0;
+    for (const rows of byDivision.values()) {
+      const numRounds = Math.max(...rows.map((r) => r.round_number));
+      const weekends = computeMatchWeekends(activeSeason.start_weekend, numRounds, holidayDates);
+      for (const r of rows) {
+        const newDate = weekends[r.round_number - 1];
+        if (newDate === r.week_date) continue;
+        const { error: updateErr } = await supabase.from('fixtures').update({ week_date: newDate }).eq('id', r.id);
+        if (updateErr) { alert(updateErr.message); return; }
+        updated++;
+      }
+    }
+    if (updated > 0) alert(`${updated} fixture date(s) rescheduled around the holiday change.`);
+  }
+
+  async function addHoliday() {
+    if (!newHolidayDate) { alert('Pick a date first.'); return; }
+    const { error } = await supabase.from('season_holidays').insert({ season_id: seasonId, holiday_date: newHolidayDate });
+    if (error) { alert(error.message); return; }
+    setNewHolidayDate('');
+    const { data: holidayRows } = await supabase.from('season_holidays').select('id, holiday_date').eq('season_id', seasonId).order('holiday_date');
+    setHolidays(holidayRows || []);
+    await rescheduleAroundHolidays((holidayRows || []).map((h) => h.holiday_date));
+  }
+
+  async function removeHoliday(holiday) {
+    if (!confirm(`Remove ${holiday.holiday_date} as a holiday? Already-generated fixtures will be rescheduled back accordingly.`)) return;
+    const { error } = await supabase.from('season_holidays').delete().eq('id', holiday.id);
+    if (error) { alert(error.message); return; }
+    const remaining = holidays.filter((h) => h.id !== holiday.id);
+    setHolidays(remaining);
+    await rescheduleAroundHolidays(remaining.map((h) => h.holiday_date));
+  }
+
   async function generateFixtures(division) {
     if (division.grouping_locked) { alert(`"${division.name}" is locked. Unlock it first to generate fixtures.`); return; }
     if (!activeSeason?.start_weekend) { alert('Set the tournament start date above first.'); return; }
@@ -235,6 +305,7 @@ export default function GroupingPage({ seasonId }) {
       divisionId: division.id,
       teamIds,
       startWeekend: activeSeason.start_weekend,
+      holidays: holidays.map((h) => h.holiday_date),
       priorMeetingHomeTeam: buildPriorMeetingMap(priorFixtures || []),
     });
 
@@ -317,6 +388,37 @@ export default function GroupingPage({ seasonId }) {
           {activeSeason?.start_weekend && (
             <span className="text-xs text-gray-500">Currently set to {activeSeason.start_weekend}</span>
           )}
+        </div>
+      </div>
+
+      <div className="border rounded p-4 mb-6 bg-gray-50">
+        <h2 className="font-medium mb-2">Holiday weekends</h2>
+        <p className="text-sm text-gray-600 mb-2">
+          No matches on these weekends — fixture generation skips them and moves that round (and everything
+          after it) to the next weekend. Usually set up front, but can be added later too (e.g. a rain-out) —
+          any division that already has fixtures gets its dates pushed automatically, with no change to
+          pairings or scores.
+        </p>
+        {holidays.length > 0 && (
+          <ul className="mb-2 space-y-1">
+            {holidays.map((h) => (
+              <li key={h.id} className="flex items-center gap-2 text-sm">
+                <span>{h.holiday_date}</span>
+                <button onClick={() => removeHoliday(h)} className="text-red-600 text-xs underline">Remove</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex gap-2 items-center">
+          <input
+            type="date"
+            value={newHolidayDate}
+            onChange={(e) => setNewHolidayDate(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+          />
+          <button onClick={addHoliday} className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm">
+            Add holiday
+          </button>
         </div>
       </div>
 
