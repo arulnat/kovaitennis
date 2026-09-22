@@ -6,6 +6,11 @@
 // This page is just the missing piece: a way for an admin to find a
 // fixture and jump into its score entry, the same way a captain would
 // from their own team dashboard.
+//
+// A division's fixtures must be frozen (Fixtures page) before anyone —
+// captain or admin — can enter a score for it; ScoreEntryPage enforces
+// this too (defense in depth for anyone linking straight to a fixture),
+// but this page also disables the action up front so it's clear why.
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -40,6 +45,9 @@ export default function UpdateScoresPage({ seasonId }) {
       .then(({ data }) => setFixtures(data || []));
   }, [seasonId, selectedDivisionId]);
 
+  const division = divisions.find((d) => d.id === selectedDivisionId) ?? null;
+  const frozen = !!division?.fixtures_frozen;
+
   if (divisions.length === 0) {
     return <p className="p-6 text-gray-500">This season has no divisions yet — create one under Divisions first.</p>;
   }
@@ -64,6 +72,13 @@ export default function UpdateScoresPage({ seasonId }) {
           ))}
         </select>
       </label>
+
+      {division && !frozen && (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
+          This division isn't frozen yet — scores can't be entered until it is. Freeze it on the Fixtures page
+          once every division's fixtures are generated and no teams are left unassigned.
+        </p>
+      )}
 
       {fixtures === null && <p className="text-gray-500 text-sm">Loading…</p>}
 
@@ -94,7 +109,12 @@ export default function UpdateScoresPage({ seasonId }) {
                   <td className="p-2">{f.teams_home?.name} vs {f.teams_away?.name}</td>
                   <td className={`p-2 font-medium ${statusColor}`}>{status} ({scored}/3)</td>
                   <td className="p-2 text-right">
-                    <button onClick={() => navigate(`/score/${f.id}`)} className="text-xs text-teal-700 underline">
+                    <button
+                      onClick={() => navigate(`/score/${f.id}`)}
+                      disabled={!frozen}
+                      title={frozen ? undefined : 'Freeze this division first'}
+                      className="text-xs text-teal-700 underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                    >
                       {scored === 0 ? 'Enter score' : 'Edit score'}
                     </button>
                   </td>
