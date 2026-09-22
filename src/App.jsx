@@ -10,6 +10,7 @@ import DivisionsPage from './pages/admin/DivisionsPage.jsx';
 import GroupingPage from './pages/admin/GroupingPage.jsx';
 import FixtureGenerationPage from './pages/admin/FixtureGenerationPage.jsx';
 import MissingScoresReportPage from './pages/admin/MissingScoresReportPage.jsx';
+import UpdateScoresPage from './pages/admin/UpdateScoresPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
 import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
@@ -29,8 +30,8 @@ export default function App() {
             {/* Public (Req 10.5 — no login required) */}
             <Route path="/standings" element={<StandingsRouteWrapper />} />
 
-            {/* Team (captain login required) */}
-            <Route path="/score/:fixtureId" element={<RequireRole roles={['team']}><ScoreEntryRouteWrapper /></RequireRole>} />
+            {/* Score entry — either captain, or an admin doing it on their behalf (Req 5.2) */}
+            <Route path="/score/:fixtureId" element={<RequireRole roles={['team', 'tournament_admin', 'super_admin']}><ScoreEntryRouteWrapper /></RequireRole>} />
 
             {/* Admin */}
             <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/admin/divisions" element={<RequireRole roles={['tournament_admin', 'super_admin']}><DivisionsPage /></RequireRole>} />
             <Route path="/admin/grouping" element={<RequireRole roles={['tournament_admin', 'super_admin']}><GroupingRouteWrapper /></RequireRole>} />
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
+            <Route path="/admin/update-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><UpdateScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
             <Route path="/admin/seasons" element={<RequireRole roles={['tournament_admin', 'super_admin']}><SeasonsPage /></RequireRole>} />
@@ -62,6 +64,7 @@ function Nav() {
           <Link to="/admin/divisions">Divisions</Link>
           <Link to="/admin/grouping">Grouping</Link>
           <Link to="/admin/fixtures">Fixtures</Link>
+          <Link to="/admin/update-scores">Update Scores</Link>
           <Link to="/admin/missing-scores">Missing Scores</Link>
           <Link to="/admin/content">Content</Link>
           <Link to="/admin/seasons">Seasons</Link>
@@ -135,6 +138,14 @@ function FixtureRouteWrapper() {
   return (
     <NeedsSeason>
       <FixtureGenerationPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
+}
+function UpdateScoresRouteWrapper() {
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <UpdateScoresPage seasonId={seasonId} />
     </NeedsSeason>
   );
 }
