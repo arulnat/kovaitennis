@@ -72,9 +72,21 @@ export function useSeason() {
 /** Small dropdown pair for the nav bar — season, then division within it. */
 export function SeasonSelector() {
   const { seasons, divisions, seasonId, divisionId, setSeasonId, setDivisionId, loading } = useSeason();
+  const { role } = useAuth();
+  const isAdmin = role === 'tournament_admin' || role === 'super_admin';
 
   if (loading) return <span className="text-xs text-gray-400">Loading seasons…</span>;
-  if (seasons.length === 0) return <span className="text-xs text-gray-400">No seasons yet — create one</span>;
+  if (seasons.length === 0) {
+    // Signed-out/team visitors only ever see non-test seasons (RLS), so an
+    // empty list here doesn't necessarily mean none exist at all — and
+    // they couldn't create one anyway, so "create one" is only shown to
+    // admins, who see every season and can actually act on it.
+    return (
+      <span className="text-xs text-gray-400">
+        {isAdmin ? 'No seasons yet — create one' : 'No seasons available yet'}
+      </span>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2 text-sm">
