@@ -88,7 +88,7 @@ export default function UpdateScoresPage({ seasonId }) {
 
       {fixtures !== null && fixtures.length > 0 && (
         <table className="w-full text-sm border">
-          <thead className="bg-gray-50">
+          <thead className="bg-teal-50">
             <tr>
               <th className="p-2">Round</th>
               <th className="text-left p-2">Week</th>

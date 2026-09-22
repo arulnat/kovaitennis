@@ -10,11 +10,17 @@
 // unfrozen division's schedule can still change (Fixtures page), so it
 // isn't ready to hand out yet. As each division gets frozen it appears
 // here automatically — no separate "publish" step.
+//
+// "Download" is the browser's own Print -> Save as PDF, not a CSV: a
+// spreadsheet can't carry the color-coded, styled layout this page uses,
+// and PDF is what actually gets circulated/printed in practice. The
+// print stylesheet (index.css) keeps the colors instead of the browser's
+// default plain-text printout, and page-break rules keep a division's
+// rounds from splitting awkwardly across pages.
 
 import { useEffect, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
-import { downloadCsv } from '../../lib/csv.js';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -60,80 +66,69 @@ export default function FixturesCalendarPage({ seasonId }) {
       });
   }, [seasonId, divisions]);
 
-  function downloadCalendar() {
-    const rows = [['Division', 'Round', 'Week Date', 'Home', 'Away']];
-    for (const d of frozenDivisions) {
-      for (const f of fixturesByDivision[d.id] || []) {
-        rows.push([
-          d.name,
-          f.round_number,
-          f.week_date,
-          f.is_bye ? '' : (f.teams_home?.name ?? ''),
-          f.is_bye ? `${f.teams_away?.name ?? f.teams_home?.name ?? ''} (Rest)` : (f.teams_away?.name ?? ''),
-        ]);
-      }
-    }
-    downloadCsv(rows, 'fixtures-calendar.csv');
-  }
-
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
-        <h1 className="text-xl font-semibold">Fixtures Calendar</h1>
+        <h1 className="text-xl font-bold">Fixtures Calendar</h1>
         <button
-          onClick={downloadCalendar}
+          onClick={() => window.print()}
           disabled={!fixturesByDivision || frozenDivisions.length === 0}
-          className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm disabled:opacity-50"
+          className="no-print px-3 py-1.5 rounded bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50"
         >
-          Download Calendar (CSV)
+          Print / Save as PDF
         </button>
       </div>
-      <p className="text-sm text-gray-600 mb-6">
+      <p className="text-sm text-slate-600 mb-6 no-print">
         Every division's fixtures once frozen, all in one place — Home vs Away for each round. Divisions not
         yet frozen aren't shown here.
       </p>
 
       {frozenDivisions.length === 0 && (
-        <p className="text-gray-500 text-sm">No divisions have been frozen yet.</p>
+        <p className="text-slate-500 text-sm">No divisions have been frozen yet.</p>
       )}
 
       {fixturesByDivision === null && frozenDivisions.length > 0 && (
-        <p className="text-gray-500 text-sm">Loading…</p>
+        <p className="text-slate-500 text-sm">Loading…</p>
       )}
 
       {fixturesByDivision && frozenDivisions.map((d) => (
-        <div key={d.id} className="mb-8">
-          <h2 className="text-lg font-semibold mb-3">{d.name}</h2>
-          {(fixturesByDivision[d.id] || []).length === 0 ? (
-            <p className="text-gray-500 text-sm">No fixtures.</p>
-          ) : (
-            groupByRound(fixturesByDivision[d.id]).map(({ round, weekDate, ties, bye }) => (
-              <div key={round} className="mb-4">
-                <p className="text-sm font-semibold text-gray-700 mb-1">
-                  Round {round} — Week of {formatWeekDate(weekDate)}
-                </p>
-                <table className="w-full text-sm border mb-1">
-                  <thead className="bg-gray-50">
-                    <tr><th className="text-left p-2">Home</th><th className="text-left p-2">Away</th></tr>
-                  </thead>
-                  <tbody>
-                    {ties.map((t) => (
-                      <tr key={t.id} className="border-t">
-                        <td className="p-2 font-medium">{t.home}</td>
-                        <td className="p-2">{t.away}</td>
+        <div key={d.id} className="mb-8" style={{ breakInside: 'avoid' }}>
+          <h2 className="text-white bg-teal-700 rounded-t px-3 py-2 text-base font-bold">{d.name}</h2>
+          <div className="border border-t-0 border-teal-100 rounded-b p-3">
+            {(fixturesByDivision[d.id] || []).length === 0 ? (
+              <p className="text-slate-500 text-sm">No fixtures.</p>
+            ) : (
+              groupByRound(fixturesByDivision[d.id]).map(({ round, weekDate, ties, bye }) => (
+                <div key={round} className="mb-4 last:mb-0" style={{ breakInside: 'avoid' }}>
+                  <p className="inline-block text-xs font-semibold text-teal-800 bg-teal-50 rounded px-2 py-1 mb-2">
+                    Round {round} — Week of {formatWeekDate(weekDate)}
+                  </p>
+                  <table className="w-full text-sm border border-slate-200 rounded overflow-hidden mb-1">
+                    <thead className="bg-teal-100">
+                      <tr>
+                        <th className="text-left p-2 text-teal-900">Home</th>
+                        <th className="text-left p-2 text-teal-900">Away</th>
                       </tr>
-                    ))}
-                    {bye && (
-                      <tr className="border-t bg-gray-50">
-                        <td className="p-2 font-medium">{bye}</td>
-                        <td className="p-2 text-gray-500 italic">Rest</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ))
-          )}
+                    </thead>
+                    <tbody>
+                      {ties.map((t, i) => (
+                        <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">{t.home}</td>
+                          <td className="p-2 text-slate-800 border-t border-slate-200">{t.away}</td>
+                        </tr>
+                      ))}
+                      {bye && (
+                        <tr className="bg-accent-400/20">
+                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">{bye}</td>
+                          <td className="p-2 text-slate-600 italic border-t border-slate-200">Rest</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       ))}
     </div>

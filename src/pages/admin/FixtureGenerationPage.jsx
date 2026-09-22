@@ -231,7 +231,7 @@ function RoundsTable({ rounds, teamName, onSwap }) {
             Round {round} — Week of {formatWeekDate(weekDate)}
           </p>
           <table className="w-full text-sm border mb-1">
-            <thead className="bg-gray-50">
+            <thead className="bg-teal-50">
               <tr><th className="text-left p-2">Home</th><th className="text-left p-2">Away</th><th className="p-2"></th></tr>
             </thead>
             <tbody>

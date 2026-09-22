@@ -1,3 +1,27 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Common theme applied globally so every page picks it up automatically —
+   see tailwind.config.js for the color palette itself. */
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+  }
+  h1, h2, h3 {
+    @apply text-teal-900;
+  }
+}
+
+/* Printing a page (e.g. the Fixtures Calendar, "Print / Save as PDF")
+   should keep its colors instead of the browser's default plain-text
+   printout, and hide chrome that only makes sense on screen. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

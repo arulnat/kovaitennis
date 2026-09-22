@@ -85,7 +85,7 @@ export default function SeasonsPage() {
       </div>
 
       <table className="w-full text-sm border">
-        <thead className="bg-gray-50">
+        <thead className="bg-teal-50">
           <tr>
             <th className="text-left p-2">Name</th>
             <th className="text-left p-2">Start Weekend</th>

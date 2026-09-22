@@ -53,29 +53,37 @@ export default function App() {
   );
 }
 
+const navLinkClass = 'text-teal-100 hover:text-white border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
+
 function Nav() {
   const { role, signOut } = useAuth();
   return (
-    <nav className="border-b p-3 flex flex-wrap gap-4 text-sm items-center">
-      <Link to="/standings" className="font-semibold">Tennis League</Link>
-      <Link to="/fixtures-calendar">Fixtures Calendar</Link>
+    <nav className="no-print bg-teal-900 border-b-2 border-accent-500 px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm items-center shadow-md">
+      <Link to="/standings" className="font-bold text-white text-base tracking-wide mr-1">
+        Tennis League
+      </Link>
+      <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
-          <Link to="/admin/bulk-upload">Bulk Upload</Link>
-          <Link to="/admin/login-credentials">Login Credentials</Link>
-          <Link to="/admin/teams">Teams</Link>
-          <Link to="/admin/divisions">Divisions</Link>
-          <Link to="/admin/grouping">Grouping</Link>
-          <Link to="/admin/fixtures">Fixtures</Link>
-          <Link to="/admin/update-scores">Update Scores</Link>
-          <Link to="/admin/missing-scores">Missing Scores</Link>
-          <Link to="/admin/content">Content</Link>
-          <Link to="/admin/seasons">Seasons</Link>
+          <Link to="/admin/bulk-upload" className={navLinkClass}>Bulk Upload</Link>
+          <Link to="/admin/login-credentials" className={navLinkClass}>Login Credentials</Link>
+          <Link to="/admin/teams" className={navLinkClass}>Teams</Link>
+          <Link to="/admin/divisions" className={navLinkClass}>Divisions</Link>
+          <Link to="/admin/grouping" className={navLinkClass}>Grouping</Link>
+          <Link to="/admin/fixtures" className={navLinkClass}>Fixtures</Link>
+          <Link to="/admin/update-scores" className={navLinkClass}>Update Scores</Link>
+          <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
+          <Link to="/admin/content" className={navLinkClass}>Content</Link>
+          <Link to="/admin/seasons" className={navLinkClass}>Seasons</Link>
         </>
       )}
       <SeasonSelector />
       <div className="ml-auto">
-        {role ? <button onClick={signOut} className="text-gray-500">Sign out</button> : <Link to="/login">Login</Link>}
+        {role ? (
+          <button onClick={signOut} className="text-teal-200 hover:text-white transition-colors">Sign out</button>
+        ) : (
+          <Link to="/login" className="text-white font-medium hover:text-accent-400 transition-colors">Login</Link>
+        )}
       </div>
     </nav>
   );

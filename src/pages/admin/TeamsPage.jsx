@@ -68,7 +68,7 @@ export default function TeamsPage({ seasonId }) {
         <p className="text-gray-500">No teams yet — use Bulk Upload to add some.</p>
       ) : (
         <table className="w-full text-sm border">
-          <thead className="bg-gray-50">
+          <thead className="bg-teal-50">
             <tr>
               <th className="text-left p-2">Team</th>
               <th className="text-left p-2">Captain</th>

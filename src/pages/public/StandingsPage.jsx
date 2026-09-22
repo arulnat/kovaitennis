@@ -67,7 +67,7 @@ export default function StandingsPage({ seasonId, divisionId }) {
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-xl font-semibold mb-4">Standings</h1>
       <table className="w-full text-sm border">
-        <thead className="bg-gray-50">
+        <thead className="bg-teal-50">
           <tr>
             <th className="text-left p-2">Team</th>
             <th className="p-2">P</th><th className="p-2">W</th><th className="p-2">L</th>
