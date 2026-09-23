@@ -33,7 +33,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
+import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
+import { homeAwayBalanceReport } from '../../lib/scheduler.js';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -53,6 +55,7 @@ function groupByRound(fixtures) {
 
 export default function FixtureGenerationPage({ seasonId }) {
   const { divisions, refreshDivisions } = useSeason();
+  const { isAdmin } = useAuth();
   const [selectedDivisionId, setSelectedDivisionId] = useState('');
   const [teams, setTeams] = useState([]);
   const [fixtures, setFixtures] = useState(null); // null = never loaded yet (first load only)
@@ -150,6 +153,12 @@ export default function FixtureGenerationPage({ seasonId }) {
   }
 
   const teamName = (id) => teams.find((t) => t.id === id)?.name ?? '—';
+  const rounds = fixtures ? groupByRound(fixtures) : [];
+  // homeAwayBalanceReport (scheduler.js) only reads each round's `ties`
+  // ({home, away} team ids), which groupByRound's output already matches.
+  const balanceReport = isAdmin
+    ? homeAwayBalanceReport(rounds).sort((a, b) => teamName(a.teamId).localeCompare(teamName(b.teamId)))
+    : [];
 
   if (divisions.length === 0) {
     return <p className="p-6 text-gray-500">This season has no divisions yet — create one under Divisions first.</p>;
@@ -211,13 +220,43 @@ export default function FixtureGenerationPage({ seasonId }) {
         )}
 
         {fixtures !== null && fixtures.length > 0 && (
-          <RoundsTable
-            rounds={groupByRound(fixtures)}
-            teamName={teamName}
-            onSwap={division?.fixtures_locked ? null : swapHomeAway}
-          />
+          <>
+            {isAdmin && <HomeAwayCountsTable report={balanceReport} teamName={teamName} />}
+            <RoundsTable
+              rounds={rounds}
+              teamName={teamName}
+              onSwap={division?.fixtures_locked ? null : swapHomeAway}
+            />
+          </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Admin/super_admin only — how many times each team is home vs away across the whole generated schedule (Req 4.6). */
+function HomeAwayCountsTable({ report, teamName }) {
+  return (
+    <div className="mb-4 max-w-xs">
+      <p className="text-sm font-semibold text-gray-700 mb-1">Home / Away count</p>
+      <table className="w-full text-sm border">
+        <thead className="bg-teal-50">
+          <tr>
+            <th className="text-left p-2">Team</th>
+            <th className="p-2">Home</th>
+            <th className="p-2">Away</th>
+          </tr>
+        </thead>
+        <tbody>
+          {report.map((r) => (
+            <tr key={r.teamId} className={`border-t ${r.balanced ? '' : 'bg-amber-50'}`}>
+              <td className="p-2 font-medium">{teamName(r.teamId)}</td>
+              <td className="p-2 text-center">{r.home}</td>
+              <td className="p-2 text-center">{r.away}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
