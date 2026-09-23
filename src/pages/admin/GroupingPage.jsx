@@ -54,6 +54,8 @@ export default function GroupingPage({ seasonId }) {
   const [groupSize, setGroupSize] = useState(4);
   const [seed, setSeed] = useState(randomSeed);
   const [startDateDraft, setStartDateDraft] = useState('');
+  const [selectedPoolIds, setSelectedPoolIds] = useState(new Set());
+  const [poolMoveTarget, setPoolMoveTarget] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +72,7 @@ export default function GroupingPage({ seasonId }) {
     setTeamSeasons(teamSeasonRows || []);
     setDivisionsWithFixtures(new Set((fixtureRows || []).map((f) => f.division_id)));
     setHolidays(holidayRows || []);
+    setSelectedPoolIds(new Set());
     setLoading(false);
   }, [seasonId]);
 
@@ -100,6 +103,39 @@ export default function GroupingPage({ seasonId }) {
       .update({ division_id: targetDivisionId, order_index: nextOrder })
       .eq('id', teamSeasonId);
     if (error) { alert(error.message); return; }
+    load();
+  }
+
+  function togglePoolSelect(teamSeasonId) {
+    setSelectedPoolIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(teamSeasonId)) next.delete(teamSeasonId); else next.add(teamSeasonId);
+      return next;
+    });
+  }
+
+  async function moveSelectedPoolTeams() {
+    if (selectedPoolIds.size === 0) { alert('Select at least one team from the unassigned pool first.'); return; }
+    if (!poolMoveTarget) { alert('Choose a division to move them to.'); return; }
+
+    const targetDivision = findDivision(poolMoveTarget);
+    if (targetDivision?.grouping_locked) {
+      alert(`"${targetDivision.name}" is locked. Unlock it first to move teams into it.`);
+      return;
+    }
+
+    const targets = teamSeasons.filter((ts) => selectedPoolIds.has(ts.id));
+    let nextOrder = teamSeasons.filter((t) => t.division_id === poolMoveTarget).length;
+    for (const ts of targets) {
+      const { error } = await supabase
+        .from('team_seasons')
+        .update({ division_id: poolMoveTarget, order_index: nextOrder })
+        .eq('id', ts.id);
+      if (error) { alert(error.message); return; }
+      nextOrder++;
+    }
+
+    setPoolMoveTarget('');
     load();
   }
 
@@ -428,6 +464,12 @@ export default function GroupingPage({ seasonId }) {
           teams={unassigned}
           divisions={divisions}
           onMove={assignDivision}
+          selectable
+          selectedIds={selectedPoolIds}
+          onToggleSelect={togglePoolSelect}
+          bulkMoveTarget={poolMoveTarget}
+          onBulkMoveTargetChange={setPoolMoveTarget}
+          onBulkMove={moveSelectedPoolTeams}
         />
         {divisions.map((d) => (
           <GroupColumn
@@ -452,6 +494,7 @@ export default function GroupingPage({ seasonId }) {
 function GroupColumn({
   title, teams, divisions, currentDivisionId, onMove, onMoveRank,
   locked, onToggleLock, hasFixtures, onGenerateFixtures,
+  selectable, selectedIds, onToggleSelect, bulkMoveTarget, onBulkMoveTargetChange, onBulkMove,
 }) {
   const isDivision = currentDivisionId != null;
 
@@ -461,6 +504,28 @@ function GroupColumn({
         <span className="font-medium text-sm">{title}</span>
         <span className="text-xs text-gray-500">{teams.length}</span>
       </div>
+
+      {selectable && (
+        <div className="flex items-center gap-1 px-2 py-1 border-b bg-gray-50">
+          <select
+            value={bulkMoveTarget}
+            onChange={(e) => onBulkMoveTargetChange(e.target.value)}
+            className="border rounded px-1 py-0.5 text-xs flex-1 min-w-0"
+          >
+            <option value="">Move {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'selected'} to…</option>
+            {divisions.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={onBulkMove}
+            disabled={selectedIds.size === 0 || !bulkMoveTarget}
+            className="text-xs text-teal-700 underline disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+          >
+            Move
+          </button>
+        </div>
+      )}
 
       {isDivision && (
         <div className="flex items-center justify-between gap-2 px-2 py-1 border-b bg-gray-50">
@@ -492,6 +557,14 @@ function GroupColumn({
         {teams.length === 0 && <p className="p-2 text-xs text-gray-400">No teams</p>}
         {teams.map((ts, i) => (
           <div key={ts.id} className="p-2 text-sm flex items-center gap-2">
+            {selectable && (
+              <input
+                type="checkbox"
+                checked={selectedIds.has(ts.id)}
+                onChange={() => onToggleSelect(ts.id)}
+                className="shrink-0"
+              />
+            )}
             {isDivision && (
               <div className="flex flex-col leading-none shrink-0">
                 <button
