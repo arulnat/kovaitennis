@@ -6,6 +6,12 @@
 // creates the team_seasons row with division_id left null, so without this
 // page a team is invisible to Fixture Generation and Standings (both
 // filter team_seasons by division_id).
+//
+// Delete is only offered for a team unassigned in this season (matching
+// what's visible right here); the delete-team Edge Function re-checks
+// server-side across every season before actually removing anything, and
+// does the full teardown — login, players, roster, credentials — since
+// deleting the underlying auth account needs the service_role key.
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
@@ -54,6 +60,26 @@ export default function TeamsPage({ seasonId }) {
     load();
   }
 
+  async function deleteTeam(row) {
+    if (row.division_id) {
+      alert(`"${row.teams?.name}" is assigned to a division — unassign it first before deleting.`);
+      return;
+    }
+    if (!confirm(`Permanently delete "${row.teams?.name}"? This removes its players, roster, and login. This cannot be undone.`)) return;
+
+    const { error } = await supabase.functions.invoke('delete-team', { body: { teamId: row.team_id } });
+    if (error) {
+      // delete-team returns a non-2xx status with a JSON {error} body for
+      // expected failures (e.g. still grouped) — supabase-js doesn't parse
+      // that into error.message itself, so pull it from the raw response.
+      let message = error.message;
+      try { message = (await error.context.json())?.error ?? message; } catch { /* fall back to error.message */ }
+      alert(message);
+      return;
+    }
+    load();
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-xl font-semibold mb-1">Teams</h1>
@@ -76,6 +102,7 @@ export default function TeamsPage({ seasonId }) {
               <th className="p-2">Players</th>
               <th className="text-left p-2">Status</th>
               <th className="text-left p-2">Division</th>
+              <th className="p-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -97,6 +124,16 @@ export default function TeamsPage({ seasonId }) {
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
+                </td>
+                <td className="p-2 text-right">
+                  <button
+                    onClick={() => deleteTeam(r)}
+                    disabled={!!r.division_id}
+                    title={r.division_id ? 'Unassign from its division first' : undefined}
+                    className="text-red-600 text-xs underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
