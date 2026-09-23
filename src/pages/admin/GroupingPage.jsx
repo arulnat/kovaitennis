@@ -101,8 +101,14 @@ export default function GroupingPage({ seasonId }) {
       return;
     }
 
-    // append at the end of the destination's current ranking
-    const nextOrder = targetDivisionId ? teamSeasons.filter((t) => t.division_id === targetDivisionId).length : 0;
+    // Append after the destination's highest current rank. Using the max
+    // existing order_index (not a count of teams) matters because a team
+    // once removed from a division can leave a gap — e.g. ranks 0,1,2 lose
+    // the team at 1, leaving 0 and 2 but a count of 2, which would collide
+    // with the surviving rank-2 team and tie two teams at the same rank.
+    const nextOrder = targetDivisionId
+      ? Math.max(-1, ...teamSeasons.filter((t) => t.division_id === targetDivisionId).map((t) => t.order_index)) + 1
+      : 0;
     const { error } = await supabase
       .from('team_seasons')
       .update({ division_id: targetDivisionId, order_index: nextOrder })
@@ -130,7 +136,9 @@ export default function GroupingPage({ seasonId }) {
     }
 
     const targets = teamSeasons.filter((ts) => selectedPoolIds.has(ts.id));
-    let nextOrder = teamSeasons.filter((t) => t.division_id === poolMoveTarget).length;
+    // See assignDivision: max(order_index)+1, not a count, to avoid
+    // colliding with a surviving team's rank after an earlier removal.
+    let nextOrder = Math.max(-1, ...teamSeasons.filter((t) => t.division_id === poolMoveTarget).map((t) => t.order_index)) + 1;
     for (const ts of targets) {
       const { error } = await supabase
         .from('team_seasons')
@@ -206,8 +214,9 @@ export default function GroupingPage({ seasonId }) {
     )) return;
 
     for (const { divisionId, teamIds } of plan.assignments) {
-      // append each drawn team after whatever's already ranked in that division
-      const baseOrder = teamSeasons.filter((ts) => ts.division_id === divisionId).length;
+      // append each drawn team after whatever's already ranked in that
+      // division — max(order_index)+1, not a count (see assignDivision).
+      const baseOrder = Math.max(-1, ...teamSeasons.filter((ts) => ts.division_id === divisionId).map((ts) => ts.order_index)) + 1;
       for (let i = 0; i < teamIds.length; i++) {
         const { error } = await supabase
           .from('team_seasons')
