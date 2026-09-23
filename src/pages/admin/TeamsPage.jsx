@@ -7,20 +7,36 @@
 // page a team is invisible to Fixture Generation and Standings (both
 // filter team_seasons by division_id).
 //
-// Delete is only offered for a team unassigned in this season (matching
-// what's visible right here); the delete-team Edge Function re-checks
-// server-side across every season before actually removing anything, and
-// does the full teardown — login, players, roster, credentials — since
-// deleting the underlying auth account needs the service_role key.
+// Delete (single, via the per-row button, or several at once via the
+// checkboxes + "Delete selected") is only offered for a team unassigned
+// in this season (matching what's visible right here) — the checkbox
+// itself is disabled for an assigned team so it can't even be selected.
+// The delete-team Edge Function re-checks server-side across every
+// season before actually removing anything, and does the full teardown —
+// login, players, roster, credentials — since deleting the underlying
+// auth account needs the service_role key.
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 
+/** delete-team returns a non-2xx status with a JSON {error} body for
+ * expected failures (e.g. still grouped) — supabase-js doesn't parse
+ * that into error.message itself, so pull it from the raw response. */
+async function extractFunctionErrorMessage(error) {
+  try {
+    const body = await error.context.json();
+    if (body?.error) return body.error;
+  } catch { /* fall back to error.message below */ }
+  return error.message;
+}
+
 export default function TeamsPage({ seasonId }) {
   const { divisions } = useSeason();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(new Set()); // team_seasons row ids
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,6 +62,7 @@ export default function TeamsPage({ seasonId }) {
     }
 
     setRows((teamSeasons || []).map((ts) => ({ ...ts, playerCount: playerCounts[ts.team_id] || 0 })));
+    setSelected(new Set());
     setLoading(false);
   }, [seasonId]);
 
@@ -60,23 +77,36 @@ export default function TeamsPage({ seasonId }) {
     load();
   }
 
-  async function deleteTeam(row) {
-    if (row.division_id) {
-      alert(`"${row.teams?.name}" is assigned to a division — unassign it first before deleting.`);
-      return;
-    }
-    if (!confirm(`Permanently delete "${row.teams?.name}"? This removes its players, roster, and login. This cannot be undone.`)) return;
+  function toggleRow(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
-    const { error } = await supabase.functions.invoke('delete-team', { body: { teamId: row.team_id } });
-    if (error) {
-      // delete-team returns a non-2xx status with a JSON {error} body for
-      // expected failures (e.g. still grouped) — supabase-js doesn't parse
-      // that into error.message itself, so pull it from the raw response.
-      let message = error.message;
-      try { message = (await error.context.json())?.error ?? message; } catch { /* fall back to error.message */ }
-      alert(message);
-      return;
+  const deletableRows = rows.filter((r) => !r.division_id);
+  const allDeletableSelected = deletableRows.length > 0 && deletableRows.every((r) => selected.has(r.id));
+
+  function toggleSelectAll() {
+    setSelected(allDeletableSelected ? new Set() : new Set(deletableRows.map((r) => r.id)));
+  }
+
+  async function deleteTeams(targets) {
+    if (targets.length === 0) return;
+    const names = targets.map((r) => r.teams?.name).join(', ');
+    const label = targets.length === 1 ? `"${names}"` : `${targets.length} teams (${names})`;
+    if (!confirm(`Permanently delete ${label}? This removes their players, roster, and login. This cannot be undone.`)) return;
+
+    setDeleting(true);
+    const failures = [];
+    for (const row of targets) {
+      const { error } = await supabase.functions.invoke('delete-team', { body: { teamId: row.team_id } });
+      if (error) failures.push(`${row.teams?.name}: ${await extractFunctionErrorMessage(error)}`);
     }
+    setDeleting(false);
+
+    if (failures.length > 0) alert(`Some deletions failed:\n${failures.join('\n')}`);
     load();
   }
 
@@ -85,7 +115,8 @@ export default function TeamsPage({ seasonId }) {
       <h1 className="text-xl font-semibold mb-1">Teams</h1>
       <p className="text-sm text-gray-600 mb-4">
         Teams registered for the currently selected season (via Bulk Upload). Assign each to a division —
-        a team with no division won't show up in Fixture Generation or Standings (Req 3.5.5).
+        a team with no division won't show up in Fixture Generation or Standings (Req 3.5.5). Only a team
+        with no division can be deleted — check the ones you want, then Delete selected.
       </p>
 
       {loading ? (
@@ -93,52 +124,82 @@ export default function TeamsPage({ seasonId }) {
       ) : rows.length === 0 ? (
         <p className="text-gray-500">No teams yet — use Bulk Upload to add some.</p>
       ) : (
-        <table className="w-full text-sm border">
-          <thead className="bg-teal-50">
-            <tr>
-              <th className="text-left p-2">Team</th>
-              <th className="text-left p-2">Captain</th>
-              <th className="text-left p-2">Phone</th>
-              <th className="p-2">Players</th>
-              <th className="text-left p-2">Status</th>
-              <th className="text-left p-2">Division</th>
-              <th className="p-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="p-2 font-medium">{r.teams?.name}</td>
-                <td className="p-2">{r.teams?.captain_name}</td>
-                <td className="p-2">{r.teams?.captain_phone}</td>
-                <td className="p-2 text-center">{r.playerCount}</td>
-                <td className="p-2">{r.status}</td>
-                <td className="p-2">
-                  <select
-                    value={r.division_id ?? ''}
-                    onChange={(e) => assignDivision(r.id, e.target.value)}
-                    className="border rounded px-2 py-1 text-xs"
-                  >
-                    <option value="">— unassigned —</option>
-                    {divisions.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="p-2 text-right">
-                  <button
-                    onClick={() => deleteTeam(r)}
-                    disabled={!!r.division_id}
-                    title={r.division_id ? 'Unassign from its division first' : undefined}
-                    className="text-red-600 text-xs underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
-                  >
-                    Delete
-                  </button>
-                </td>
+        <>
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              onClick={() => deleteTeams(rows.filter((r) => selected.has(r.id)))}
+              disabled={selected.size === 0 || deleting}
+              className="px-3 py-1.5 rounded bg-red-600 text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {deleting ? 'Deleting…' : `Delete selected (${selected.size})`}
+            </button>
+          </div>
+
+          <table className="w-full text-sm border">
+            <thead className="bg-teal-50">
+              <tr>
+                <th className="p-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allDeletableSelected}
+                    onChange={toggleSelectAll}
+                    disabled={deletableRows.length === 0}
+                    title="Select all deletable teams"
+                  />
+                </th>
+                <th className="text-left p-2">Team</th>
+                <th className="text-left p-2">Captain</th>
+                <th className="text-left p-2">Phone</th>
+                <th className="p-2">Players</th>
+                <th className="text-left p-2">Status</th>
+                <th className="text-left p-2">Division</th>
+                <th className="p-2">Delete</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t">
+                  <td className="p-2 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleRow(r.id)}
+                      disabled={!!r.division_id}
+                      title={r.division_id ? 'Unassign from its division first' : undefined}
+                    />
+                  </td>
+                  <td className="p-2 font-medium">{r.teams?.name}</td>
+                  <td className="p-2">{r.teams?.captain_name}</td>
+                  <td className="p-2">{r.teams?.captain_phone}</td>
+                  <td className="p-2 text-center">{r.playerCount}</td>
+                  <td className="p-2">{r.status}</td>
+                  <td className="p-2">
+                    <select
+                      value={r.division_id ?? ''}
+                      onChange={(e) => assignDivision(r.id, e.target.value)}
+                      className="border rounded px-2 py-1 text-xs"
+                    >
+                      <option value="">— unassigned —</option>
+                      {divisions.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="p-2 text-right">
+                    <button
+                      onClick={() => deleteTeams([r])}
+                      disabled={!!r.division_id || deleting}
+                      title={r.division_id ? 'Unassign from its division first' : undefined}
+                      className="text-red-600 text-xs underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
     </div>
   );
