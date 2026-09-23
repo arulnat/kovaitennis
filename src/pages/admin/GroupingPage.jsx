@@ -20,10 +20,15 @@
 // Each division also has its own grouping_locked flag: once locked, its
 // roster (which teams belong to it) and each team's order_index (rank
 // within the division, e.g. for seeding) are frozen, and Generate
-// Fixtures refuses to run — the intended flow is arrange teams, set
-// ranking, generate fixtures, THEN lock to protect it all from further
-// changes. Locking is always a manual toggle (never an automatic side
-// effect of generating), consistent with every other lock in this app.
+// Fixtures refuses to run. Successfully generating fixtures locks the
+// division automatically — the intended flow is arrange teams, set
+// ranking, generate fixtures (auto-locks), and it stays that way unless
+// an admin deliberately unlocks it again (e.g. to add a late team).
+// While unlocked, Generate Fixtures becomes Regenerate Fixtures if a
+// schedule already exists: it deletes the old one and builds a fresh
+// one from the current roster, then re-locks. Blocked while frozen
+// (divisions.fixtures_frozen) as an extra safety net, though in
+// practice a frozen division is always also grouping_locked already.
 //
 // Holiday weekends (season_holidays) are dates with no matches — set up
 // front, or added later for a rain-out. Generate Fixtures always uses the
@@ -317,16 +322,31 @@ export default function GroupingPage({ seasonId }) {
   }
 
   async function generateFixtures(division) {
-    if (division.grouping_locked) { alert(`"${division.name}" is locked. Unlock it first to generate fixtures.`); return; }
+    if (division.grouping_locked) { alert(`"${division.name}" is locked. Unlock it first to generate (or regenerate) fixtures.`); return; }
+    if (division.fixtures_frozen) { alert(`"${division.name}" is frozen — unfreeze it first (Fixtures page) before regenerating.`); return; }
     if (!activeSeason?.start_weekend) { alert('Set the tournament start date above first.'); return; }
     const teamIds = teamSeasons
       .filter((ts) => ts.division_id === division.id)
       .sort((a, b) => a.order_index - b.order_index)
       .map((ts) => ts.teams.id);
     if (teamIds.length < 2) { alert('This division needs at least 2 teams first.'); return; }
-    if (divisionsWithFixtures.has(division.id)) { alert('Fixtures were already generated for this division.'); return; }
 
-    if (!confirm(`Generate fixtures for "${division.name}" (${teamIds.length} teams)? Home/away is automatically balanced (Req 4.6).`)) return;
+    // Regenerating (roster changed after an unlock) replaces the whole
+    // schedule from scratch — safe as long as it's not frozen, since
+    // scores can only ever be entered once frozen (Update Scores), so
+    // there's nothing real to lose here.
+    const alreadyGenerated = divisionsWithFixtures.has(division.id);
+    const verb = alreadyGenerated ? 'Regenerate' : 'Generate';
+    if (!confirm(
+      `${verb} fixtures for "${division.name}" (${teamIds.length} teams)?` +
+      (alreadyGenerated ? ' This replaces the existing schedule entirely.' : '') +
+      ' Home/away is automatically balanced (Req 4.6), and the division will be locked afterward.'
+    )) return;
+
+    if (alreadyGenerated) {
+      const { error: deleteErr } = await supabase.from('fixtures').delete().eq('season_id', seasonId).eq('division_id', division.id);
+      if (deleteErr) { alert(deleteErr.message); return; }
+    }
 
     // Req 4.9: pull last season's fixtures (any division) to detect
     // rematches and auto-swap home/away.
@@ -347,7 +367,15 @@ export default function GroupingPage({ seasonId }) {
 
     const { error } = await supabase.from('fixtures').insert(rows);
     if (error) { alert(error.message); return; }
-    load();
+
+    // Once fixtures exist, the division locks automatically (Req: "once
+    // fixture is generated, that division goes to locked state") — an
+    // admin can still manually unlock it later (e.g. to add a team),
+    // which is exactly what makes regenerating possible above.
+    const { error: lockErr } = await supabase.from('divisions').update({ grouping_locked: true }).eq('id', division.id);
+    if (lockErr) { alert(lockErr.message); return; }
+
+    await Promise.all([load(), refreshDivisions()]);
   }
 
   const unassigned = teamSeasons.filter((ts) => !ts.division_id);
@@ -539,7 +567,7 @@ function GroupColumn({
       )}
 
       {onGenerateFixtures && (
-        hasFixtures ? (
+        hasFixtures && locked ? (
           <p className="w-full text-xs text-gray-500 text-center py-1 border-b bg-gray-50">Fixtures generated ✓</p>
         ) : (
           <button
@@ -548,7 +576,7 @@ function GroupColumn({
             title={locked ? 'Unlock this division first' : undefined}
             className="w-full text-xs text-teal-700 underline py-1 border-b disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
           >
-            Generate Fixtures
+            {hasFixtures ? 'Regenerate Fixtures' : 'Generate Fixtures'}
           </button>
         )
       )}
