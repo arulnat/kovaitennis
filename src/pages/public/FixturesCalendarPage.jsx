@@ -15,10 +15,15 @@
 // spreadsheet can't carry the color-coded, styled layout this page uses,
 // and PDF is what actually gets circulated/printed in practice. The
 // print stylesheet (index.css) keeps the colors instead of the browser's
-// default plain-text printout, and page-break rules keep a division's
-// rounds from splitting awkwardly across pages.
+// default plain-text printout and sets the page to landscape A4 for more
+// room; on top of that, the whole schedule must always print as exactly
+// one physical page regardless of how many teams/divisions/rounds there
+// are, so printableRef below is measured and scaled down (via CSS
+// transform, right before the browser's print dialog opens) to fit
+// within one page's printable area — the more there is to show, the
+// smaller it prints, rather than spilling onto a second page.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
@@ -50,11 +55,50 @@ function groupByRound(fixtures) {
   return [...byRound.values()].sort((a, b) => a.round - b.round);
 }
 
+// A4 landscape at 96dpi, minus the @page margin set in index.css (10mm ~
+// 38px per side) — the printable area printableRef's content must fit
+// inside once scaled.
+const PRINT_AREA_WIDTH_PX = 1123 - 2 * 38;
+const PRINT_AREA_HEIGHT_PX = 794 - 2 * 38;
+
 export default function FixturesCalendarPage({ seasonId }) {
   const { divisions } = useSeason();
   const [fixturesByDivision, setFixturesByDivision] = useState(null); // null = loading
+  const printableRef = useRef(null);
 
   const frozenDivisions = divisions.filter((d) => d.fixtures_frozen);
+
+  // Shrink the whole schedule to fit one printed page, whatever its actual
+  // size — measured fresh right before printing (not on every render,
+  // since the unscaled size is what needs measuring).
+  useEffect(() => {
+    function fitToOnePage() {
+      const el = printableRef.current;
+      if (!el) return;
+      el.style.transform = 'none';
+      el.style.width = '';
+      const scale = Math.min(
+        1,
+        PRINT_AREA_WIDTH_PX / el.scrollWidth,
+        PRINT_AREA_HEIGHT_PX / el.scrollHeight
+      );
+      el.style.transform = `scale(${scale})`;
+      el.style.transformOrigin = 'top left';
+      el.style.width = `${100 / scale}%`;
+    }
+    function resetAfterPrint() {
+      const el = printableRef.current;
+      if (!el) return;
+      el.style.transform = '';
+      el.style.width = '';
+    }
+    window.addEventListener('beforeprint', fitToOnePage);
+    window.addEventListener('afterprint', resetAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', fitToOnePage);
+      window.removeEventListener('afterprint', resetAfterPrint);
+    };
+  }, [fixturesByDivision]);
 
   useEffect(() => {
     if (!seasonId || frozenDivisions.length === 0) { setFixturesByDivision({}); return; }
@@ -103,52 +147,56 @@ export default function FixturesCalendarPage({ seasonId }) {
         <p className="text-slate-500 text-sm">Loading…</p>
       )}
 
-      {fixturesByDivision && frozenDivisions.map((d) => (
-        <div key={d.id} className="mb-8" style={{ breakInside: 'avoid' }}>
-          <h2 className="text-white bg-teal-700 rounded-t px-3 py-2 text-base font-bold">{d.name}</h2>
-          <div className="border border-t-0 border-teal-100 rounded-b p-3">
-            {(fixturesByDivision[d.id] || []).length === 0 ? (
-              <p className="text-slate-500 text-sm">No fixtures.</p>
-            ) : (
-              groupByRound(fixturesByDivision[d.id]).map(({ round, weekDate, ties, bye }) => (
-                <div key={round} className="mb-4 last:mb-0" style={{ breakInside: 'avoid' }}>
-                  <p className="inline-block text-xs font-semibold text-teal-800 bg-teal-50 rounded px-2 py-1 mb-2">
-                    Round {round} — Week of {formatWeekDate(weekDate)}
-                  </p>
-                  <table className="w-full text-sm border border-slate-200 rounded overflow-hidden mb-1">
-                    <thead className="bg-teal-100">
-                      <tr>
-                        <th className="text-left p-2 text-teal-900">Home</th>
-                        <th className="text-left p-2 text-teal-900">Away</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ties.map((t, i) => (
-                        <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
-                            <TeamLink teamId={t.homeId}>{t.home}</TeamLink>
-                          </td>
-                          <td className="p-2 text-slate-800 border-t border-slate-200">
-                            <TeamLink teamId={t.awayId}>{t.away}</TeamLink>
-                          </td>
-                        </tr>
-                      ))}
-                      {bye && (
-                        <tr className="bg-accent-400/20">
-                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
-                            <TeamLink teamId={bye.id}>{bye.name}</TeamLink>
-                          </td>
-                          <td className="p-2 text-slate-600 italic border-t border-slate-200">Rest</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              ))
-            )}
-          </div>
+      {fixturesByDivision && (
+        <div ref={printableRef}>
+          {frozenDivisions.map((d) => (
+            <div key={d.id} className="mb-8">
+              <h2 className="text-white bg-teal-700 rounded-t px-3 py-2 text-base font-bold">{d.name}</h2>
+              <div className="border border-t-0 border-teal-100 rounded-b p-3">
+                {(fixturesByDivision[d.id] || []).length === 0 ? (
+                  <p className="text-slate-500 text-sm">No fixtures.</p>
+                ) : (
+                  groupByRound(fixturesByDivision[d.id]).map(({ round, weekDate, ties, bye }) => (
+                    <div key={round} className="mb-4 last:mb-0">
+                      <p className="inline-block text-xs font-semibold text-teal-800 bg-teal-50 rounded px-2 py-1 mb-2">
+                        Round {round} — Week of {formatWeekDate(weekDate)}
+                      </p>
+                      <table className="w-full text-sm border border-slate-200 rounded overflow-hidden mb-1">
+                        <thead className="bg-teal-100">
+                          <tr>
+                            <th className="text-left p-2 text-teal-900">Home</th>
+                            <th className="text-left p-2 text-teal-900">Away</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ties.map((t, i) => (
+                            <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                              <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
+                                <TeamLink teamId={t.homeId}>{t.home}</TeamLink>
+                              </td>
+                              <td className="p-2 text-slate-800 border-t border-slate-200">
+                                <TeamLink teamId={t.awayId}>{t.away}</TeamLink>
+                              </td>
+                            </tr>
+                          ))}
+                          {bye && (
+                            <tr className="bg-accent-400/20">
+                              <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
+                                <TeamLink teamId={bye.id}>{bye.name}</TeamLink>
+                              </td>
+                              <td className="p-2 text-slate-600 italic border-t border-slate-200">Rest</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

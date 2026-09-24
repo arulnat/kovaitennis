@@ -25,3 +25,11 @@
     print-color-adjust: exact !important;
   }
 }
+
+/* Landscape gives the Fixtures Calendar the most room to work with before
+   FixturesCalendarPage's own scale-to-fit-one-page logic kicks in — the
+   PRINT_AREA_WIDTH_PX/HEIGHT_PX constants there assume this exact size. */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
