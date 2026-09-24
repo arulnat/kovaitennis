@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings, highlightBands } from '../../lib/standings.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 export default function StandingsPage({ seasonId, divisionId }) {
   const [rows, setRows] = useState(null);
@@ -82,7 +83,7 @@ export default function StandingsPage({ seasonId, divisionId }) {
                 r.highlight === 'top' ? 'bg-green-50' : r.highlight === 'bottom' ? 'bg-red-50' : ''
               }
             >
-              <td className="p-2 font-medium">{teamNames[r.teamId]}</td>
+              <td className="p-2 font-medium"><TeamLink teamId={r.teamId}>{teamNames[r.teamId]}</TeamLink></td>
               <td className="p-2 text-center">{r.played}</td>
               <td className="p-2 text-center">{r.wins}</td>
               <td className="p-2 text-center">{r.losses}</td>

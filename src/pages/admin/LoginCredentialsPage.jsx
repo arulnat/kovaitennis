@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { downloadCredentialsSheet } from '../../lib/bulkUpload.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 export default function LoginCredentialsPage() {
   const [teams, setTeams] = useState([]);
@@ -92,7 +93,7 @@ export default function LoginCredentialsPage() {
           <tbody>
             {teams.map((t) => (
               <tr key={t.id} className="border-t">
-                <td className="p-2">{t.name}</td>
+                <td className="p-2"><TeamLink teamId={t.id}>{t.name}</TeamLink></td>
                 <td className="p-2 font-mono">{t.login_id}</td>
                 <td className="p-2 font-mono">
                   {t.team_credentials?.default_password ?? <span className="text-gray-400 italic">no login yet</span>}

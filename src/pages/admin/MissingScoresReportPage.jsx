@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 export default function MissingScoresReportPage({ seasonId, divisionId }) {
   const [weekDate, setWeekDate] = useState('');
@@ -60,7 +61,11 @@ export default function MissingScoresReportPage({ seasonId, divisionId }) {
             {rows.map((f) => (
               <tr key={f.id} className="border-t">
                 <td className="p-2">{f.week_date}</td>
-                <td className="p-2">{f.teams_home?.name} vs {f.teams_away?.name}</td>
+                <td className="p-2">
+                  <TeamLink teamId={f.home_team_id}>{f.teams_home?.name}</TeamLink>
+                  {' vs '}
+                  <TeamLink teamId={f.away_team_id}>{f.teams_away?.name}</TeamLink>
+                </td>
                 <td className={`p-2 font-medium ${statusColor[f.status]}`}>
                   {statusLabel[f.status]} ({f.scoredCount}/3)
                 </td>

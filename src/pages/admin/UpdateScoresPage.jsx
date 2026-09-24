@@ -16,6 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 export default function UpdateScoresPage({ seasonId }) {
   const { divisions } = useSeason();
@@ -33,7 +34,7 @@ export default function UpdateScoresPage({ seasonId }) {
     supabase
       .from('fixtures')
       .select(`
-        id, round_number, week_date,
+        id, round_number, week_date, home_team_id, away_team_id,
         teams_home:teams!fixtures_home_team_id_fkey(name),
         teams_away:teams!fixtures_away_team_id_fkey(name),
         rubbers(winner_side)
@@ -106,7 +107,11 @@ export default function UpdateScoresPage({ seasonId }) {
                 <tr key={f.id} className="border-t">
                   <td className="p-2 text-center">{f.round_number}</td>
                   <td className="p-2">{f.week_date}</td>
-                  <td className="p-2">{f.teams_home?.name} vs {f.teams_away?.name}</td>
+                  <td className="p-2">
+                    <TeamLink teamId={f.home_team_id}>{f.teams_home?.name}</TeamLink>
+                    {' vs '}
+                    <TeamLink teamId={f.away_team_id}>{f.teams_away?.name}</TeamLink>
+                  </td>
                   <td className={`p-2 font-medium ${statusColor}`}>{status} ({scored}/3)</td>
                   <td className="p-2 text-right">
                     <button

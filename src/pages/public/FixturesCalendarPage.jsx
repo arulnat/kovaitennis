@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -32,8 +33,19 @@ function groupByRound(fixtures) {
   for (const f of fixtures) {
     if (!byRound.has(f.round_number)) byRound.set(f.round_number, { round: f.round_number, weekDate: f.week_date, ties: [], bye: null });
     const r = byRound.get(f.round_number);
-    if (f.is_bye) r.bye = f.teams_away?.name ?? f.teams_home?.name ?? '—';
-    else r.ties.push({ id: f.id, home: f.teams_home?.name ?? '—', away: f.teams_away?.name ?? '—' });
+    if (f.is_bye) {
+      r.bye = f.teams_away
+        ? { id: f.teams_away.id, name: f.teams_away.name }
+        : f.teams_home
+          ? { id: f.teams_home.id, name: f.teams_home.name }
+          : null;
+    } else {
+      r.ties.push({
+        id: f.id,
+        homeId: f.teams_home?.id ?? null, home: f.teams_home?.name ?? '—',
+        awayId: f.teams_away?.id ?? null, away: f.teams_away?.name ?? '—',
+      });
+    }
   }
   return [...byRound.values()].sort((a, b) => a.round - b.round);
 }
@@ -52,8 +64,8 @@ export default function FixturesCalendarPage({ seasonId }) {
       .from('fixtures')
       .select(`
         division_id, round_number, week_date, is_bye,
-        teams_home:teams!fixtures_home_team_id_fkey(name),
-        teams_away:teams!fixtures_away_team_id_fkey(name)
+        teams_home:teams!fixtures_home_team_id_fkey(id, name),
+        teams_away:teams!fixtures_away_team_id_fkey(id, name)
       `)
       .eq('season_id', seasonId)
       .in('division_id', frozenDivisions.map((d) => d.id))
@@ -113,13 +125,19 @@ export default function FixturesCalendarPage({ seasonId }) {
                     <tbody>
                       {ties.map((t, i) => (
                         <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">{t.home}</td>
-                          <td className="p-2 text-slate-800 border-t border-slate-200">{t.away}</td>
+                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
+                            <TeamLink teamId={t.homeId}>{t.home}</TeamLink>
+                          </td>
+                          <td className="p-2 text-slate-800 border-t border-slate-200">
+                            <TeamLink teamId={t.awayId}>{t.away}</TeamLink>
+                          </td>
                         </tr>
                       ))}
                       {bye && (
                         <tr className="bg-accent-400/20">
-                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">{bye}</td>
+                          <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
+                            <TeamLink teamId={bye.id}>{bye.name}</TeamLink>
+                          </td>
                           <td className="p-2 text-slate-600 italic border-t border-slate-200">Rest</td>
                         </tr>
                       )}

@@ -43,6 +43,7 @@ import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { planAutoGroup } from '../../lib/grouping.js';
 import { buildFixtureRows, buildPriorMeetingMap, computeMatchWeekends } from '../../lib/scheduler.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
@@ -622,7 +623,9 @@ function GroupColumn({
                 </button>
               </div>
             )}
-            <p className="font-medium truncate min-w-0 flex-1">{ts.teams?.name}</p>
+            <p className="font-medium truncate min-w-0 flex-1">
+              <TeamLink teamId={ts.teams?.id}>{ts.teams?.name}</TeamLink>
+            </p>
             <div className="flex items-center gap-1 shrink-0">
               <select
                 value={currentDivisionId ?? ''}

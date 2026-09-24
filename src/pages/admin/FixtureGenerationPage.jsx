@@ -36,6 +36,7 @@ import { useSeason } from '../../lib/seasonContext.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { homeAwayBalanceReport } from '../../lib/scheduler.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -250,7 +251,7 @@ function HomeAwayCountsTable({ report, teamName }) {
         <tbody>
           {report.map((r) => (
             <tr key={r.teamId} className={`border-t ${r.balanced ? '' : 'bg-amber-50'}`}>
-              <td className="p-2 font-medium">{teamName(r.teamId)}</td>
+              <td className="p-2 font-medium"><TeamLink teamId={r.teamId}>{teamName(r.teamId)}</TeamLink></td>
               <td className="p-2 text-center">{r.home}</td>
               <td className="p-2 text-center">{r.away}</td>
             </tr>
@@ -276,8 +277,8 @@ function RoundsTable({ rounds, teamName, onSwap }) {
             <tbody>
               {ties.map((t) => (
                 <tr key={t.id} className="border-t">
-                  <td className="p-2 font-medium">{teamName(t.home)}</td>
-                  <td className="p-2">{teamName(t.away)}</td>
+                  <td className="p-2 font-medium"><TeamLink teamId={t.home}>{teamName(t.home)}</TeamLink></td>
+                  <td className="p-2"><TeamLink teamId={t.away}>{teamName(t.away)}</TeamLink></td>
                   <td className="p-2 text-right">
                     {onSwap && (
                       <button onClick={() => onSwap(t)} className="text-xs text-gray-500 underline">
@@ -289,7 +290,7 @@ function RoundsTable({ rounds, teamName, onSwap }) {
               ))}
               {bye && (
                 <tr className="border-t bg-gray-50">
-                  <td className="p-2 font-medium">{teamName(bye)}</td>
+                  <td className="p-2 font-medium"><TeamLink teamId={bye}>{teamName(bye)}</TeamLink></td>
                   <td className="p-2 text-gray-500 italic" colSpan={2}>Rest</td>
                 </tr>
               )}

@@ -23,6 +23,7 @@ import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
+import TeamLink from '../../components/TeamLink.jsx';
 
 /** delete-team returns a non-2xx status with a JSON {error} body for
  * expected failures (e.g. still grouped) — supabase-js doesn't parse
@@ -186,7 +187,7 @@ export default function TeamsPage({ seasonId }) {
                           title={r.division_id ? 'Unassign from its division first (Grouping)' : undefined}
                         />
                       </td>
-                      <td className="p-2 font-medium">{r.teams?.name}</td>
+                      <td className="p-2 font-medium"><TeamLink teamId={r.team_id}>{r.teams?.name}</TeamLink></td>
                       <td className="p-2">{r.teams?.captain_name}</td>
                       <td className="p-2">{r.teams?.captain_phone}</td>
                       <td className="p-2 text-center">{r.playerCount}</td>

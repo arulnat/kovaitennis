@@ -1,5 +1,5 @@
 // src/App.jsx — top-level routing for the MVP (HP-priority) screens.
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth, RequireRole } from './lib/auth.jsx';
 import { SeasonProvider, useSeason, SeasonSelector } from './lib/seasonContext.jsx';
 
@@ -16,6 +16,7 @@ import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
 import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
+import TeamProfilePage from './pages/public/TeamProfilePage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
             {/* Public (Req 10.5 — no login required) */}
             <Route path="/standings" element={<StandingsRouteWrapper />} />
             <Route path="/fixtures-calendar" element={<FixturesCalendarRouteWrapper />} />
+            <Route path="/team/:teamId" element={<TeamProfileRouteWrapper />} />
 
             {/* Score entry — either captain, or an admin doing it on their behalf (Req 5.2) */}
             <Route path="/score/:fixtureId" element={<RequireRole roles={['team', 'tournament_admin', 'super_admin']}><ScoreEntryRouteWrapper /></RequireRole>} />
@@ -123,6 +125,11 @@ function FixturesCalendarRouteWrapper() {
       <FixturesCalendarPage seasonId={seasonId} />
     </NeedsSeason>
   );
+}
+function TeamProfileRouteWrapper() {
+  const { seasonId } = useSeason();
+  const { teamId } = useParams();
+  return <TeamProfilePage seasonId={seasonId} teamId={teamId} />;
 }
 function ScoreEntryRouteWrapper() {
   const fixtureId = window.location.pathname.split('/').pop();
