@@ -49,6 +49,10 @@ function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
 }
 
+// Sentinel for the bulk-move dropdown's "Unassigned pool" option — distinct
+// from '' (nothing chosen yet), since a real division id is also a string.
+const UNASSIGNED_TARGET = '__unassigned__';
+
 export default function GroupingPage({ seasonId }) {
   const { divisions, refreshDivisions, activeSeason, refresh: refreshSeasons } = useSeason();
 
@@ -60,8 +64,8 @@ export default function GroupingPage({ seasonId }) {
   const [groupSize, setGroupSize] = useState(4);
   const [seed, setSeed] = useState(randomSeed);
   const [startDateDraft, setStartDateDraft] = useState('');
-  const [selectedPoolIds, setSelectedPoolIds] = useState(new Set());
-  const [poolMoveTarget, setPoolMoveTarget] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set()); // team_season ids, from any one column
+  const [moveTarget, setMoveTarget] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +82,7 @@ export default function GroupingPage({ seasonId }) {
     setTeamSeasons(teamSeasonRows || []);
     setDivisionsWithFixtures(new Set((fixtureRows || []).map((f) => f.division_id)));
     setHolidays(holidayRows || []);
-    setSelectedPoolIds(new Set());
+    setSelectedIds(new Set());
     setLoading(false);
   }, [seasonId]);
 
@@ -118,38 +122,53 @@ export default function GroupingPage({ seasonId }) {
     load();
   }
 
-  function togglePoolSelect(teamSeasonId) {
-    setSelectedPoolIds((prev) => {
+  function toggleSelect(teamSeasonId) {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(teamSeasonId)) next.delete(teamSeasonId); else next.add(teamSeasonId);
       return next;
     });
   }
 
-  async function moveSelectedPoolTeams() {
-    if (selectedPoolIds.size === 0) { alert('Select at least one team from the unassigned pool first.'); return; }
-    if (!poolMoveTarget) { alert('Choose a division to move them to.'); return; }
+  // Bulk move — available from the Unassigned pool column and from every
+  // division column, so several already-grouped teams can be moved to a
+  // different division (or back to the pool) in one shot, not just one at
+  // a time via each row's own select.
+  async function moveSelectedTeams() {
+    if (selectedIds.size === 0) { alert('Select at least one team first.'); return; }
+    if (!moveTarget) { alert('Choose a destination first.'); return; }
 
-    const targetDivision = findDivision(poolMoveTarget);
+    const targetDivisionId = moveTarget === UNASSIGNED_TARGET ? null : moveTarget;
+    const targetDivision = targetDivisionId ? findDivision(targetDivisionId) : null;
     if (targetDivision?.grouping_locked) {
       alert(`"${targetDivision.name}" is locked. Unlock it first to move teams into it.`);
       return;
     }
 
-    const targets = teamSeasons.filter((ts) => selectedPoolIds.has(ts.id));
+    const targets = teamSeasons.filter((ts) => selectedIds.has(ts.id));
+    const lockedSource = targets
+      .map((ts) => ts.division_id && findDivision(ts.division_id))
+      .find((d) => d?.grouping_locked);
+    if (lockedSource) {
+      alert(`"${lockedSource.name}" is locked. Unlock it first to move teams out of it.`);
+      return;
+    }
+
     // See assignDivision: max(order_index)+1, not a count, to avoid
     // colliding with a surviving team's rank after an earlier removal.
-    let nextOrder = Math.max(-1, ...teamSeasons.filter((t) => t.division_id === poolMoveTarget).map((t) => t.order_index)) + 1;
+    let nextOrder = targetDivisionId
+      ? Math.max(-1, ...teamSeasons.filter((t) => t.division_id === targetDivisionId).map((t) => t.order_index)) + 1
+      : 0;
     for (const ts of targets) {
       const { error } = await supabase
         .from('team_seasons')
-        .update({ division_id: poolMoveTarget, order_index: nextOrder })
+        .update({ division_id: targetDivisionId, order_index: nextOrder })
         .eq('id', ts.id);
       if (error) { alert(error.message); return; }
       nextOrder++;
     }
 
-    setPoolMoveTarget('');
+    setMoveTarget('');
     load();
   }
 
@@ -503,11 +522,11 @@ export default function GroupingPage({ seasonId }) {
           divisions={divisions}
           onMove={assignDivision}
           selectable
-          selectedIds={selectedPoolIds}
-          onToggleSelect={togglePoolSelect}
-          bulkMoveTarget={poolMoveTarget}
-          onBulkMoveTargetChange={setPoolMoveTarget}
-          onBulkMove={moveSelectedPoolTeams}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          bulkMoveTarget={moveTarget}
+          onBulkMoveTargetChange={setMoveTarget}
+          onBulkMove={moveSelectedTeams}
         />
         {divisions.map((d) => (
           <GroupColumn
@@ -522,6 +541,12 @@ export default function GroupingPage({ seasonId }) {
             onToggleLock={() => toggleGroupingLock(d)}
             hasFixtures={divisionsWithFixtures.has(d.id)}
             onGenerateFixtures={() => generateFixtures(d)}
+            selectable
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            bulkMoveTarget={moveTarget}
+            onBulkMoveTargetChange={setMoveTarget}
+            onBulkMove={moveSelectedTeams}
           />
         ))}
       </div>
@@ -551,7 +576,8 @@ function GroupColumn({
             className="border rounded px-1 py-0.5 text-xs flex-1 min-w-0"
           >
             <option value="">Move {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'selected'} to…</option>
-            {divisions.map((d) => (
+            {isDivision && <option value={UNASSIGNED_TARGET}>Unassigned pool</option>}
+            {divisions.filter((d) => d.id !== currentDivisionId).map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
