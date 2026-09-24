@@ -578,7 +578,9 @@ function GroupColumn({
             <option value="">Move {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'selected'} to…</option>
             {isDivision && <option value={UNASSIGNED_TARGET}>Unassigned pool</option>}
             {divisions.filter((d) => d.id !== currentDivisionId).map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+              <option key={d.id} value={d.id} disabled={d.grouping_locked}>
+                {d.name}{d.grouping_locked ? ' (locked)' : ''}
+              </option>
             ))}
           </select>
           <button
@@ -660,7 +662,9 @@ function GroupColumn({
               >
                 <option value="">Pool</option>
                 {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.id} value={d.id} disabled={d.grouping_locked && d.id !== currentDivisionId}>
+                    {d.name}{d.grouping_locked ? ' (locked)' : ''}
+                  </option>
                 ))}
               </select>
               {currentDivisionId && (
