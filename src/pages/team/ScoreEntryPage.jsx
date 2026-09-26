@@ -366,15 +366,17 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
     <div className="border rounded p-4 mb-4">
       <p className="font-medium mb-2">{label}</p>
 
-      <div className="grid grid-cols-2 gap-4 mb-2">
-        <PlayerPicker label="Home" roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled} />
-        <PlayerPicker label="Away" roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled} />
-      </div>
-
-      <label className="flex items-center gap-2 text-sm mb-2">
+      <label className="flex items-center gap-2 text-sm mb-3">
         <input type="checkbox" checked={isWalkover} onChange={(e) => setIsWalkover(e.target.checked)} disabled={disabled} />
         Walkover
       </label>
+
+      {isWalkover ? (
+        <div className="grid grid-cols-2 gap-4 mb-2">
+          <PlayerPicker label="Home" roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled} />
+          <PlayerPicker label="Away" roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled} />
+        </div>
+      ) : null}
 
       {isWalkover ? (
         <div className="space-y-2 mb-2">
@@ -420,10 +422,17 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
           )}
         </div>
       ) : (
-        <div className="space-y-1 mb-2">
-          <SetInput label="Set 1" value={set1} onChange={setSet1} disabled={disabled} />
-          {!isSingles && <SetInput label="Set 2" value={set2} onChange={setSet2} disabled={disabled} />}
-          {!isSingles && <SetInput label="Super-TB (if 1-1)" value={set3} onChange={setSet3} disabled={disabled} />}
+        <div className="flex flex-wrap items-end gap-4 mb-2">
+          <div className="flex gap-3">
+            <PlayerPicker label="Home" roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled} compact />
+            <PlayerPicker label="Away" roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled} compact />
+          </div>
+          <ScoreBox label="Set score" value={set1} onChange={setSet1} disabled={disabled} />
+          {!isSingles && <ScoreBox label="Set score" value={set2} onChange={setSet2} disabled={disabled} />}
+          {!isSingles && <ScoreBox label="Point score (super-TB, if 1-1)" value={set3} onChange={setSet3} disabled={disabled} />}
+          <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
+            Save
+          </button>
         </div>
       )}
 
@@ -437,17 +446,19 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
         />
       </div>
 
-      <button onClick={handleSubmit} disabled={disabled} className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm disabled:opacity-50">
-        Save {label}
-      </button>
+      {isWalkover && (
+        <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
+          Save
+        </button>
+      )}
     </div>
   );
 }
 
-function PlayerPicker({ label, roster, selectable, count, value, onChange, disabled }) {
+function PlayerPicker({ label, roster, selectable, count, value, onChange, disabled, compact }) {
   const selectableSet = new Set(selectable);
   return (
-    <div>
+    <div className={compact ? 'w-40' : undefined}>
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       {[...Array(count)].map((_, i) => (
         <select
@@ -467,6 +478,22 @@ function PlayerPicker({ label, roster, selectable, count, value, onChange, disab
             .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       ))}
+    </div>
+  );
+}
+
+/** Labeled two-input score box (games or points) — used inline as its own column: Players | Set score | Point score | Save. */
+function ScoreBox({ label, value, onChange, disabled }) {
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-1 whitespace-nowrap">{label}</p>
+      <div className="flex items-center gap-1">
+        <input type="number" min="0" value={value.home} disabled={disabled}
+          onChange={(e) => onChange({ ...value, home: e.target.value })} className="border rounded px-2 py-1.5 w-14 text-center" />
+        <span className="text-gray-400">–</span>
+        <input type="number" min="0" value={value.away} disabled={disabled}
+          onChange={(e) => onChange({ ...value, away: e.target.value })} className="border rounded px-2 py-1.5 w-14 text-center" />
+      </div>
     </div>
   );
 }
