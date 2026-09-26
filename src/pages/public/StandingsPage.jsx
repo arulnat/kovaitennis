@@ -38,8 +38,10 @@ export default function StandingsPage() {
         .from('fixtures')
         .select('id, home_team_id, away_team_id, rubbers(*)')
         .eq('season_id', seasonId)
-        .eq('division_id', divisionId)
-        .eq('status', 'complete'); // adjust to your actual "all 3 rubbers in" marker
+        .eq('division_id', divisionId);
+      // Which ties count is decided below (all 3 rubbers confirmed) — fixtures.status
+      // is a separate scheduling field that's never actually transitioned to 'complete'
+      // anywhere, so filtering on it here silently hid every finished tie.
 
       const ties = (fixtures || [])
         .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at))

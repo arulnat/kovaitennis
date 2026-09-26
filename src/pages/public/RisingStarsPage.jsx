@@ -18,6 +18,7 @@ import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeIndividualStandings } from '../../lib/standings.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PlayerLink from '../../components/PlayerLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import Dropdown from '../../components/Dropdown.jsx';
 
@@ -208,7 +209,7 @@ export default function RisingStarsPage({ seasonId }) {
           <tbody>
             {shownRows.map((r, i) => (
               <tr key={r.playerId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                <td className="p-2 font-bold border-t">{r.playerName ?? '—'}</td>
+                <td className="p-2 font-bold border-t"><PlayerLink playerId={r.playerId}>{r.playerName ?? '—'}</PlayerLink></td>
                 <td className="p-2 border-t"><TeamLink teamId={r.teamId}>{r.teamName}</TeamLink></td>
                 <td className="p-2 border-t text-gray-600">{r.divisionName}</td>
                 <td className="p-2 text-center border-t font-extrabold">{r.wins}</td>

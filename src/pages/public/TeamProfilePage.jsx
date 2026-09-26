@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings } from '../../lib/standings.js';
 import StatPanel from '../../components/StatPanel.jsx';
 import Avatar from '../../components/Avatar.jsx';
+import PlayerLink from '../../components/PlayerLink.jsx';
 
 const SKILLS = [
   { key: 'serve', label: 'Serve' },
@@ -114,8 +115,11 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       if (tsRow?.division_id) {
         const [{ data: divisionTeamSeasons }, { data: divisionFixtures }] = await Promise.all([
           supabase.from('team_seasons').select('team_id').eq('season_id', seasonId).eq('division_id', tsRow.division_id),
+          // Which ties count is decided below (all 3 rubbers confirmed) — not
+          // fixtures.status, which is a scheduling field nothing ever sets to
+          // 'complete', so filtering on it here silently hid every finished tie.
           supabase.from('fixtures').select('id, home_team_id, away_team_id, rubbers(*)')
-            .eq('season_id', seasonId).eq('division_id', tsRow.division_id).eq('status', 'complete'),
+            .eq('season_id', seasonId).eq('division_id', tsRow.division_id),
         ]);
         if (cancelled) return;
 
@@ -203,11 +207,6 @@ export default function TeamProfilePage({ seasonId, teamId }) {
         <Avatar name={team.name} size="lg" className="ring-4 ring-accent-500" />
         <div>
           <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white">{team.name}</h1>
-          {teamSeason?.status && teamSeason.status !== 'placed' && (
-            <span className="inline-block mt-1 text-xs font-bold uppercase tracking-wide bg-accent-500 text-teal-950 rounded px-2 py-0.5">
-              {teamSeason.status}
-            </span>
-          )}
         </div>
       </div>
 
@@ -238,16 +237,18 @@ export default function TeamProfilePage({ seasonId, teamId }) {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {roster.map((r) => (
-                  <div key={r.player_id} className="flex flex-col items-center text-center gap-1.5 p-2 rounded-lg bg-white shadow border border-slate-100">
-                    <Avatar name={r.players?.name} />
-                    <span className="text-xs font-semibold text-slate-800 leading-tight">{r.players?.name}</span>
-                    {r.players?.gender && <span className="text-[10px] text-slate-400 uppercase">{r.players.gender}</span>}
-                    {ratingsByPlayer[r.player_id] && (
-                      <span className="text-[9px] text-slate-500 leading-tight" title={`Average of ${ratingsByPlayer[r.player_id].count} rating(s) this season`}>
-                        Avg {ratingsByPlayer[r.player_id].average}
-                      </span>
-                    )}
-                  </div>
+                  <PlayerLink key={r.player_id} playerId={r.player_id} className="block">
+                    <div className="flex flex-col items-center text-center gap-1.5 p-2 rounded-lg bg-white shadow border border-slate-100 hover:border-accent-500 transition-colors">
+                      <Avatar name={r.players?.name} />
+                      <span className="text-xs font-semibold text-slate-800 leading-tight">{r.players?.name}</span>
+                      {r.players?.gender && <span className="text-[10px] text-slate-400 uppercase">{r.players.gender}</span>}
+                      {ratingsByPlayer[r.player_id] && (
+                        <span className="text-[9px] text-slate-500 leading-tight" title={`Average of ${ratingsByPlayer[r.player_id].count} rating(s) this season`}>
+                          Avg {ratingsByPlayer[r.player_id].average}
+                        </span>
+                      )}
+                    </div>
+                  </PlayerLink>
                 ))}
               </div>
             )}
@@ -274,7 +275,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                     const summary = ratingsByPlayer[r.player_id];
                     return (
                       <tr key={r.player_id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="p-2 font-medium border-t">{r.players?.name}</td>
+                        <td className="p-2 font-medium border-t"><PlayerLink playerId={r.player_id}>{r.players?.name}</PlayerLink></td>
                         <td className="p-2 text-center border-t font-extrabold">{summary.average}</td>
                         {SKILLS.map((s) => (
                           <td key={s.key} className="p-2 text-center border-t text-xs">
