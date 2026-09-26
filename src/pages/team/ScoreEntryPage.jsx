@@ -639,18 +639,17 @@ function RubberEditor({
     if (score.set3 && !isValidSuperTiebreakSet(score.set3.home, score.set3.away)) {
       alert('Invalid super-tiebreak score (min 10, win by 2 past 10-10).'); return;
     }
-    if (showTiebreakColumn) {
-      const tiebreakEntered = tiebreak.home !== '' || tiebreak.away !== '';
-      if (isTiebreakSet) {
-        const tbHome = Number(tiebreak.home), tbAway = Number(tiebreak.away);
-        if (!tiebreakEntered || !isValidSuperTiebreakSet(tbHome, tbAway)) {
-          alert('Set 1 went to 7-6 — enter a valid tiebreak point score (min 10, win by 2 past 10-10).'); return;
-        }
-        score.set1.tiebreakHome = tbHome;
-        score.set1.tiebreakAway = tbAway;
-      } else if (tiebreakEntered) {
-        alert('Tiebreak points can only be entered when set 1 finishes 7-6 (one side on 6, the other on 7).'); return;
+    // Set 1 not actually 7-6/6-7 — whatever's sitting in the Tiebreak
+    // boxes (leftover from a stray click, an old entry before the set
+    // score was corrected, etc.) is irrelevant and simply ignored, never
+    // an error. Only a genuine 7-6/6-7 finish requires and validates it.
+    if (showTiebreakColumn && isTiebreakSet) {
+      const tbHome = Number(tiebreak.home), tbAway = Number(tiebreak.away);
+      if (tiebreak.home === '' || tiebreak.away === '' || !isValidSuperTiebreakSet(tbHome, tbAway)) {
+        alert('Set 1 went to 7-6 — enter a valid tiebreak point score (min 10, win by 2 past 10-10).'); return;
       }
+      score.set1.tiebreakHome = tbHome;
+      score.set1.tiebreakAway = tbAway;
     }
 
     onSave({
