@@ -79,7 +79,7 @@ Status legend: ✅ built · 🔁 built, modified from the original ask · ⏸ de
 | 6.5 | Top 2 / bottom 2 highlighted | ✅ | `highlightBands` |
 | 6.6 | Individual standings; doubles credits both players, not the pair | ✅ | `computeIndividualStandings` (caller aggregates doubles per-player) |
 | 6.7 | Individual standings highlight bands | ✅ | `highlightBands` (reused) |
-| 6.8 | Combined cross-group singles leaderboard | ✅ (function ready) | `computeIndividualStandings` accepts any slice of records; page-level combined view not built |
+| 6.8 | Combined cross-group singles leaderboard | ✅ | **Rising Stars** page (`/rising-stars`, public) — `computeIndividualStandings` (unchanged) now has a page: singles/doubles toggle (doubles combines doubles1+doubles2 per player, per 6.6), a division filter defaulting to "Show All" (all groups combined, 6.8) or one group (6.6), and a team filter within that scope to spot one team's standouts — the team filter and the doubles option are both additions beyond the original numbered spec. |
 | 6.11 | Champion doubles pair recorded per season | ✅ (schema only) | `seasons.champion_doubles_winner_ids` |
 | — | Standings computed live from `rubbers`, never cached | ✅ | `StandingsPage.jsx` queries fresh every load, so a correction inside the 5.7 edit window shows immediately |
 

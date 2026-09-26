@@ -18,6 +18,7 @@ import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
 import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
 import TeamProfilePage from './pages/public/TeamProfilePage.jsx';
+import RisingStarsPage from './pages/public/RisingStarsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
             {/* Public (Req 10.5 — no login required) */}
             <Route path="/standings" element={<StandingsRouteWrapper />} />
             <Route path="/fixtures-calendar" element={<FixturesCalendarRouteWrapper />} />
+            <Route path="/rising-stars" element={<RisingStarsRouteWrapper />} />
             <Route path="/team/:teamId" element={<TeamProfileRouteWrapper />} />
 
             {/* Score entry — either captain, or an admin doing it on their behalf (Req 5.2) */}
@@ -109,6 +111,7 @@ function Nav() {
         Tennis League
       </Link>
       <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
+      <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <SetupMenu />
@@ -163,6 +166,14 @@ function FixturesCalendarRouteWrapper() {
   return (
     <NeedsSeason>
       <FixturesCalendarPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
+}
+function RisingStarsRouteWrapper() {
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <RisingStarsPage seasonId={seasonId} />
     </NeedsSeason>
   );
 }
