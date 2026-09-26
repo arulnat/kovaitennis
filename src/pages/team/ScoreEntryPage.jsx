@@ -2,17 +2,24 @@
 //
 // Req 5.1–5.9: either captain enters/edits a tie's 3 rubbers, saved one
 // at a time as a normal (not final) update — Save is provisional right
-// up until the tie finalizes. Eligibility (5.5) is enforced by filtering
-// the player selectors live via selectablePlayers().
+// up until the tie finalizes. The 3 rubbers can be entered in any
+// order (doubles1 first, then singles, etc.) — nothing here gates one
+// on another. Eligibility (5.5) is enforced by filtering the player
+// selectors live via selectablePlayers(). A running tie-score tally
+// (rubbers won so far) shows once any rubber is in, and standings
+// (Section 6) update live off the same `rubbers` rows automatically.
 //
 // Finalization replaces the original spec's 7-day captain-edit window:
-// once all 3 rubbers are scored AND both captains have rated every
-// opposing player who played (the Performance tab), a database trigger
-// (0014_auto_finalize_tie.sql) stamps fixtures.finalized_at itself —
-// captains can no longer edit anything after that, but admin can still
-// edit scores (never ratings — that's true even before finalization:
-// admin has no write access to tie_player_ratings at all, "admin can
-// only edit the scores, not the performance of the players").
+// once all 3 rubbers are scored, a database trigger
+// (0014_auto_finalize_tie.sql, corrected by 0015 to drop ratings from
+// the condition) stamps fixtures.finalized_at itself — captains can no
+// longer edit scores after that, admin still can. Strategy Builder
+// ratings (the Performance tab) are optional and were deliberately
+// decoupled from this: they're never required for finalization and are
+// never locked by it either — the opposing captain can give one
+// whenever they like. Admin has no write access to ratings at all,
+// regardless of finalization ("admin can only edit the scores, not the
+// performance of the players").
 //
 // Nothing can be scored until the fixture's season is published (Fixtures
 // page) — this applies to admin too, not just captains: the schedule
@@ -176,17 +183,20 @@ export default function ScoreEntryPage({ fixtureId }) {
       )}
 
       <p className="text-sm text-gray-600 mb-4">
-        Either captain can save or edit any rubber's score — Save is provisional, not final.{' '}
+        Either captain can save or edit any rubber's score, in any order — Save is provisional, not final.{' '}
         {isFinalized ? (
           <span className="text-red-600 font-semibold">
-            This tie is finalized — {isAdmin ? 'admin can still fix a score, but ratings are locked for everyone.' : 'contact admin for any further changes.'}
+            This tie is finalized — {isAdmin ? 'admin can still fix a score.' : 'contact admin for any further changes to scores.'}
           </span>
         ) : (
-          <span className="text-teal-700">
-            It stays open until all 3 rubbers are scored and both captains have rated the opposing players who played (Performance tab) — then it locks for good.
-          </span>
-        )}
+          <span className="text-teal-700">It stays open until all 3 rubbers are scored — then it locks for good.</span>
+        )}{' '}
+        Rating the opposing players who played (Performance tab) is optional and never locks — give one whenever you like, before or after the tie finalizes.
       </p>
+
+      {RUBBER_TYPES.some((t) => rubbers[t]?.winner_side) && (
+        <TieScoreTally rubbers={rubbers} teamNames={teamNames} />
+      )}
 
       <div className="flex border-b-2 border-accent-500 mb-4 flex-wrap">
         {RUBBER_TYPES.map((type) => (
@@ -246,7 +256,6 @@ export default function ScoreEntryPage({ fixtureId }) {
           teamNames={teamNames}
           ratings={ratings}
           tieComplete={tieComplete}
-          isFinalized={isFinalized}
           isAdmin={isAdmin}
           mySide={mySide}
           onSave={saveRating}
@@ -257,6 +266,19 @@ export default function ScoreEntryPage({ fixtureId }) {
 }
 
 const RUBBER_LABELS = { singles: 'Singles', doubles1: 'Doubles 1', doubles2: 'Doubles 2' };
+
+/** Running rubbers-won tally for the tie so far — "the points between 2 teams" — updates the instant any rubber is saved, in whatever order they were entered. This is the match score itself; each team's season standings points (Section 6) update the same way, live off the same `rubbers` rows, wherever standings are shown. */
+function TieScoreTally({ rubbers, teamNames }) {
+  const homeWon = RUBBER_TYPES.filter((t) => rubbers[t]?.winner_side === 'home').length;
+  const awayWon = RUBBER_TYPES.filter((t) => rubbers[t]?.winner_side === 'away').length;
+  return (
+    <div className="flex items-center justify-center gap-4 bg-teal-950 text-white rounded-lg shadow-lg py-3 mb-4">
+      <span className={`text-sm font-extrabold uppercase tracking-wide ${homeWon > awayWon ? 'text-accent-400' : ''}`}>{teamNames.home}</span>
+      <span className="text-2xl font-extrabold">{homeWon} – {awayWon}</span>
+      <span className={`text-sm font-extrabold uppercase tracking-wide ${awayWon > homeWon ? 'text-accent-400' : ''}`}>{teamNames.away}</span>
+    </div>
+  );
+}
 
 /** Distinct player ids actually selected across the 3 rubbers, for one side — "who played", per Req 15.1/15.2. */
 function playersWhoPlayed(rubbers, side) {
@@ -273,10 +295,11 @@ function playersWhoPlayed(rubbers, side) {
 /**
  * Req 15.1/15.2/15.5/15.7 — the opposing captain rates each player who
  * played, once per tie: a 5–10 overall score plus Strong/Weak/neutral
- * tags on 4 named skills. Only the opposing captain can write here (see
- * tie_player_ratings RLS) — admin never can, only ever a read-only view.
+ * tags on 4 named skills. Optional, and never locked by finalization —
+ * only the opposing captain can write here (see tie_player_ratings
+ * RLS) — admin never can, only ever a read-only view.
  */
-function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieComplete, isFinalized, isAdmin, mySide, onSave }) {
+function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieComplete, isAdmin, mySide, onSave }) {
   if (!tieComplete) {
     return <p className="text-sm text-gray-500 p-4">Enter and save all 3 rubbers' scores first — ratings open once the tie is complete.</p>;
   }
@@ -309,9 +332,8 @@ function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieCompl
   return (
     <div>
       <p className="text-sm text-gray-600 mb-3">
-        Rate {teamNames[opponentSide]}'s players who played this tie — a scouting aid for whoever plays them next.
+        Rate {teamNames[opponentSide]}'s players who played this tie — optional, a scouting aid for whoever plays them next. Give it whenever you like, it's never locked.
       </p>
-      {isFinalized && <p className="text-sm text-red-600 mb-3">This tie is finalized — ratings are locked.</p>}
       {opponentPlayers.length === 0 ? (
         <p className="text-sm text-gray-500">No opposing players recorded yet.</p>
       ) : (
@@ -322,7 +344,6 @@ function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieCompl
               playerId={playerId}
               playerName={opponentRoster.find((p) => p.id === playerId)?.name ?? '—'}
               existing={ratingFor(playerId)}
-              disabled={isFinalized}
               onSave={(payload) => onSave(playerId, myTeamId, payload)}
             />
           ))}
@@ -364,7 +385,7 @@ function ReadOnlyRatings({ title, playerIds, roster, ratings }) {
   );
 }
 
-function PlayerRatingRow({ playerId, playerName, existing, disabled, onSave }) {
+function PlayerRatingRow({ playerId, playerName, existing, onSave }) {
   const [overallRating, setOverallRating] = useState(existing?.overall_rating ?? '');
   const [skills, setSkills] = useState(Object.fromEntries(SKILLS.map((s) => [s.key, existing?.[s.key] ?? null])));
   const [saving, setSaving] = useState(false);
@@ -388,7 +409,7 @@ function PlayerRatingRow({ playerId, playerName, existing, disabled, onSave }) {
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-500">Overall (5–10)</label>
           <input
-            type="number" min="5" max="10" value={overallRating} disabled={disabled}
+            type="number" min="5" max="10" value={overallRating}
             onChange={(e) => setOverallRating(e.target.value)}
             className="border rounded px-2 py-1 w-16 text-center text-sm"
           />
@@ -402,9 +423,8 @@ function PlayerRatingRow({ playerId, playerName, existing, disabled, onSave }) {
               <button
                 key={v}
                 type="button"
-                disabled={disabled}
                 onClick={() => toggleSkill(s.key, v)}
-                className={`px-2 py-0.5 rounded uppercase font-bold text-[10px] disabled:opacity-40 ${
+                className={`px-2 py-0.5 rounded uppercase font-bold text-[10px] ${
                   skills[s.key] === v
                     ? v === 'strong' ? 'bg-teal-700 text-white' : 'bg-amber-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
