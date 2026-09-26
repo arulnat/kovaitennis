@@ -4,8 +4,12 @@
 // page (that's where "Generate Fixtures" lives — a division is ready the
 // moment its grouping is settled, and assignHomeAway guarantees the Req
 // 4.6 home/away balance algorithmically, so there's no preview/override
-// step at generation time). Pick a division from the list box; if it has
-// no generated fixtures yet, nothing is shown.
+// step at generation time). Two tabs, admin-only Schedule/Balance switch
+// (a non-admin only ever sees Schedule, no tab bar at all): Schedule
+// picks one division from the list box (if it has no generated fixtures
+// yet, nothing is shown); Home/Away Balance shows every division's
+// count table at once (Req 4.12), not just the one selected for
+// Schedule, loaded lazily the first time the tab is opened.
 //
 // Admins can still manually swap a fixture's home/away after the fact —
 // gated by each division's own fixtures_locked flag (defaults unlocked,
@@ -59,9 +63,11 @@ function groupByRound(fixtures) {
 export default function FixtureGenerationPage({ seasonId }) {
   const { divisions, refreshDivisions, activeSeason, refresh } = useSeason();
   const { isAdmin } = useAuth();
+  const [tab, setTab] = useState('schedule'); // 'schedule' | 'balance' (balance is admin-only)
   const [selectedDivisionId, setSelectedDivisionId] = useState('');
   const [teams, setTeams] = useState([]);
   const [fixtures, setFixtures] = useState(null); // null = never loaded yet (first load only)
+  const [balanceByDivision, setBalanceByDivision] = useState(null); // null = not loaded yet
   const requestId = useRef(0);
   const contentRef = useRef(null);
 
@@ -99,6 +105,38 @@ export default function FixtureGenerationPage({ seasonId }) {
   }, [seasonId, selectedDivisionId]);
 
   useEffect(() => { loadFixtures(); }, [loadFixtures]);
+
+  // Home/Away Balance tab: every division at once, not just the one
+  // selected for Schedule.
+  const loadBalance = useCallback(async () => {
+    if (!isAdmin) return;
+    setBalanceByDivision(null);
+    const [{ data: teamRows }, { data: fixtureRows }] = await Promise.all([
+      supabase.from('team_seasons').select('division_id, teams(id, name)').eq('season_id', seasonId),
+      supabase.from('fixtures').select('division_id, home_team_id, away_team_id, is_bye').eq('season_id', seasonId),
+    ]);
+    const namesByDivision = {};
+    for (const r of teamRows || []) {
+      (namesByDivision[r.division_id] ??= new Map()).set(r.teams.id, r.teams.name);
+    }
+    const tiesByDivision = {};
+    for (const f of fixtureRows || []) {
+      if (f.is_bye) continue;
+      (tiesByDivision[f.division_id] ??= []).push({ home: f.home_team_id, away: f.away_team_id });
+    }
+    const result = divisions.map((d) => {
+      const names = namesByDivision[d.id] ?? new Map();
+      const report = homeAwayBalanceReport([{ ties: tiesByDivision[d.id] ?? [] }])
+        .sort((a, b) => (names.get(a.teamId) ?? '').localeCompare(names.get(b.teamId) ?? ''));
+      return { division: d, teamName: (id) => names.get(id) ?? '—', report };
+    });
+    setBalanceByDivision(result);
+  }, [isAdmin, seasonId, divisions]);
+
+  function selectTab(t) {
+    setTab(t);
+    if (t === 'balance') loadBalance();
+  }
 
   const division = divisions.find((d) => d.id === selectedDivisionId) ?? null;
 
@@ -155,15 +193,11 @@ export default function FixtureGenerationPage({ seasonId }) {
     const { error } = await supabase.from('fixtures').update({ home_team_id: tie.away, away_team_id: tie.home }).eq('id', tie.id);
     if (error) { alert(error.message); return; }
     loadFixtures();
+    setBalanceByDivision(null); // stale after a swap — refetched next time the Balance tab is opened
   }
 
   const teamName = (id) => teams.find((t) => t.id === id)?.name ?? '—';
   const rounds = fixtures ? groupByRound(fixtures) : [];
-  // homeAwayBalanceReport (scheduler.js) only reads each round's `ties`
-  // ({home, away} team ids), which groupByRound's output already matches.
-  const balanceReport = isAdmin
-    ? homeAwayBalanceReport(rounds).sort((a, b) => teamName(a.teamId).localeCompare(teamName(b.teamId)))
-    : [];
 
   if (divisions.length === 0) {
     return <p className="p-6 text-gray-500">This season has no divisions yet — create one under Divisions first.</p>;
@@ -187,58 +221,92 @@ export default function FixtureGenerationPage({ seasonId }) {
         }
       />
 
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-        <label className="text-sm text-gray-700">
-          Division
-          <select
-            value={selectedDivisionId}
-            onChange={(e) => setSelectedDivisionId(e.target.value)}
-            className="border rounded px-2 py-1 text-sm ml-2"
-          >
-            {divisions.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-        </label>
-
-        {division && (
-          <div className="flex items-center gap-2">
-            <span className={`text-xs font-medium px-2 py-1 rounded ${division.fixtures_locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-              Swaps {division.fixtures_locked ? 'Locked' : 'Unlocked'}
-            </span>
-            <button onClick={toggleFixturesLock} className="text-xs text-teal-700 underline">
-              {division.fixtures_locked ? 'Unlock swaps' : 'Lock swaps'}
+      {isAdmin && (
+        <div className="flex border-b-2 border-accent-500 mb-4">
+          {[['schedule', 'Schedule'], ['balance', 'Home / Away Balance']].map(([t, label]) => (
+            <button
+              key={t}
+              onClick={() => selectTab(t)}
+              className={`px-4 py-2 text-sm font-extrabold uppercase tracking-wide rounded-t ${
+                tab === t ? 'bg-teal-900 text-white' : 'text-teal-800 hover:bg-teal-50'
+              }`}
+            >
+              {label}
             </button>
-          </div>
-        )}
-      </div>
-
-      {activeSeason && !activeSeason.published && (
-        <p className="text-xs text-gray-500 mb-4">
-          Scores can't be entered anywhere in this season until it's published — see the Publish Season button above.
-        </p>
+          ))}
+        </div>
       )}
 
-      <div ref={contentRef} style={{ minHeight: '16rem' }}>
-        {fixtures === null && <p className="text-gray-500 text-sm">Loading…</p>}
+      {tab === 'balance' && isAdmin ? (
+        <div>
+          {balanceByDivision === null ? (
+            <p className="text-gray-500 text-sm">Loading…</p>
+          ) : (
+            balanceByDivision.map(({ division: d, teamName: dTeamName, report }) => (
+              <div key={d.id} className="mb-6">
+                <h2 className="text-sm font-extrabold uppercase tracking-wide text-teal-900 mb-1">{d.name}</h2>
+                {report.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No fixtures generated yet.</p>
+                ) : (
+                  <HomeAwayCountsTable report={report} teamName={dTeamName} />
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+            <label className="text-sm text-gray-700">
+              Division
+              <select
+                value={selectedDivisionId}
+                onChange={(e) => setSelectedDivisionId(e.target.value)}
+                className="border rounded px-2 py-1 text-sm ml-2"
+              >
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </label>
 
-        {fixtures !== null && fixtures.length === 0 && (
-          <p className="text-gray-500 text-sm">
-            No fixtures generated yet for this division — use Grouping to generate them.
-          </p>
-        )}
+            {division && (
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium px-2 py-1 rounded ${division.fixtures_locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                  Swaps {division.fixtures_locked ? 'Locked' : 'Unlocked'}
+                </span>
+                <button onClick={toggleFixturesLock} className="text-xs text-teal-700 underline">
+                  {division.fixtures_locked ? 'Unlock swaps' : 'Lock swaps'}
+                </button>
+              </div>
+            )}
+          </div>
 
-        {fixtures !== null && fixtures.length > 0 && (
-          <>
-            {isAdmin && <HomeAwayCountsTable report={balanceReport} teamName={teamName} />}
-            <RoundsTable
-              rounds={rounds}
-              teamName={teamName}
-              onSwap={division?.fixtures_locked ? null : swapHomeAway}
-            />
-          </>
-        )}
-      </div>
+          {activeSeason && !activeSeason.published && (
+            <p className="text-xs text-gray-500 mb-4">
+              Scores can't be entered anywhere in this season until it's published — see the Publish Season button above.
+            </p>
+          )}
+
+          <div ref={contentRef} style={{ minHeight: '16rem' }}>
+            {fixtures === null && <p className="text-gray-500 text-sm">Loading…</p>}
+
+            {fixtures !== null && fixtures.length === 0 && (
+              <p className="text-gray-500 text-sm">
+                No fixtures generated yet for this division — use Grouping to generate them.
+              </p>
+            )}
+
+            {fixtures !== null && fixtures.length > 0 && (
+              <RoundsTable
+                rounds={rounds}
+                teamName={teamName}
+                onSwap={division?.fixtures_locked ? null : swapHomeAway}
+              />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
