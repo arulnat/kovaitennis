@@ -17,7 +17,7 @@ export default function MissingScoresReportPage({ seasonId }) {
   async function runReport() {
     let query = supabase
       .from('fixtures')
-      .select('id, week_date, home_team_id, away_team_id, teams_home:teams!fixtures_home_team_id_fkey(name), teams_away:teams!fixtures_away_team_id_fkey(name), rubbers(rubber_type, winner_side)')
+      .select('id, week_date, home_team_id, away_team_id, teams_home:teams!fixtures_home_team_id_fkey(name), teams_away:teams!fixtures_away_team_id_fkey(name), rubbers(rubber_type, winner_side, confirmed_at)')
       .eq('season_id', seasonId)
       .eq('is_bye', false);
 
@@ -27,7 +27,7 @@ export default function MissingScoresReportPage({ seasonId }) {
     if (error) { alert(error.message); return; }
 
     const withStatus = (data || []).map((f) => {
-      const scored = f.rubbers?.filter((r) => r.winner_side).length ?? 0;
+      const scored = f.rubbers?.filter((r) => r.winner_side && r.confirmed_at).length ?? 0;
       const status = scored === 3 ? 'complete' : scored === 0 ? 'nothing_entered' : 'partial';
       return { ...f, scoredCount: scored, status };
     });

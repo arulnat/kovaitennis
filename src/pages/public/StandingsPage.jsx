@@ -42,7 +42,7 @@ export default function StandingsPage() {
         .eq('status', 'complete'); // adjust to your actual "all 3 rubbers in" marker
 
       const ties = (fixtures || [])
-        .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side))
+        .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at))
         .map((f) => {
           const homeWins = f.rubbers.filter((r) => r.winner_side === 'home').length;
           const winner = homeWins >= 2 ? 'home' : 'away';

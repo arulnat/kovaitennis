@@ -39,7 +39,7 @@ export default function UpdateScoresPage({ seasonId }) {
         id, round_number, week_date, home_team_id, away_team_id,
         teams_home:teams!fixtures_home_team_id_fkey(name),
         teams_away:teams!fixtures_away_team_id_fkey(name),
-        rubbers(winner_side)
+        rubbers(winner_side, confirmed_at)
       `)
       .eq('season_id', seasonId)
       .eq('division_id', selectedDivisionId)
@@ -98,7 +98,7 @@ export default function UpdateScoresPage({ seasonId }) {
           </thead>
           <tbody>
             {fixtures.map((f) => {
-              const scored = f.rubbers?.filter((r) => r.winner_side).length ?? 0;
+              const scored = f.rubbers?.filter((r) => r.winner_side && r.confirmed_at).length ?? 0;
               const status = scored === 3 ? 'Complete' : scored === 0 ? 'Nothing entered' : 'Partially updated';
               const statusColor = scored === 3 ? 'text-green-700' : scored === 0 ? 'text-red-700' : 'text-amber-700';
               return (

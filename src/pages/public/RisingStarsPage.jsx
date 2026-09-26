@@ -43,7 +43,7 @@ function aggregatePlayerStats(fixtures, kind) {
 
   for (const f of fixtures) {
     for (const r of f.rubbers ?? []) {
-      if (!rubberTypes.includes(r.rubber_type) || !r.winner_side) continue;
+      if (!rubberTypes.includes(r.rubber_type) || !r.winner_side || !r.confirmed_at) continue;
 
       let homeSetsWon = 0, homeSetsLost = 0, homeGamesWon = 0, homeGamesLost = 0;
       for (const n of [1, 2, 3]) {
@@ -92,7 +92,7 @@ export default function RisingStarsPage({ seasonId }) {
           teams_home:teams!fixtures_home_team_id_fkey(id, name),
           teams_away:teams!fixtures_away_team_id_fkey(id, name),
           divisions(id, name),
-          rubbers(rubber_type, winner_side, home_player1_id, home_player2_id, away_player1_id, away_player2_id, set1_home, set1_away, set2_home, set2_away, set3_home, set3_away)
+          rubbers(rubber_type, winner_side, confirmed_at, home_player1_id, home_player2_id, away_player1_id, away_player2_id, set1_home, set1_away, set2_home, set2_away, set3_home, set3_away)
         `)
         .eq('season_id', seasonId)
         .eq('is_bye', false);

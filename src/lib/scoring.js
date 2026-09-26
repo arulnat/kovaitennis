@@ -183,6 +183,8 @@ export function scoreToRow(score) {
   return {
     set1_home: score.set1?.home ?? null,
     set1_away: score.set1?.away ?? null,
+    set1_tiebreak_home: score.set1?.tiebreakHome ?? null,
+    set1_tiebreak_away: score.set1?.tiebreakAway ?? null,
     set2_home: score.set2?.home ?? null,
     set2_away: score.set2?.away ?? null,
     set3_home: score.set3?.home ?? null,
@@ -193,6 +195,10 @@ export function scoreToRow(score) {
 /** Inverse of scoreToRow. */
 export function rowToScore(row) {
   const score = { set1: { home: row.set1_home, away: row.set1_away } };
+  if (row.set1_tiebreak_home != null) {
+    score.set1.tiebreakHome = row.set1_tiebreak_home;
+    score.set1.tiebreakAway = row.set1_tiebreak_away;
+  }
   if (row.set2_home != null) score.set2 = { home: row.set2_home, away: row.set2_away };
   if (row.set3_home != null) score.set3 = { home: row.set3_home, away: row.set3_away };
   return score;

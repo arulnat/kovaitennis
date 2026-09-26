@@ -48,7 +48,7 @@ function formatWeekDate(dateStr) {
 /** Same tie-result derivation StandingsPage uses, kept local since here it's evaluated relative to one team's side. */
 function tieOutcomeForTeam(fixture, isHome) {
   const rubbers = fixture.rubbers ?? [];
-  if (rubbers.length !== 3 || !rubbers.every((r) => r.winner_side)) return null;
+  if (rubbers.length !== 3 || !rubbers.every((r) => r.winner_side && r.confirmed_at)) return null;
   const homeWins = rubbers.filter((r) => r.winner_side === 'home').length;
   const won = isHome ? homeWins >= 2 : homeWins < 2;
   return won ? 'W' : 'L';
@@ -119,7 +119,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
 
         const teamIds = (divisionTeamSeasons || []).map((r) => r.team_id);
         const ties = (divisionFixtures || [])
-          .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side))
+          .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at))
           .map((f) => {
             const homeWins = f.rubbers.filter((r) => r.winner_side === 'home').length;
             const winner = homeWins >= 2 ? 'home' : 'away';
@@ -148,7 +148,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
           id, round_number, week_date, is_bye, home_team_id, away_team_id,
           teams_home:teams!fixtures_home_team_id_fkey(id, name),
           teams_away:teams!fixtures_away_team_id_fkey(id, name),
-          rubbers(winner_side)
+          rubbers(winner_side, confirmed_at)
         `)
         .eq('season_id', seasonId)
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
@@ -172,8 +172,8 @@ export default function TeamProfilePage({ seasonId, teamId }) {
     );
   }
 
-  const scoredFixtures = fixtures.filter((f) => !f.is_bye && f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side));
-  const upcomingFixtures = fixtures.filter((f) => f.is_bye || !(f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side)));
+  const scoredFixtures = fixtures.filter((f) => !f.is_bye && f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at));
+  const upcomingFixtures = fixtures.filter((f) => f.is_bye || !(f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at)));
   const shownFixtures = tab === 'completed' ? scoredFixtures : upcomingFixtures;
 
   const statRows = [
