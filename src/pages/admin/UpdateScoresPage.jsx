@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 export default function UpdateScoresPage({ seasonId }) {
   const { divisions } = useSeason();
@@ -55,11 +56,10 @@ export default function UpdateScoresPage({ seasonId }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Update Scores</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Pick a fixture to enter or edit its score — same as either captain can, including after their normal
-        7-day edit window has locked it (Req 5.2, 5.7).
-      </p>
+      <PageHeader
+        title="Update Scores"
+        subtitle="Pick a fixture to enter or edit its score — same as either captain can, including after their normal 7-day edit window has locked it (Req 5.2, 5.7)."
+      />
 
       <label className="text-sm text-gray-700 block mb-4">
         Division

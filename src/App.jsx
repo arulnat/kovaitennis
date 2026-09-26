@@ -55,13 +55,13 @@ export default function App() {
   );
 }
 
-const navLinkClass = 'text-teal-100 hover:text-white border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
+const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
 
 function Nav() {
   const { role, signOut } = useAuth();
   return (
-    <nav className="no-print bg-teal-900 border-b-2 border-accent-500 px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm items-center shadow-md">
-      <Link to="/standings" className="font-bold text-white text-base tracking-wide mr-1">
+    <nav className="no-print bg-teal-900 border-b-4 border-accent-500 px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm items-center shadow-md">
+      <Link to="/standings" className="font-extrabold uppercase text-white text-lg tracking-wide mr-1">
         Tennis League
       </Link>
       <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
@@ -82,9 +82,9 @@ function Nav() {
       <SeasonSelector />
       <div className="ml-auto">
         {role ? (
-          <button onClick={signOut} className="text-teal-200 hover:text-white transition-colors">Sign out</button>
+          <button onClick={signOut} className="text-teal-200 hover:text-white font-semibold uppercase text-xs tracking-wide transition-colors">Sign out</button>
         ) : (
-          <Link to="/login" className="text-white font-medium hover:text-accent-400 transition-colors">Login</Link>
+          <Link to="/login" className="text-white font-bold uppercase text-xs tracking-wide hover:text-accent-400 transition-colors">Login</Link>
         )}
       </div>
     </nav>

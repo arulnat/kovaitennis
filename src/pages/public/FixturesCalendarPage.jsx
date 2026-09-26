@@ -27,6 +27,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -124,20 +125,19 @@ export default function FixturesCalendarPage({ seasonId }) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
-        <h1 className="text-xl font-bold">Fixtures Calendar</h1>
-        <button
-          onClick={() => window.print()}
-          disabled={!fixturesByDivision || frozenDivisions.length === 0}
-          className="no-print px-3 py-1.5 rounded bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50"
-        >
-          Print / Save as PDF
-        </button>
-      </div>
-      <p className="text-sm text-slate-600 mb-6 no-print">
-        Every division's fixtures once frozen, all in one place — Home vs Away for each round. Divisions not
-        yet frozen aren't shown here.
-      </p>
+      <PageHeader
+        title="Fixtures Calendar"
+        subtitle="Every division's fixtures once frozen, all in one place — Home vs Away for each round. Divisions not yet frozen aren't shown here."
+        actions={
+          <button
+            onClick={() => window.print()}
+            disabled={!fixturesByDivision || frozenDivisions.length === 0}
+            className="no-print px-4 py-2 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide hover:bg-teal-800 disabled:opacity-50 shadow"
+          >
+            Print / Save as PDF
+          </button>
+        }
+      />
 
       {frozenDivisions.length === 0 && (
         <p className="text-slate-500 text-sm">No divisions have been frozen yet.</p>
@@ -151,7 +151,7 @@ export default function FixturesCalendarPage({ seasonId }) {
         <div ref={printableRef}>
           {frozenDivisions.map((d) => (
             <div key={d.id} className="mb-8">
-              <h2 className="text-white bg-teal-700 rounded-t px-3 py-2 text-base font-bold">{d.name}</h2>
+              <h2 className="text-white bg-teal-900 rounded-t px-3 py-2 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
               <div className="border border-t-0 border-teal-100 rounded-b p-3">
                 {(fixturesByDivision[d.id] || []).length === 0 ? (
                   <p className="text-slate-500 text-sm">No fixtures.</p>

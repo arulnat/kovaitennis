@@ -37,6 +37,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { homeAwayBalanceReport } from '../../lib/scheduler.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -167,7 +168,7 @@ export default function FixtureGenerationPage({ seasonId }) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-4">Fixtures</h1>
+      <PageHeader title="Fixtures" />
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <label className="text-sm text-gray-700">

@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 export default function MissingScoresReportPage({ seasonId, divisionId }) {
   const [weekDate, setWeekDate] = useState('');
@@ -40,11 +41,10 @@ export default function MissingScoresReportPage({ seasonId, divisionId }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Missing / Pending Scores Report</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Run manually (Req 12.8) — use this to follow up directly with teams whose scores are missing or incomplete.
-        There is no automatic dispute mechanism; this report is it.
-      </p>
+      <PageHeader
+        title="Missing / Pending Scores Report"
+        subtitle="Run manually (Req 12.8) — use this to follow up directly with teams whose scores are missing or incomplete. There is no automatic dispute mechanism; this report is it."
+      />
 
       <div className="flex items-center gap-2 mb-4">
         <label className="text-sm">Week:</label>

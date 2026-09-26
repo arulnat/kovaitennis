@@ -24,6 +24,7 @@ import { useSeason } from '../../lib/seasonContext.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 /** delete-team returns a non-2xx status with a JSON {error} body for
  * expected failures (e.g. still grouped) — supabase-js doesn't parse
@@ -125,12 +126,10 @@ export default function TeamsPage({ seasonId }) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Teams</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Teams registered for the currently selected season (via Bulk Upload). Grouping into divisions and
-        ranking happens on the Grouping page — this list mirrors it: unassigned first, then each division
-        highest to lowest, ranked within it. Only an unassigned team can be deleted.
-      </p>
+      <PageHeader
+        title="Teams"
+        subtitle={'Teams registered for the currently selected season (via Bulk Upload). Grouping into divisions and ranking happens on the Grouping page — this list mirrors it: unassigned first, then each division highest to lowest, ranked within it. Only an unassigned team can be deleted.'}
+      />
 
       {loading ? (
         <p className="text-gray-500">Loading…</p>

@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { parseWorkbook, validateBulkUpload, downloadSampleTemplate } from '../../lib/bulkUpload.js';
 import { supabase } from '../../lib/supabaseClient.js';
+import PageHeader from '../../components/PageHeader.jsx';
 
 export default function BulkUploadPage({ seasonId }) {
   const [status, setStatus] = useState('idle'); // idle | parsing | error | preview | importing | done
@@ -60,7 +61,7 @@ export default function BulkUploadPage({ seasonId }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Bulk Team &amp; Roster Upload</h1>
+      <PageHeader title="Bulk Team & Roster Upload" />
       <p className="text-sm text-gray-600 mb-2">
         CSV file, no header row — two rows per team, one block after another:
       </p>

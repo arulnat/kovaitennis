@@ -3,15 +3,22 @@
 // A single team's profile: captain/contact info, current-season division
 // and standing (reusing standings.js exactly as StandingsPage does, then
 // picking this team's own row out of the computed table), season roster,
-// and this season's fixtures with results. Public — no login required,
-// same as Standings/Fixtures Calendar (Req 10.5) — since this is the page
-// every team-name hyperlink across the app (public or logged-in) points
-// to, for any login.
+// and this season's fixtures split into Completed/Upcoming tabs. Public —
+// no login required, same as Standings/Fixtures Calendar (Req 10.5) —
+// since this is the page every team-name hyperlink across the app (public
+// or logged-in) points to, for any login.
+//
+// Bold hero + stat panel + roster grid, in the spirit of league.cdta.co.in's
+// bold, high-contrast team page (not a copy of its layout) — see
+// components/StatPanel.jsx and Avatar.jsx, shared with other pages for a
+// consistent "nice look and feel" across the whole app.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings } from '../../lib/standings.js';
+import StatPanel from '../../components/StatPanel.jsx';
+import Avatar from '../../components/Avatar.jsx';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -33,6 +40,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
   const [standingRow, setStandingRow] = useState(null); // { rank, totalTeams, ...record } or null
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('upcoming'); // 'upcoming' | 'completed'
 
   useEffect(() => {
     let cancelled = false;
@@ -123,20 +131,46 @@ export default function TeamProfilePage({ seasonId, teamId }) {
   if (team === null) return <p className="p-6 text-gray-500">Loading…</p>;
   if (team === false) {
     return (
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-6">
         <p className="text-gray-500">Team not found.</p>
         <Link to="/standings" className="text-teal-700 text-sm underline">Back to Standings</Link>
       </div>
     );
   }
 
+  const scoredFixtures = fixtures.filter((f) => !f.is_bye && f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side));
+  const upcomingFixtures = fixtures.filter((f) => f.is_bye || !(f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side)));
+  const shownFixtures = tab === 'completed' ? scoredFixtures : upcomingFixtures;
+
+  const statRows = [
+    ...(team.clubs?.name ? [{ label: 'Club', value: team.clubs.name }] : []),
+    { label: 'Captain', value: team.captain_name || '—' },
+    ...(team.captain_phone ? [{ label: 'Phone', value: team.captain_phone }] : []),
+    ...(teamSeason?.divisions?.name ? [{ label: 'Division', value: teamSeason.divisions.name, highlight: true }] : []),
+    ...(standingRow ? [
+      { label: 'Rank', value: `${standingRow.rank} of ${standingRow.totalTeams}` },
+      { label: 'Points', value: standingRow.points },
+      { label: 'Played', value: standingRow.played },
+      { label: 'Won / Lost', value: `${standingRow.wins} / ${standingRow.losses}` },
+      { label: 'Sets +/-', value: `${standingRow.setsDiff >= 0 ? '+' : ''}${standingRow.setsDiff}` },
+      { label: 'Games +/-', value: `${standingRow.gamesDiff >= 0 ? '+' : ''}${standingRow.gamesDiff}` },
+    ] : []),
+  ];
+
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">{team.name}</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        {team.clubs?.name ? `${team.clubs.name} · ` : ''}
-        Captain: {team.captain_name || '—'}{team.captain_phone ? ` (${team.captain_phone})` : ''}
-      </p>
+    <div className="max-w-4xl mx-auto p-6">
+      {/* Hero */}
+      <div className="rounded-lg overflow-hidden shadow-lg bg-gradient-to-br from-teal-800 to-teal-950 text-white px-6 py-8 mb-6 flex items-center gap-5">
+        <Avatar name={team.name} size="lg" className="ring-4 ring-accent-500" />
+        <div>
+          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white">{team.name}</h1>
+          {teamSeason?.status && teamSeason.status !== 'placed' && (
+            <span className="inline-block mt-1 text-xs font-bold uppercase tracking-wide bg-accent-500 text-teal-950 rounded px-2 py-0.5">
+              {teamSeason.status}
+            </span>
+          )}
+        </div>
+      </div>
 
       {loading ? (
         <p className="text-gray-500 text-sm">Loading…</p>
@@ -145,64 +179,71 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       ) : !teamSeason ? (
         <p className="text-gray-500 text-sm">Not registered for the currently selected season.</p>
       ) : (
-        <>
-          <div className="mb-6">
-            <p className="text-sm font-semibold text-gray-700 mb-1">This season</p>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="md:col-span-1">
             {!teamSeason.division_id ? (
-              <p className="text-amber-700 text-sm">Unassigned — not yet placed in a division.</p>
+              <p className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded p-3">
+                Unassigned — not yet placed in a division.
+              </p>
             ) : (
-              <div className="text-sm border rounded p-3 bg-teal-50 inline-block">
-                <span className="font-medium">{teamSeason.divisions?.name}</span>
-                {standingRow && (
-                  <span className="text-gray-700">
-                    {' '}— Rank {standingRow.rank} of {standingRow.totalTeams} ·{' '}
-                    {standingRow.played}P {standingRow.wins}W {standingRow.losses}L ·{' '}
-                    Pts {standingRow.points} · Sets {standingRow.setsDiff >= 0 ? '+' : ''}{standingRow.setsDiff} ·{' '}
-                    Games {standingRow.gamesDiff >= 0 ? '+' : ''}{standingRow.gamesDiff}
-                  </span>
-                )}
+              <StatPanel rows={statRows} />
+            )}
+          </div>
+
+          <div className="md:col-span-1">
+            <h2 className="text-sm font-extrabold uppercase tracking-wider text-teal-900 border-b-2 border-accent-500 pb-1 mb-3">
+              Players ({roster.length})
+            </h2>
+            {roster.length === 0 ? (
+              <p className="text-gray-500 text-sm">No roster on file for this season.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {roster.map((r) => (
+                  <div key={r.player_id} className="flex flex-col items-center text-center gap-1.5 p-2 rounded-lg bg-white shadow border border-slate-100">
+                    <Avatar name={r.players?.name} />
+                    <span className="text-xs font-semibold text-slate-800 leading-tight">{r.players?.name}</span>
+                    {r.players?.gender && <span className="text-[10px] text-slate-400 uppercase">{r.players.gender}</span>}
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="mb-6">
-            <p className="text-sm font-semibold text-gray-700 mb-1">Roster ({roster.length})</p>
-            {roster.length === 0 ? (
-              <p className="text-gray-500 text-sm">No roster on file for this season.</p>
-            ) : (
-              <ul className="text-sm border rounded divide-y">
-                {roster.map((r) => (
-                  <li key={r.player_id} className="p-2">
-                    {r.players?.name}
-                    {r.players?.gender ? <span className="text-gray-400"> ({r.players.gender})</span> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <div className="md:col-span-2">
+            <div className="flex border-b-2 border-accent-500 mb-3">
+              {['upcoming', 'completed'].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-4 py-2 text-sm font-extrabold uppercase tracking-wide rounded-t ${
+                    tab === t ? 'bg-teal-900 text-white' : 'text-teal-800 hover:bg-teal-50'
+                  }`}
+                >
+                  {t === 'upcoming' ? 'Upcoming Matches' : 'Completed Matches'}
+                </button>
+              ))}
+            </div>
 
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-1">Fixtures</p>
-            {fixtures.length === 0 ? (
-              <p className="text-gray-500 text-sm">No fixtures yet this season.</p>
+            {shownFixtures.length === 0 ? (
+              <p className="text-gray-500 text-sm">No {tab} matches.</p>
             ) : (
-              <table className="w-full text-sm border">
-                <thead className="bg-teal-50">
+              <table className="w-full text-sm border rounded overflow-hidden">
+                <thead className="bg-teal-900 text-teal-50">
                   <tr>
-                    <th className="p-2">Round</th>
-                    <th className="text-left p-2">Week</th>
-                    <th className="text-left p-2">Opponent</th>
-                    <th className="p-2">Result</th>
+                    <th className="p-2 font-bold uppercase text-xs tracking-wide">Round</th>
+                    <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Week</th>
+                    <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Opponent</th>
+                    <th className="p-2 font-bold uppercase text-xs tracking-wide">Result</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {fixtures.map((f) => {
+                  {shownFixtures.map((f, i) => {
                     if (f.is_bye) {
                       return (
-                        <tr key={f.id} className="border-t bg-gray-50">
-                          <td className="p-2 text-center">{f.round_number}</td>
-                          <td className="p-2">{formatWeekDate(f.week_date)}</td>
-                          <td className="p-2 text-gray-500 italic" colSpan={2}>Rest (bye)</td>
+                        <tr key={f.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                          <td className="p-2 text-center border-t">{f.round_number}</td>
+                          <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
+                          <td className="p-2 text-gray-500 italic border-t" colSpan={2}>Rest (bye)</td>
                         </tr>
                       );
                     }
@@ -210,16 +251,16 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                     const opponent = isHome ? f.teams_away : f.teams_home;
                     const outcome = tieOutcomeForTeam(f, isHome);
                     return (
-                      <tr key={f.id} className="border-t">
-                        <td className="p-2 text-center">{f.round_number}</td>
-                        <td className="p-2">{formatWeekDate(f.week_date)}</td>
-                        <td className="p-2">
+                      <tr key={f.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                        <td className="p-2 text-center border-t font-semibold">{f.round_number}</td>
+                        <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
+                        <td className="p-2 border-t">
                           {isHome ? 'vs ' : '@ '}
-                          <Link to={`/team/${opponent?.id}`} className="hover:underline hover:text-teal-700">
+                          <Link to={`/team/${opponent?.id}`} className="font-semibold hover:underline hover:text-teal-700">
                             {opponent?.name ?? '—'}
                           </Link>
                         </td>
-                        <td className={`p-2 text-center font-medium ${outcome === 'W' ? 'text-green-700' : outcome === 'L' ? 'text-red-700' : 'text-gray-400'}`}>
+                        <td className={`p-2 text-center border-t font-extrabold ${outcome === 'W' ? 'text-green-700' : outcome === 'L' ? 'text-red-700' : 'text-gray-400'}`}>
                           {outcome ?? '—'}
                         </td>
                       </tr>
@@ -229,7 +270,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
               </table>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

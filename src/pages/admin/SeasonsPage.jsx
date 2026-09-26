@@ -10,6 +10,7 @@
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
+import PageHeader from '../../components/PageHeader.jsx';
 
 export default function SeasonsPage() {
   const { refresh: refreshGlobalSeasons } = useSeason(); // keeps the nav bar's dropdown in sync
@@ -64,11 +65,10 @@ export default function SeasonsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Seasons</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Create and manage seasons. Purge Data permanently deletes a season and everything under it — locked by
-        default, so you must deliberately unlock a season before it can be purged.
-      </p>
+      <PageHeader
+        title="Seasons"
+        subtitle="Create and manage seasons. Purge Data permanently deletes a season and everything under it — locked by default, so you must deliberately unlock a season before it can be purged."
+      />
 
       <div className="border rounded p-4 mb-4">
         <h2 className="font-medium mb-2">Create a Season</h2>

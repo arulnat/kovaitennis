@@ -44,6 +44,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { planAutoGroup } from '../../lib/grouping.js';
 import { buildFixtureRows, buildPriorMeetingMap, computeMatchWeekends } from '../../lib/scheduler.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
@@ -413,11 +414,10 @@ export default function GroupingPage({ seasonId }) {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Grouping</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Move teams into divisions and rank them within it — manually, or auto-generate groups for whatever's
-        left unassigned. Every change saves immediately, so you can come back and pick up where you left off.
-      </p>
+      <PageHeader
+        title="Grouping"
+        subtitle="Move teams into divisions and rank them within it — manually, or auto-generate groups for whatever's left unassigned. Every change saves immediately, so you can come back and pick up where you left off."
+      />
 
       <div className="border rounded p-4 mb-6 bg-gray-50">
         <h2 className="font-medium mb-2">Auto-generate groups</h2>

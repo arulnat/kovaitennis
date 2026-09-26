@@ -10,6 +10,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { downloadCredentialsSheet } from '../../lib/bulkUpload.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 export default function LoginCredentialsPage() {
   const [teams, setTeams] = useState([]);
@@ -52,11 +53,10 @@ export default function LoginCredentialsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Login Credentials</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Every team's login ID and default password, across all bulk uploads. Circulate these to captains
-        (Req 2.2, 10.2) — each is forced to change their password on first login.
-      </p>
+      <PageHeader
+        title="Login Credentials"
+        subtitle="Every team's login ID and default password, across all bulk uploads. Circulate these to captains (Req 2.2, 10.2) — each is forced to change their password on first login."
+      />
 
       <div className="flex gap-3 items-center mb-4 flex-wrap">
         <button

@@ -14,6 +14,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { useAuth } from '../../lib/auth.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 import {
   RUBBER_TYPES, winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
   isValidSuperTiebreakSet, applyWalkover, selectablePlayers, isValidTimePlayed,
@@ -129,7 +130,7 @@ export default function ScoreEntryPage({ fixtureId }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-1">Score Entry</h1>
+      <PageHeader title="Score Entry" />
 
       {!isFrozen && (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">

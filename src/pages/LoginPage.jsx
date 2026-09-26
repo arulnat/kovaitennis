@@ -46,24 +46,36 @@ export default function LoginPage() {
 
   if (mustChangePassword) {
     return (
-      <form onSubmit={handlePasswordChange} className="max-w-sm mx-auto p-6">
-        <h1 className="text-lg font-semibold mb-4">Set a new password</h1>
-        <p className="text-sm text-gray-600 mb-4">Required on first login (Req 2.3/10.2).</p>
-        <input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
-        <input type="password" placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
-        {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-        <button type="submit" className="w-full py-2 rounded bg-teal-700 text-white text-sm font-medium">Set password</button>
-      </form>
+      <div className="max-w-sm mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="bg-teal-900 px-6 py-4 border-b-4 border-accent-500">
+            <h1 className="text-lg font-extrabold uppercase tracking-wide text-white">Set a new password</h1>
+          </div>
+          <form onSubmit={handlePasswordChange} className="p-6">
+            <p className="text-sm text-gray-600 mb-4">Required on first login (Req 2.3/10.2).</p>
+            <input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
+            <input type="password" placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
+            {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+            <button type="submit" className="w-full py-2.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide hover:bg-teal-800 shadow">Set password</button>
+          </form>
+        </div>
+      </div>
     );
   }
 
   return (
-    <form onSubmit={handleLogin} className="max-w-sm mx-auto p-6">
-      <h1 className="text-lg font-semibold mb-4">Login</h1>
-      <input placeholder="Login ID (or admin email)" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
-      <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
-      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-      <button type="submit" className="w-full py-2 rounded bg-teal-700 text-white text-sm font-medium">Sign in</button>
-    </form>
+    <div className="max-w-sm mx-auto p-6">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="bg-teal-900 px-6 py-4 border-b-4 border-accent-500">
+          <h1 className="text-lg font-extrabold uppercase tracking-wide text-white">Login</h1>
+        </div>
+        <form onSubmit={handleLogin} className="p-6">
+          <input placeholder="Login ID (or admin email)" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
+          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
+          {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+          <button type="submit" className="w-full py-2.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide hover:bg-teal-800 shadow">Sign in</button>
+        </form>
+      </div>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings, highlightBands } from '../../lib/standings.js';
 import TeamLink from '../../components/TeamLink.jsx';
+import PageHeader from '../../components/PageHeader.jsx';
 
 export default function StandingsPage({ seasonId, divisionId }) {
   const [rows, setRows] = useState(null);
@@ -66,36 +67,40 @@ export default function StandingsPage({ seasonId, divisionId }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-4">Standings</h1>
-      <table className="w-full text-sm border">
-        <thead className="bg-teal-50">
+      <PageHeader title="Standings" />
+      <table className="w-full text-sm border rounded overflow-hidden shadow">
+        <thead className="bg-teal-900 text-teal-50">
           <tr>
-            <th className="text-left p-2">Team</th>
-            <th className="p-2">P</th><th className="p-2">W</th><th className="p-2">L</th>
-            <th className="p-2">Pts</th><th className="p-2">Sets +/-</th><th className="p-2">Games +/-</th>
+            <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Team</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">P</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">W</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">L</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">Pts</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">Sets +/-</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">Games +/-</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r, i) => (
             <tr
               key={r.teamId}
               className={
-                r.highlight === 'top' ? 'bg-green-50' : r.highlight === 'bottom' ? 'bg-red-50' : ''
+                r.highlight === 'top' ? 'bg-accent-400/30' : r.highlight === 'bottom' ? 'bg-red-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'
               }
             >
-              <td className="p-2 font-medium"><TeamLink teamId={r.teamId}>{teamNames[r.teamId]}</TeamLink></td>
-              <td className="p-2 text-center">{r.played}</td>
-              <td className="p-2 text-center">{r.wins}</td>
-              <td className="p-2 text-center">{r.losses}</td>
-              <td className="p-2 text-center">{r.points}</td>
-              <td className="p-2 text-center">{r.setsDiff}</td>
-              <td className="p-2 text-center">{r.gamesDiff}</td>
+              <td className="p-2 font-bold border-t"><TeamLink teamId={r.teamId}>{teamNames[r.teamId]}</TeamLink></td>
+              <td className="p-2 text-center border-t">{r.played}</td>
+              <td className="p-2 text-center border-t">{r.wins}</td>
+              <td className="p-2 text-center border-t">{r.losses}</td>
+              <td className="p-2 text-center border-t font-extrabold">{r.points}</td>
+              <td className="p-2 text-center border-t">{r.setsDiff}</td>
+              <td className="p-2 text-center border-t">{r.gamesDiff}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <p className="text-xs text-gray-500 mt-2">
-        Top 2 (green) and bottom 2 (red) highlighted per Req 6.5. Teams tied after every tiebreak level share the same rank (Req 6.4).
+        Top 2 (gold) and bottom 2 (red) highlighted per Req 6.5. Teams tied after every tiebreak level share the same rank (Req 6.4).
       </p>
     </div>
   );
