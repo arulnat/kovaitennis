@@ -1,10 +1,16 @@
 // src/pages/public/FixturesCalendarPage.jsx
 //
-// Req 4.8 — a single page with every frozen division's fixtures laid
-// out together (Home vs Away, clearly labeled), so it can be circulated
-// to captains/players as one document instead of them hunting through
-// individual division views. Public — no login required, same as
-// Standings — since the whole point is to circulate it widely.
+// Req 4.8 — a single page with every division's fixtures laid out
+// together, so it can be circulated to captains/players as one document
+// instead of them hunting through individual division views. Public —
+// no login required, same as Standings — since the whole point is to
+// circulate it widely.
+//
+// One team-by-date grid per division: a row per team, a column per
+// match date, each cell the opponent for that round — colored by
+// home/away (see buildTeamDateGrid) — rather than a separate Home/Away
+// table per round, so a team's whole schedule reads left-to-right in
+// one line instead of being spread across many small per-round tables.
 //
 // Only shows anything once the season is published (seasons.published):
 // an unpublished season's schedule can still change (Fixtures page), so
@@ -35,27 +41,37 @@ function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/** Groups one division's fixture rows by round_number for display. */
-function groupByRound(fixtures) {
-  const byRound = new Map();
+/**
+ * One division's fixtures reshaped into a team-by-date grid: a row per
+ * team, a column per round/date, each cell the opponent played that
+ * round (colored by home/away) or "Rest" on a bye.
+ */
+function buildTeamDateGrid(fixtures) {
+  const roundDates = new Map(); // round_number -> week_date
+  const teams = new Map(); // teamId -> name
+  const cells = new Map(); // `${teamId}:${round}` -> {opponentId, opponentName, isHome} | 'bye'
+
   for (const f of fixtures) {
-    if (!byRound.has(f.round_number)) byRound.set(f.round_number, { round: f.round_number, weekDate: f.week_date, ties: [], bye: null });
-    const r = byRound.get(f.round_number);
+    roundDates.set(f.round_number, f.week_date);
     if (f.is_bye) {
-      r.bye = f.teams_away
-        ? { id: f.teams_away.id, name: f.teams_away.name }
-        : f.teams_home
-          ? { id: f.teams_home.id, name: f.teams_home.name }
-          : null;
-    } else {
-      r.ties.push({
-        id: f.id,
-        homeId: f.teams_home?.id ?? null, home: f.teams_home?.name ?? '—',
-        awayId: f.teams_away?.id ?? null, away: f.teams_away?.name ?? '—',
-      });
+      const resting = f.teams_away ?? f.teams_home;
+      if (resting) {
+        teams.set(resting.id, resting.name);
+        cells.set(`${resting.id}:${f.round_number}`, 'bye');
+      }
+      continue;
+    }
+    if (f.teams_home && f.teams_away) {
+      teams.set(f.teams_home.id, f.teams_home.name);
+      teams.set(f.teams_away.id, f.teams_away.name);
+      cells.set(`${f.teams_home.id}:${f.round_number}`, { opponentId: f.teams_away.id, opponentName: f.teams_away.name, isHome: true });
+      cells.set(`${f.teams_away.id}:${f.round_number}`, { opponentId: f.teams_home.id, opponentName: f.teams_home.name, isHome: false });
     }
   }
-  return [...byRound.values()].sort((a, b) => a.round - b.round);
+
+  const rounds = [...roundDates.keys()].sort((a, b) => a - b);
+  const teamRows = [...teams.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  return { rounds, roundDates, teamRows, cells };
 }
 
 // A4 landscape at 96dpi, minus the @page margin set in index.css (10mm ~
@@ -131,7 +147,7 @@ export default function FixturesCalendarPage({ seasonId }) {
     <div className="max-w-4xl mx-auto p-6">
       <PageHeader
         title="Fixtures Calendar"
-        subtitle="Every division's fixtures once the season is published, all in one place — Home vs Away for each round. Nothing shows here until then."
+        subtitle="Every division's fixtures once the season is published, all in one place — one row per team, one column per match date. Nothing shows here until then."
         actions={
           <button
             onClick={() => window.print()}
@@ -151,54 +167,68 @@ export default function FixturesCalendarPage({ seasonId }) {
         <p className="text-slate-500 text-sm">Loading…</p>
       )}
 
+      {fixturesByDivision && shownDivisions.length > 0 && (
+        <p className="text-xs text-slate-600 mb-4 no-print">
+          Each row is a team; each column a match date. A cell shows who they play —{' '}
+          <span className="font-bold text-teal-700">home</span> or{' '}
+          <span className="font-bold text-accent-600">away</span>.
+        </p>
+      )}
+
       {fixturesByDivision && (
         <div ref={printableRef} className="fixtures-print-fit">
-          {shownDivisions.map((d) => (
-            <div key={d.id} className="mb-8">
-              <h2 className="text-white bg-teal-900 rounded-t px-3 py-2 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
-              <div className="border border-t-0 border-teal-100 rounded-b p-3">
-                {(fixturesByDivision[d.id] || []).length === 0 ? (
-                  <p className="text-slate-500 text-sm">No fixtures.</p>
-                ) : (
-                  groupByRound(fixturesByDivision[d.id]).map(({ round, weekDate, ties, bye }) => (
-                    <div key={round} className="mb-4 last:mb-0">
-                      <p className="inline-block text-xs font-semibold text-teal-800 bg-teal-50 rounded px-2 py-1 mb-2">
-                        Round {round} — Week of {formatWeekDate(weekDate)}
-                      </p>
-                      <table className="w-full text-sm border border-slate-200 rounded overflow-hidden mb-1">
-                        <thead className="bg-teal-100">
-                          <tr>
-                            <th className="text-left p-2 text-teal-900">Home</th>
-                            <th className="text-left p-2 text-teal-900">Away</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ties.map((t, i) => (
-                            <tr key={t.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                              <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
-                                <TeamLink teamId={t.homeId}>{t.home}</TeamLink>
-                              </td>
-                              <td className="p-2 text-slate-800 border-t border-slate-200">
-                                <TeamLink teamId={t.awayId}>{t.away}</TeamLink>
-                              </td>
-                            </tr>
+          {shownDivisions.map((d) => {
+            const grid = buildTeamDateGrid(fixturesByDivision[d.id] || []);
+            return (
+              <div key={d.id} className="mb-8">
+                <h2 className="text-white bg-teal-900 rounded-t px-3 py-2 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
+                <div className="border border-t-0 border-teal-100 rounded-b p-3 overflow-x-auto">
+                  {grid.teamRows.length === 0 ? (
+                    <p className="text-slate-500 text-sm">No fixtures.</p>
+                  ) : (
+                    <table className="text-sm border-collapse">
+                      <thead className="bg-teal-100">
+                        <tr>
+                          <th className="text-left p-2 text-teal-900 whitespace-nowrap">Team</th>
+                          {grid.rounds.map((r) => (
+                            <th key={r} className="p-2 text-teal-900 text-xs whitespace-nowrap">{formatWeekDate(grid.roundDates.get(r))}</th>
                           ))}
-                          {bye && (
-                            <tr className="bg-accent-400/20">
-                              <td className="p-2 font-medium text-slate-800 border-t border-slate-200">
-                                <TeamLink teamId={bye.id}>{bye.name}</TeamLink>
-                              </td>
-                              <td className="p-2 text-slate-600 italic border-t border-slate-200">Rest</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  ))
-                )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {grid.teamRows.map((team, i) => (
+                          <tr key={team.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="p-2 font-semibold text-slate-800 border-t border-slate-200 whitespace-nowrap">
+                              <TeamLink teamId={team.id}>{team.name}</TeamLink>
+                            </td>
+                            {grid.rounds.map((r) => {
+                              const cell = grid.cells.get(`${team.id}:${r}`);
+                              return (
+                                <td key={r} className="p-2 text-center border-t border-slate-200 whitespace-nowrap">
+                                  {cell === 'bye' ? (
+                                    <span className="text-slate-400 italic text-xs">Rest</span>
+                                  ) : cell ? (
+                                    <TeamLink
+                                      teamId={cell.opponentId}
+                                      className={`font-bold hover:underline ${cell.isHome ? 'text-teal-700' : 'text-accent-600'}`}
+                                    >
+                                      {cell.opponentName}
+                                    </TeamLink>
+                                  ) : (
+                                    <span className="text-slate-300">—</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
