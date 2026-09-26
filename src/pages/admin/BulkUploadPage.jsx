@@ -9,7 +9,7 @@
 // real Supabase Auth accounts — that can't run from the browser). Newly
 // created teams land in team_seasons with no division_id, so they start
 // out in Grouping's "Unassigned pool" ready to be placed. Login IDs and
-// passwords are no longer shown here — see the Login Credentials page.
+// passwords are no longer shown here — see the Team Logins page.
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -138,7 +138,7 @@ export default function BulkUploadPage({ seasonId }) {
           )}
           <p className="text-sm text-gray-600 mt-3">
             New teams start out unassigned — place them into a division under Grouping. Their login IDs and
-            passwords are on the <Link to="/admin/login-credentials" className="text-teal-700 underline">Login Credentials</Link> page.
+            passwords are on the <Link to="/admin/login-credentials" className="text-teal-700 underline">Team Logins</Link> page.
           </p>
         </div>
       )}

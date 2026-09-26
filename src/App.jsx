@@ -59,11 +59,12 @@ export default function App() {
 const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
 const dropdownLinkClass = 'block px-4 py-2 text-teal-100 hover:text-white hover:bg-teal-800 font-semibold uppercase text-xs tracking-wide transition-colors whitespace-nowrap';
 
-// Seasons -> Divisions -> Bulk Upload is the order an admin actually sets
-// a season up in, so grouping them under one "Setup" menu (in that
-// order) keeps the one-time setup steps together and out of the way of
-// the day-to-day admin links, instead of each sitting as its own
-// top-level nav item.
+// Seasons -> Divisions -> Bulk Upload -> Team Logins is the order an
+// admin actually sets a season up in (logins only exist once teams are
+// uploaded), so grouping them under one "Setup" menu, in that order,
+// keeps the one-time setup steps together and out of the way of the
+// day-to-day admin links, instead of each sitting as its own top-level
+// nav item.
 function SetupMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -93,6 +94,7 @@ function SetupMenu() {
           <Link to="/admin/seasons" className={dropdownLinkClass}>Seasons</Link>
           <Link to="/admin/divisions" className={dropdownLinkClass}>Divisions</Link>
           <Link to="/admin/bulk-upload" className={dropdownLinkClass}>Bulk Upload</Link>
+          <Link to="/admin/login-credentials" className={dropdownLinkClass}>Team Logins</Link>
         </div>
       )}
     </div>
@@ -110,7 +112,6 @@ function Nav() {
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <SetupMenu />
-          <Link to="/admin/login-credentials" className={navLinkClass}>Login Credentials</Link>
           <Link to="/admin/teams" className={navLinkClass}>Teams</Link>
           <Link to="/admin/grouping" className={navLinkClass}>Grouping</Link>
           <Link to="/admin/fixtures" className={navLinkClass}>Fixtures</Link>
