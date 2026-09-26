@@ -24,10 +24,13 @@
  * head-to-head), 6.4 (3+-team tiebreak = sets diff -> games diff,
  * residual ties share rank).
  *
- * Points are per rubber won, not a flat 1 per tie win — a 2-1 win earns
- * 2 points, a 3-0 sweep earns 3, so a narrow win and a whitewash aren't
- * worth the same in the table (this replaced an earlier flat-1-per-win
- * rule). `wins`/`losses` still count ties, for the W/L columns.
+ * Played/Won/Lost/Points all count individual RUBBERS, not ties — a
+ * single completed tie always adds 3 to Played, split between the two
+ * sides' Won/Lost by however many rubbers each took (3-0, 2-1, etc.),
+ * and Points is just that same Won count (a rubber win is worth exactly
+ * 1 point, so a team's points and rubbers-won total are always equal).
+ * `winner` is only used for the head-to-head tiebreak below, not for
+ * Won/Lost/Points directly.
  *
  * @param {string[]} teamIds - all teams in the group (incl. those with 0 played)
  * @param {TieRecord[]} ties
@@ -39,7 +42,7 @@
 export function computeTeamStandings(teamIds, ties) {
   const base = new Map(
     teamIds.map((id) => [id, {
-      teamId: id, played: 0, wins: 0, losses: 0, points: 0,
+      teamId: id, played: 0, wins: 0, losses: 0,
       setsWon: 0, setsLost: 0, gamesWon: 0, gamesLost: 0,
     }])
   );
@@ -49,20 +52,20 @@ export function computeTeamStandings(teamIds, ties) {
     const away = base.get(t.awayTeamId);
     if (!home || !away) continue; // ignore ties referencing unknown teams
 
-    home.played++; away.played++;
+    const homeRubbersLost = 3 - t.homeRubbersWon;
+    home.played += 3; away.played += 3;
+    home.wins += t.homeRubbersWon; home.losses += homeRubbersLost;
+    away.wins += homeRubbersLost; away.losses += t.homeRubbersWon;
+
     home.setsWon += t.homeSetsWon; home.setsLost += t.homeSetsLost;
     away.setsWon += t.homeSetsLost; away.setsLost += t.homeSetsWon;
     home.gamesWon += t.homeGamesWon; home.gamesLost += t.homeGamesLost;
     away.gamesWon += t.homeGamesLost; away.gamesLost += t.homeGamesWon;
-
-    home.points += t.homeRubbersWon;
-    away.points += 3 - t.homeRubbersWon;
-    if (t.winner === 'home') { home.wins++; away.losses++; }
-    else { away.wins++; home.losses++; }
   }
 
   const rows = [...base.values()].map((r) => ({
     ...r,
+    points: r.wins, // rubber wins and points are the same number by definition
     setsDiff: r.setsWon - r.setsLost,
     gamesDiff: r.gamesWon - r.gamesLost,
   }));
