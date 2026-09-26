@@ -102,8 +102,10 @@ export default function StandingsPage() {
             <th className="p-2 font-bold uppercase text-xs tracking-wide">W</th>
             <th className="p-2 font-bold uppercase text-xs tracking-wide">L</th>
             <th className="p-2 font-bold uppercase text-xs tracking-wide">Pts</th>
-            <th className="p-2 font-bold uppercase text-xs tracking-wide">Sets +/-</th>
-            <th className="p-2 font-bold uppercase text-xs tracking-wide">Games +/-</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">Sets Won</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">Sets Lost</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">Games Won</th>
+            <th className="p-2 font-bold uppercase text-xs tracking-wide">Games Lost</th>
           </tr>
         </thead>
         <tbody>
@@ -120,8 +122,10 @@ export default function StandingsPage() {
               <td className="p-2 text-center border-t">{r.wins}</td>
               <td className="p-2 text-center border-t">{r.losses}</td>
               <td className="p-2 text-center border-t font-extrabold">{r.points}</td>
-              <td className="p-2 text-center border-t">{r.setsDiff}</td>
-              <td className="p-2 text-center border-t">{r.gamesDiff}</td>
+              <td className="p-2 text-center border-t">{r.setsWon}</td>
+              <td className="p-2 text-center border-t">{r.setsLost}</td>
+              <td className="p-2 text-center border-t">{r.gamesWon}</td>
+              <td className="p-2 text-center border-t">{r.gamesLost}</td>
             </tr>
           ))}
         </tbody>

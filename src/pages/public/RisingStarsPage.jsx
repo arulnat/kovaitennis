@@ -197,9 +197,12 @@ export default function RisingStarsPage({ seasonId }) {
               <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Player</th>
               <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Team</th>
               <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Division</th>
-              <th className="p-2 font-bold uppercase text-xs tracking-wide">W / L</th>
-              <th className="p-2 font-bold uppercase text-xs tracking-wide">Sets +/-</th>
-              <th className="p-2 font-bold uppercase text-xs tracking-wide">Games +/-</th>
+              <th className="p-2 font-bold uppercase text-xs tracking-wide">W</th>
+              <th className="p-2 font-bold uppercase text-xs tracking-wide">L</th>
+              <th className="p-2 font-bold uppercase text-xs tracking-wide">Sets Won</th>
+              <th className="p-2 font-bold uppercase text-xs tracking-wide">Sets Lost</th>
+              <th className="p-2 font-bold uppercase text-xs tracking-wide">Games Won</th>
+              <th className="p-2 font-bold uppercase text-xs tracking-wide">Games Lost</th>
             </tr>
           </thead>
           <tbody>
@@ -208,9 +211,12 @@ export default function RisingStarsPage({ seasonId }) {
                 <td className="p-2 font-bold border-t">{r.playerName ?? '—'}</td>
                 <td className="p-2 border-t"><TeamLink teamId={r.teamId}>{r.teamName}</TeamLink></td>
                 <td className="p-2 border-t text-gray-600">{r.divisionName}</td>
-                <td className="p-2 text-center border-t font-extrabold">{r.wins} / {r.losses}</td>
-                <td className="p-2 text-center border-t">{r.setsDiff >= 0 ? '+' : ''}{r.setsDiff}</td>
-                <td className="p-2 text-center border-t">{r.gamesDiff >= 0 ? '+' : ''}{r.gamesDiff}</td>
+                <td className="p-2 text-center border-t font-extrabold">{r.wins}</td>
+                <td className="p-2 text-center border-t font-extrabold">{r.losses}</td>
+                <td className="p-2 text-center border-t">{r.setsWon}</td>
+                <td className="p-2 text-center border-t">{r.setsLost}</td>
+                <td className="p-2 text-center border-t">{r.gamesWon}</td>
+                <td className="p-2 text-center border-t">{r.gamesLost}</td>
               </tr>
             ))}
           </tbody>

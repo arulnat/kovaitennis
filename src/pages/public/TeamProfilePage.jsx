@@ -185,9 +185,12 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       { label: 'Rank', value: `${standingRow.rank} of ${standingRow.totalTeams}` },
       { label: 'Points', value: standingRow.points },
       { label: 'Played', value: standingRow.played },
-      { label: 'Won / Lost', value: `${standingRow.wins} / ${standingRow.losses}` },
-      { label: 'Sets +/-', value: `${standingRow.setsDiff >= 0 ? '+' : ''}${standingRow.setsDiff}` },
-      { label: 'Games +/-', value: `${standingRow.gamesDiff >= 0 ? '+' : ''}${standingRow.gamesDiff}` },
+      { label: 'Won', value: standingRow.wins },
+      { label: 'Lost', value: standingRow.losses },
+      { label: 'Sets Won', value: standingRow.setsWon },
+      { label: 'Sets Lost', value: standingRow.setsLost },
+      { label: 'Games Won', value: standingRow.gamesWon },
+      { label: 'Games Lost', value: standingRow.gamesLost },
     ] : []),
   ];
 
