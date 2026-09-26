@@ -1,0 +1,24 @@
+# Cloudflare Workers/Pages static-asset headers (mirrored into dist/ by
+# Vite, since anything under public/ is copied to the build output root
+# unchanged).
+#
+# Every JS/CSS file Vite builds has a content hash in its filename
+# (index-XXXXXXXX.js), so it's safe — correct, even — to cache those
+# forever: a new build always means a new filename, never the same URL
+# with different content. index.html is the opposite: it's the only
+# thing that references those hashed filenames, so if IT gets cached,
+# the browser (or Cloudflare's edge) keeps loading an old build's JS/CSS
+# indefinitely after a new deploy, which is exactly the "why doesn't my
+# change show up" symptom this project kept hitting — a hard refresh
+# always "fixed" it because that bypasses the browser cache, but nothing
+# stopped it recurring on every future deploy without one. Forcing
+# index.html to always revalidate closes that gap for good.
+
+/index.html
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
