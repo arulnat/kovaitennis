@@ -55,6 +55,15 @@ export default function ScoreEntryPage({ fixtureId }) {
   const [fixture, setFixture] = useState(null);
   const [season, setSeason] = useState(null);
   const [rubbers, setRubbers] = useState({}); // keyed by rubber_type
+  // Player picks per rubber type, lifted up here (rather than kept inside
+  // each RubberEditor) so eligibility filtering (Req 5.5 — a player plays
+  // at most one doubles rubber) reacts to what's chosen live in the OTHER
+  // doubles tab, not just whatever was last saved to the DB.
+  const [playerSelections, setPlayerSelections] = useState({
+    singles: { home: [], away: [] },
+    doubles1: { home: [], away: [] },
+    doubles2: { home: [], away: [] },
+  });
   const [roster, setRoster] = useState({ home: [], away: [] });
   const [teamNames, setTeamNames] = useState({ home: '', away: '' });
   const [ratings, setRatings] = useState([]); // tie_player_ratings rows for this fixture
@@ -70,6 +79,15 @@ export default function ScoreEntryPage({ fixtureId }) {
       const byType = {};
       for (const r of data || []) byType[r.rubber_type] = r;
       setRubbers(byType);
+      const playersOf = (r) => ({
+        home: r ? [r.home_player1_id, r.home_player2_id].filter(Boolean) : [],
+        away: r ? [r.away_player1_id, r.away_player2_id].filter(Boolean) : [],
+      });
+      setPlayerSelections({
+        singles: playersOf(byType.singles),
+        doubles1: playersOf(byType.doubles1),
+        doubles2: playersOf(byType.doubles2),
+      });
     });
   }, [fixtureId]);
 
@@ -107,10 +125,13 @@ export default function ScoreEntryPage({ fixtureId }) {
   const canEdit = isPublished && (isAdmin || !isFinalized);
   const mySide = teamId && fixture ? (teamId === fixture.home_team_id ? 'home' : teamId === fixture.away_team_id ? 'away' : null) : null;
 
-  // already-selected players across the tie, for eligibility filtering (Req 5.5)
+  // already-selected players across the tie, for eligibility filtering
+  // (Req 5.5) — read from the live in-progress picks, not just what's
+  // saved, so choosing someone in Doubles1 immediately removes them from
+  // Doubles2's list too, even before Doubles1 is saved.
   const alreadySelectedFor = (side) => ({
-    doubles1: [rubbers.doubles1?.[`${side}_player1_id`], rubbers.doubles1?.[`${side}_player2_id`]].filter(Boolean),
-    doubles2: [rubbers.doubles2?.[`${side}_player1_id`], rubbers.doubles2?.[`${side}_player2_id`]].filter(Boolean),
+    doubles1: playerSelections.doubles1[side],
+    doubles2: playerSelections.doubles2[side],
   });
 
   async function saveRubber(type, { homePlayers, awayPlayers, score, isWalkover, walkoverSide, walkoverStage, timePlayed }) {
@@ -281,6 +302,10 @@ export default function ScoreEntryPage({ fixtureId }) {
             awayRoster={roster.away}
             homeTeamName={teamNames.home}
             awayTeamName={teamNames.away}
+            homePlayers={playerSelections[type].home}
+            awayPlayers={playerSelections[type].away}
+            onHomePlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], home: v } }))}
+            onAwayPlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], away: v } }))}
             selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
             selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
             disabled={!canEdit}
@@ -535,16 +560,14 @@ function RubberResultCard({ rubber, homeTeamName, awayTeamName, homeRoster, away
   );
 }
 
-function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, awayTeamName, selectableHome, selectableAway, disabled, onSave, onUpdate }) {
+function RubberEditor({
+  type, rubber, homeRoster, awayRoster, homeTeamName, awayTeamName,
+  homePlayers, awayPlayers, onHomePlayersChange, onAwayPlayersChange,
+  selectableHome, selectableAway, disabled, onSave, onUpdate,
+}) {
   const isSingles = type === 'singles';
   const label = RUBBER_LABELS[type];
 
-  const [homePlayers, setHomePlayers] = useState(
-    rubber ? [rubber.home_player1_id, rubber.home_player2_id].filter(Boolean) : []
-  );
-  const [awayPlayers, setAwayPlayers] = useState(
-    rubber ? [rubber.away_player1_id, rubber.away_player2_id].filter(Boolean) : []
-  );
   const [isWalkover, setIsWalkover] = useState(rubber?.is_walkover ?? false);
   const [walkoverSide, setWalkoverSide] = useState(rubber?.walkover_winner_side ?? '');
   const [set1, setSet1] = useState(rubber ? { home: rubber.set1_home, away: rubber.set1_away } : { home: '', away: '' });
@@ -664,7 +687,7 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
                   <input type="radio" name={`walkover-winner-${type}`} checked={walkoverSide === 'home'} onChange={() => setWalkoverSide('home')} disabled={disabled} />
                 </td>
               )}
-              <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled || isWalkover} compact /></td>
+              <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={onHomePlayersChange} disabled={disabled || isWalkover} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled || isWalkover} /></td>
               {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled || isWalkover} /></td>}
@@ -677,7 +700,7 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
                   <input type="radio" name={`walkover-winner-${type}`} checked={walkoverSide === 'away'} onChange={() => setWalkoverSide('away')} disabled={disabled} />
                 </td>
               )}
-              <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled || isWalkover} compact /></td>
+              <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={onAwayPlayersChange} disabled={disabled || isWalkover} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled || isWalkover} /></td>
               {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled || isWalkover} /></td>}
@@ -713,26 +736,32 @@ function PlayerPicker({ label, roster, selectable, count, value, onChange, disab
   return (
     <div className={compact ? 'w-40' : undefined}>
       {label && <p className="text-xs text-gray-500 mb-1">{label}</p>}
-      {[...Array(count)].map((_, i) => (
-        <Dropdown
-          key={i}
-          value={value[i] ?? ''}
-          disabled={disabled}
-          placeholder="Select player…"
-          onChange={(v) => {
-            const next = [...value];
-            next[i] = v;
-            onChange(next);
-          }}
-          className="w-full mb-1"
-          options={[
-            { value: '', label: 'Select player…' },
-            ...roster
-              .filter((p) => selectableSet.has(p.id) || p.id === value[i])
-              .map((p) => ({ value: p.id, label: p.name })),
-          ]}
-        />
-      ))}
+      {[...Array(count)].map((_, i) => {
+        // A doubles pair needs two different people — the partner slot's
+        // own pick is excluded here too, not just cross-rubber picks, so
+        // no one can be selected as their own partner.
+        const partnerPick = count === 2 ? value[1 - i] : null;
+        return (
+          <Dropdown
+            key={i}
+            value={value[i] ?? ''}
+            disabled={disabled}
+            placeholder="Select player…"
+            onChange={(v) => {
+              const next = [...value];
+              next[i] = v;
+              onChange(next);
+            }}
+            className="w-full mb-1"
+            options={[
+              { value: '', label: 'Select player…' },
+              ...roster
+                .filter((p) => (selectableSet.has(p.id) || p.id === value[i]) && p.id !== partnerPick)
+                .map((p) => ({ value: p.id, label: p.name })),
+            ]}
+          />
+        );
+      })}
     </div>
   );
 }
