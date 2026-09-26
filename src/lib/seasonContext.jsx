@@ -69,9 +69,15 @@ export function useSeason() {
   return ctx;
 }
 
-/** Small dropdown pair for the nav bar — season, then division within it. */
+/**
+ * Season picker for the nav bar. Division is no longer picked here —
+ * every page that cares which division is showing (Standings) has its
+ * own in-page division tabs now, reading/writing the same divisionId
+ * this provider holds, so there's no separate "current division" left
+ * for a nav-bar control to need to expose.
+ */
 export function SeasonSelector() {
-  const { seasons, divisions, seasonId, divisionId, setSeasonId, setDivisionId, loading } = useSeason();
+  const { seasons, seasonId, setSeasonId, loading } = useSeason();
   const { role } = useAuth();
   const isAdmin = role === 'tournament_admin' || role === 'super_admin';
 
@@ -89,27 +95,14 @@ export function SeasonSelector() {
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <select
-        value={seasonId ?? ''}
-        onChange={(e) => setSeasonId(e.target.value)}
-        className="border rounded px-2 py-1 text-xs"
-      >
-        {seasons.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}{s.is_test ? ' (test)' : ''}</option>
-        ))}
-      </select>
-      {divisions.length > 0 && (
-        <select
-          value={divisionId ?? ''}
-          onChange={(e) => setDivisionId(e.target.value)}
-          className="border rounded px-2 py-1 text-xs"
-        >
-          {divisions.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </select>
-      )}
-    </div>
+    <select
+      value={seasonId ?? ''}
+      onChange={(e) => setSeasonId(e.target.value)}
+      className="border rounded px-2 py-1 text-xs"
+    >
+      {seasons.map((s) => (
+        <option key={s.id} value={s.id}>{s.name}{s.is_test ? ' (test)' : ''}</option>
+      ))}
+    </select>
   );
 }

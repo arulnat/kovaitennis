@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 
-export default function MissingScoresReportPage({ seasonId, divisionId }) {
+export default function MissingScoresReportPage({ seasonId }) {
   const [weekDate, setWeekDate] = useState('');
   const [rows, setRows] = useState(null);
 
@@ -21,7 +21,6 @@ export default function MissingScoresReportPage({ seasonId, divisionId }) {
       .eq('season_id', seasonId)
       .eq('is_bye', false);
 
-    if (divisionId) query = query.eq('division_id', divisionId);
     if (weekDate) query = query.eq('week_date', weekDate);
 
     const { data, error } = await query;
