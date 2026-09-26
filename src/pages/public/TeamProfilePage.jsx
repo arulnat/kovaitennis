@@ -138,7 +138,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                 if (h > a) homeSetsWon++; else homeSetsLost++;
               }
             }
-            return { homeTeamId: f.home_team_id, awayTeamId: f.away_team_id, winner, homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost };
+            return { homeTeamId: f.home_team_id, awayTeamId: f.away_team_id, winner, homeRubbersWon: homeWins, homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost };
           });
 
         const standings = computeTeamStandings(teamIds, ties);

@@ -59,6 +59,7 @@ export default function StandingsPage() {
           }
           return {
             homeTeamId: f.home_team_id, awayTeamId: f.away_team_id, winner,
+            homeRubbersWon: homeWins,
             homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost,
           };
         });

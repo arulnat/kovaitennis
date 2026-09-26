@@ -11,6 +11,7 @@
  * @property {string} homeTeamId
  * @property {string} awayTeamId
  * @property {'home'|'away'} winner
+ * @property {number} homeRubbersWon - out of 3; the away side's is assumed 3 - this
  * @property {number} homeSetsWon
  * @property {number} homeSetsLost
  * @property {number} homeGamesWon
@@ -19,9 +20,14 @@
 
 /**
  * Compute team standings for one group from its completed ties.
- * Req 6.1 (played/wins/losses/sets/games), 6.2 (1pt/win),
- * 6.3 (2-team tiebreak = head-to-head), 6.4 (3+-team tiebreak = sets
- * diff -> games diff, residual ties share rank).
+ * Req 6.1 (played/wins/losses/sets/games), 6.3 (2-team tiebreak =
+ * head-to-head), 6.4 (3+-team tiebreak = sets diff -> games diff,
+ * residual ties share rank).
+ *
+ * Points are per rubber won, not a flat 1 per tie win — a 2-1 win earns
+ * 2 points, a 3-0 sweep earns 3, so a narrow win and a whitewash aren't
+ * worth the same in the table (this replaced an earlier flat-1-per-win
+ * rule). `wins`/`losses` still count ties, for the W/L columns.
  *
  * @param {string[]} teamIds - all teams in the group (incl. those with 0 played)
  * @param {TieRecord[]} ties
@@ -49,8 +55,10 @@ export function computeTeamStandings(teamIds, ties) {
     home.gamesWon += t.homeGamesWon; home.gamesLost += t.homeGamesLost;
     away.gamesWon += t.homeGamesLost; away.gamesLost += t.homeGamesWon;
 
-    if (t.winner === 'home') { home.wins++; home.points++; away.losses++; }
-    else { away.wins++; away.points++; home.losses++; }
+    home.points += t.homeRubbersWon;
+    away.points += 3 - t.homeRubbersWon;
+    if (t.winner === 'home') { home.wins++; away.losses++; }
+    else { away.wins++; home.losses++; }
   }
 
   const rows = [...base.values()].map((r) => ({

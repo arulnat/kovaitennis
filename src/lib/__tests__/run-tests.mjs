@@ -285,11 +285,11 @@ test('team standings: 2-team tiebreak uses head-to-head (Req 6.3)', () => {
   // A and B both finish 1-1 overall but A beat B head-to-head
   const teams = ['A', 'B', 'C'];
   const ties = [
-    { homeTeamId: 'A', awayTeamId: 'B', winner: 'home', homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
-    { homeTeamId: 'B', awayTeamId: 'C', winner: 'home', homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
-    { homeTeamId: 'C', awayTeamId: 'A', winner: 'home', homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+    { homeTeamId: 'A', awayTeamId: 'B', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+    { homeTeamId: 'B', awayTeamId: 'C', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+    { homeTeamId: 'C', awayTeamId: 'A', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
   ];
-  // all three teams are 1-1 (perfect 3-cycle) -> falls through to sets/games diff, all equal -> shared rank
+  // all three teams are 1-1 with equal points (every tie a 3-0 sweep) -> falls through to sets/games diff, all equal -> shared rank
   const standings = computeTeamStandings(teams, ties);
   assert.equal(standings[0].rank, 1);
   assert.equal(standings[1].rank, 1);
@@ -299,9 +299,9 @@ test('team standings: 2-team tiebreak uses head-to-head (Req 6.3)', () => {
 test('team standings: clear winner ranks above a tied pair correctly, tied pair shares rank 2', () => {
   const teams = ['A', 'B', 'C'];
   const ties = [
-    { homeTeamId: 'A', awayTeamId: 'B', winner: 'home', homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 2 },
-    { homeTeamId: 'A', awayTeamId: 'C', winner: 'home', homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 2 },
-    { homeTeamId: 'B', awayTeamId: 'C', winner: 'home', homeSetsWon: 2, homeSetsLost: 1, homeGamesWon: 12, homeGamesLost: 10 },
+    { homeTeamId: 'A', awayTeamId: 'B', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 2 },
+    { homeTeamId: 'A', awayTeamId: 'C', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 2 },
+    { homeTeamId: 'B', awayTeamId: 'C', winner: 'home', homeRubbersWon: 2, homeSetsWon: 2, homeSetsLost: 1, homeGamesWon: 12, homeGamesLost: 10 },
   ];
   const standings = computeTeamStandings(teams, ties);
   assert.equal(standings[0].teamId, 'A');
