@@ -16,9 +16,18 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient.js';
+import { useAuth } from '../../lib/auth.jsx';
 import { computeTeamStandings } from '../../lib/standings.js';
 import StatPanel from '../../components/StatPanel.jsx';
 import Avatar from '../../components/Avatar.jsx';
+
+const RATING_SKILLS = [
+  { key: 'rating_serve', label: 'Serve', short: 'S' },
+  { key: 'rating_volley', label: 'Volley', short: 'V' },
+  { key: 'rating_forehand', label: 'Forehand', short: 'F' },
+  { key: 'rating_backhand', label: 'Backhand', short: 'B' },
+  { key: 'rating_fitness', label: 'Fitness', short: 'Ft' },
+];
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -34,9 +43,11 @@ function tieOutcomeForTeam(fixture, isHome) {
 }
 
 export default function TeamProfilePage({ seasonId, teamId }) {
+  const { teamId: myTeamId, isAdmin } = useAuth();
   const [team, setTeam] = useState(null); // null = loading, false = not found
   const [teamSeason, setTeamSeason] = useState(null); // this season's placement, or undefined if none
   const [roster, setRoster] = useState([]);
+  const [ratingsByPlayer, setRatingsByPlayer] = useState({}); // player_id -> {rating_serve, ...}
   const [standingRow, setStandingRow] = useState(null); // { rank, totalTeams, ...record } or null
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +85,15 @@ export default function TeamProfilePage({ seasonId, teamId }) {
         .eq('team_id', teamId);
       if (cancelled) return;
       setRoster(rosterRows || []);
+
+      if ((rosterRows || []).length > 0) {
+        const { data: ratingRows } = await supabase
+          .from('player_ratings')
+          .select('*')
+          .in('player_id', rosterRows.map((r) => r.player_id));
+        if (cancelled) return;
+        setRatingsByPlayer(Object.fromEntries((ratingRows || []).map((r) => [r.player_id, r])));
+      }
 
       if (tsRow?.division_id) {
         const [{ data: divisionTeamSeasons }, { data: divisionFixtures }] = await Promise.all([
@@ -137,6 +157,8 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       </div>
     );
   }
+
+  const canEditRatings = isAdmin || (!!myTeamId && myTeamId === teamId);
 
   const scoredFixtures = fixtures.filter((f) => !f.is_bye && f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side));
   const upcomingFixtures = fixtures.filter((f) => f.is_bye || !(f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side)));
@@ -203,11 +225,29 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                     <Avatar name={r.players?.name} />
                     <span className="text-xs font-semibold text-slate-800 leading-tight">{r.players?.name}</span>
                     {r.players?.gender && <span className="text-[10px] text-slate-400 uppercase">{r.players.gender}</span>}
+                    {ratingsByPlayer[r.player_id] && (
+                      <span className="text-[9px] text-slate-500 leading-tight">
+                        {RATING_SKILLS.map((s) => `${s.short}${ratingsByPlayer[r.player_id][s.key] ?? '–'}`).join(' · ')}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {canEditRatings && roster.length > 0 && (
+            <div className="md:col-span-2">
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-teal-900 border-b-2 border-accent-500 pb-1 mb-3">
+                Player Ratings
+              </h2>
+              <PlayerRatingsEditor
+                roster={roster}
+                ratingsByPlayer={ratingsByPlayer}
+                onSaved={(playerId, row) => setRatingsByPlayer((prev) => ({ ...prev, [playerId]: row }))}
+              />
+            </div>
+          )}
 
           <div className="md:col-span-2">
             <div className="flex border-b-2 border-accent-500 mb-3">
@@ -273,5 +313,81 @@ export default function TeamProfilePage({ seasonId, teamId }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Editable Serve/Volley/Forehand/Backhand/Fitness ratings (5-10 scale) — visible only to an admin or the player's own team's captain (see player_ratings RLS); everyone else just sees the read-only badges on each player's card above. */
+function PlayerRatingsEditor({ roster, ratingsByPlayer, onSaved }) {
+  return (
+    <table className="w-full text-sm border rounded overflow-hidden">
+      <thead className="bg-teal-900 text-teal-50">
+        <tr>
+          <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Player</th>
+          {RATING_SKILLS.map((s) => (
+            <th key={s.key} className="p-2 font-bold uppercase text-xs tracking-wide">{s.label}</th>
+          ))}
+          <th className="p-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {roster.map((r, i) => (
+          <PlayerRatingRow
+            key={r.player_id}
+            playerId={r.player_id}
+            playerName={r.players?.name}
+            rating={ratingsByPlayer[r.player_id]}
+            striped={i % 2 === 1}
+            onSaved={onSaved}
+          />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function PlayerRatingRow({ playerId, playerName, rating, striped, onSaved }) {
+  const [values, setValues] = useState(
+    Object.fromEntries(RATING_SKILLS.map((s) => [s.key, rating?.[s.key] ?? '']))
+  );
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    for (const s of RATING_SKILLS) {
+      const v = values[s.key];
+      if (v !== '' && (!Number.isInteger(Number(v)) || Number(v) < 5 || Number(v) > 10)) {
+        alert(`${s.label} must be a whole number from 5 to 10.`);
+        return;
+      }
+    }
+    setSaving(true);
+    const row = {
+      player_id: playerId,
+      ...Object.fromEntries(RATING_SKILLS.map((s) => [s.key, values[s.key] === '' ? null : Number(values[s.key])])),
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from('player_ratings').upsert(row).select().single();
+    setSaving(false);
+    if (error) { alert(`Save failed: ${error.message}`); return; }
+    onSaved(playerId, data);
+  }
+
+  return (
+    <tr className={striped ? 'bg-slate-50' : 'bg-white'}>
+      <td className="p-2 font-semibold border-t whitespace-nowrap">{playerName}</td>
+      {RATING_SKILLS.map((s) => (
+        <td key={s.key} className="p-2 text-center border-t">
+          <input
+            type="number" min="5" max="10" value={values[s.key]}
+            onChange={(e) => setValues((prev) => ({ ...prev, [s.key]: e.target.value }))}
+            className="border rounded px-1 py-1 w-14 text-center"
+          />
+        </td>
+      ))}
+      <td className="p-2 text-right border-t">
+        <button onClick={save} disabled={saving} className="px-3 py-1 rounded bg-teal-700 text-white text-xs font-bold uppercase tracking-wide disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </td>
+    </tr>
   );
 }

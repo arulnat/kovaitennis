@@ -126,6 +126,7 @@ Built in response to specific requests during development, with no corresponding
 - **Teams page** — read-only mirror of Grouping's own ordering (unassigned first, then division-by-division, highest to lowest, ranked within), bulk and single delete restricted to unassigned teams, full teardown (login, players, roster, credentials) via the `delete-team` edge function.
 - **Team Profile page** (`/team/:teamId`, public) — captain/contact info, current-season division and standing, season roster, and this season's fixtures with results. Every team name shown anywhere in the app (Standings, Fixtures Calendar, Teams, Grouping, Fixtures viewer, Update Scores, Missing Scores, Team Logins) links to it.
 - **Update Scores page** (admin) — lets an admin jump straight into any fixture's score entry, mirroring what a captain can do.
+- **Player performance ratings** (`player_ratings` table) — Serve/Volley/Forehand/Backhand/Fitness, each 5-10, editable by an admin or by the captain of that player's own team (`players.team_id` match), publicly readable and shown on Team Profile. This is very likely what the README's "Strategy Builder" line (deferred/not-built, from the original Priority Roadmap) was building toward, though that document itself was never available in this codebase to confirm the exact original spec against.
 
 ## Known data-integrity fix
 
