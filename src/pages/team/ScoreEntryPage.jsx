@@ -65,6 +65,11 @@ export default function ScoreEntryPage({ fixtureId }) {
     doubles2: { home: [], away: [] },
   });
   const [roster, setRoster] = useState({ home: [], away: [] });
+  // Which rubber types are showing the editable form right now, rather
+  // than the read-only result card — a rubber with a score already
+  // starts collapsed to its card; "Edit" (or having nothing saved yet)
+  // is what opens the form back up.
+  const [editingTypes, setEditingTypes] = useState({});
   const [teamNames, setTeamNames] = useState({ home: '', away: '' });
   const [ratings, setRatings] = useState([]); // tie_player_ratings rows for this fixture
   const [activeTab, setActiveTab] = useState('singles');
@@ -176,6 +181,7 @@ export default function ScoreEntryPage({ fixtureId }) {
     if (error) { alert(`Save failed: ${error.message}`); return; }
 
     setRubbers((prev) => ({ ...prev, [type]: data }));
+    setEditingTypes((prev) => ({ ...prev, [type]: false }));
 
     await supabase.from('audit_log').insert({
       action: 'rubber.save', entity_type: 'rubber', entity_id: data.id,
@@ -200,6 +206,7 @@ export default function ScoreEntryPage({ fixtureId }) {
     if (error) { alert(`Update failed: ${error.message}`); return; }
 
     setRubbers((prev) => ({ ...prev, [type]: data }));
+    setEditingTypes((prev) => ({ ...prev, [type]: false }));
 
     await supabase.from('audit_log').insert({
       action: 'rubber.confirm', entity_type: 'rubber', entity_id: data.id,
@@ -283,37 +290,52 @@ export default function ScoreEntryPage({ fixtureId }) {
         </button>
       </div>
 
-      {RUBBER_TYPES.map((type) => (
-        <div key={type} className={activeTab === type ? '' : 'hidden'}>
-          {rubbers[type]?.winner_side && (
-            <RubberResultCard
-              rubber={rubbers[type]}
-              homeTeamName={teamNames.home}
-              awayTeamName={teamNames.away}
-              homeRoster={roster.home}
-              awayRoster={roster.away}
-              weekDate={fixture.week_date}
-            />
-          )}
-          <RubberEditor
-            type={type}
-            rubber={rubbers[type]}
-            homeRoster={roster.home}
-            awayRoster={roster.away}
-            homeTeamName={teamNames.home}
-            awayTeamName={teamNames.away}
-            homePlayers={playerSelections[type].home}
-            awayPlayers={playerSelections[type].away}
-            onHomePlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], home: v } }))}
-            onAwayPlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], away: v } }))}
-            selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
-            selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
-            disabled={!canEdit}
-            onSave={(payload) => saveRubber(type, payload)}
-            onUpdate={() => confirmRubber(type)}
-          />
-        </div>
-      ))}
+      {RUBBER_TYPES.map((type) => {
+        const hasResult = !!rubbers[type]?.winner_side;
+        const isEditing = editingTypes[type] || !hasResult;
+        return (
+          <div key={type} className={activeTab === type ? '' : 'hidden'}>
+            {hasResult && (
+              <RubberResultCard
+                rubber={rubbers[type]}
+                homeTeamName={teamNames.home}
+                awayTeamName={teamNames.away}
+                homeRoster={roster.home}
+                awayRoster={roster.away}
+                weekDate={fixture.week_date}
+              />
+            )}
+            {hasResult && !isEditing ? (
+              canEdit && (
+                <button
+                  onClick={() => setEditingTypes((prev) => ({ ...prev, [type]: true }))}
+                  className="px-4 py-1.5 rounded border border-teal-700 text-teal-700 text-sm font-bold uppercase tracking-wide hover:bg-teal-50"
+                >
+                  Edit
+                </button>
+              )
+            ) : (
+              <RubberEditor
+                type={type}
+                rubber={rubbers[type]}
+                homeRoster={roster.home}
+                awayRoster={roster.away}
+                homeTeamName={teamNames.home}
+                awayTeamName={teamNames.away}
+                homePlayers={playerSelections[type].home}
+                awayPlayers={playerSelections[type].away}
+                onHomePlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], home: v } }))}
+                onAwayPlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], away: v } }))}
+                selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
+                selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
+                disabled={!canEdit}
+                onSave={(payload) => saveRubber(type, payload)}
+                onUpdate={() => confirmRubber(type)}
+              />
+            )}
+          </div>
+        );
+      })}
 
       <div className={activeTab === 'performance' ? '' : 'hidden'}>
         <PerformanceTab
