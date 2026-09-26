@@ -1,4 +1,5 @@
 // src/App.jsx — top-level routing for the MVP (HP-priority) screens.
+import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth, RequireRole } from './lib/auth.jsx';
 import { SeasonProvider, useSeason, SeasonSelector } from './lib/seasonContext.jsx';
@@ -56,6 +57,47 @@ export default function App() {
 }
 
 const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
+const dropdownLinkClass = 'block px-4 py-2 text-teal-100 hover:text-white hover:bg-teal-800 font-semibold uppercase text-xs tracking-wide transition-colors whitespace-nowrap';
+
+// Seasons -> Divisions -> Bulk Upload is the order an admin actually sets
+// a season up in, so grouping them under one "Setup" menu (in that
+// order) keeps the one-time setup steps together and out of the way of
+// the day-to-day admin links, instead of each sitting as its own
+// top-level nav item.
+function SetupMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`${navLinkClass} flex items-center gap-1`}
+      >
+        Setup <span className="text-[9px]">▾</span>
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="absolute left-0 top-full mt-2 bg-teal-900 border-2 border-accent-500 rounded shadow-lg py-1 z-10"
+        >
+          <Link to="/admin/seasons" className={dropdownLinkClass}>Seasons</Link>
+          <Link to="/admin/divisions" className={dropdownLinkClass}>Divisions</Link>
+          <Link to="/admin/bulk-upload" className={dropdownLinkClass}>Bulk Upload</Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Nav() {
   const { role, signOut } = useAuth();
@@ -67,16 +109,14 @@ function Nav() {
       <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
-          <Link to="/admin/bulk-upload" className={navLinkClass}>Bulk Upload</Link>
+          <SetupMenu />
           <Link to="/admin/login-credentials" className={navLinkClass}>Login Credentials</Link>
           <Link to="/admin/teams" className={navLinkClass}>Teams</Link>
-          <Link to="/admin/divisions" className={navLinkClass}>Divisions</Link>
           <Link to="/admin/grouping" className={navLinkClass}>Grouping</Link>
           <Link to="/admin/fixtures" className={navLinkClass}>Fixtures</Link>
           <Link to="/admin/update-scores" className={navLinkClass}>Update Scores</Link>
           <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
           <Link to="/admin/content" className={navLinkClass}>Content</Link>
-          <Link to="/admin/seasons" className={navLinkClass}>Seasons</Link>
         </>
       )}
       <SeasonSelector />
