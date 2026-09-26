@@ -103,16 +103,21 @@ export default function FixturesCalendarPage({ seasonId }) {
     function updateScale() {
       // SAFETY_MARGIN: the on-screen measurement below reliably
       // undershoots how tall the content actually renders once `zoom` is
-      // applied for print — verified experimentally (print-to-PDF, then
-      // counting the resulting pages) rather than derived from a known
-      // cause; 1.0 (no margin) consistently produced 2 pages instead of
-      // 1, and this value was the largest (least-shrinking, most
-      // legible) one that still reliably held to a single page across
-      // repeated tries. Revisit if a much larger season (many more
-      // divisions/rounds) is ever found to still spill onto a second
-      // page — it may need to go lower still.
+      // actually shrinking something for print — verified experimentally
+      // (print-to-PDF, then counting the resulting pages) rather than
+      // derived from a known cause; 1.0 (no margin) consistently produced
+      // 2 pages instead of 1, and this value was the largest (least-
+      // shrinking, most legible) one that still reliably held to a
+      // single page across repeated tries. Only applied when shrinking
+      // is actually needed (rawScale < 1) — a season short enough to
+      // already fit at its natural size prints at natural size, no
+      // needless extra shrink, since `zoom: 1` shouldn't carry the same
+      // discrepancy a real zoom<1 does. Revisit the margin itself if a
+      // much larger season (many more divisions/rounds) is ever found to
+      // still spill onto a second page — it may need to go lower still.
       const SAFETY_MARGIN = 0.65;
-      const scale = Math.min(1, PRINT_AREA_WIDTH_PX / el.scrollWidth, PRINT_AREA_HEIGHT_PX / el.scrollHeight) * SAFETY_MARGIN;
+      const rawScale = Math.min(1, PRINT_AREA_WIDTH_PX / el.scrollWidth, PRINT_AREA_HEIGHT_PX / el.scrollHeight);
+      const scale = rawScale < 1 ? rawScale * SAFETY_MARGIN : 1;
       el.style.setProperty('--print-scale', String(scale));
     }
     updateScale();
