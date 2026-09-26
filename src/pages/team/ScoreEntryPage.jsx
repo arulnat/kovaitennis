@@ -1,17 +1,25 @@
 // src/pages/team/ScoreEntryPage.jsx
 //
-// Req 5.1–5.9: either captain enters/edits a tie's 3 rubbers. Once all 3
-// are in, the tie stays editable by either captain for 7 days (incl.
-// player corrections, Req 5.7), then locks to admin-only. No confirm/
-// dispute step (v6). Eligibility (5.5) is enforced by filtering the
-// player selectors live via selectablePlayers().
+// Req 5.1–5.9: either captain enters/edits a tie's 3 rubbers, saved one
+// at a time as a normal (not final) update — Save is provisional right
+// up until the tie finalizes. Eligibility (5.5) is enforced by filtering
+// the player selectors live via selectablePlayers().
+//
+// Finalization replaces the original spec's 7-day captain-edit window:
+// once all 3 rubbers are scored AND both captains have rated every
+// opposing player who played (the Performance tab), a database trigger
+// (0014_auto_finalize_tie.sql) stamps fixtures.finalized_at itself —
+// captains can no longer edit anything after that, but admin can still
+// edit scores (never ratings — that's true even before finalization:
+// admin has no write access to tie_player_ratings at all, "admin can
+// only edit the scores, not the performance of the players").
 //
 // Nothing can be scored until the fixture's season is published (Fixtures
 // page) — this applies to admin too, not just captains: the schedule
 // isn't final until then, so a score entered against it could end up
 // orphaned by a later grouping change.
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { useAuth } from '../../lib/auth.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
@@ -21,7 +29,12 @@ import {
   defaultWalkoverTime, scoreToRow, rowToScore,
 } from '../../lib/scoring.js';
 
-const EDIT_WINDOW_DAYS = 7; // Req 5.7
+const SKILLS = [
+  { key: 'serve', label: 'Serve' },
+  { key: 'forehand', label: 'Forehand' },
+  { key: 'backhand', label: 'Backhand' },
+  { key: 'volley', label: 'Volley' },
+];
 
 export default function ScoreEntryPage({ fixtureId }) {
   const { teamId, isAdmin } = useAuth();
@@ -30,10 +43,15 @@ export default function ScoreEntryPage({ fixtureId }) {
   const [rubbers, setRubbers] = useState({}); // keyed by rubber_type
   const [roster, setRoster] = useState({ home: [], away: [] });
   const [teamNames, setTeamNames] = useState({ home: '', away: '' });
+  const [ratings, setRatings] = useState([]); // tie_player_ratings rows for this fixture
   const [activeTab, setActiveTab] = useState('singles');
 
+  const reloadFixture = () => supabase.from('fixtures').select('*').eq('id', fixtureId).single().then(({ data }) => setFixture(data));
+  const reloadRatings = () => supabase.from('tie_player_ratings').select('*').eq('fixture_id', fixtureId).then(({ data }) => setRatings(data || []));
+
   useEffect(() => {
-    supabase.from('fixtures').select('*').eq('id', fixtureId).single().then(({ data }) => setFixture(data));
+    reloadFixture();
+    reloadRatings();
     supabase.from('rubbers').select('*').eq('fixture_id', fixtureId).then(({ data }) => {
       const byType = {};
       for (const r of data || []) byType[r.rubber_type] = r;
@@ -68,16 +86,12 @@ export default function ScoreEntryPage({ fixtureId }) {
   }, [fixture]);
 
   const tieComplete = RUBBER_TYPES.every((t) => rubbers[t]?.winner_side);
-  const earliestLock = useMemo(() => {
-    const times = RUBBER_TYPES.map((t) => rubbers[t]?.completed_at).filter(Boolean);
-    if (times.length < 3) return null;
-    const latestCompletion = new Date(Math.max(...times.map((t) => new Date(t).getTime())));
-    return new Date(latestCompletion.getTime() + EDIT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  }, [rubbers]);
-
-  const isLocked = tieComplete && earliestLock && new Date() > earliestLock && !isAdmin;
+  const isFinalized = !!fixture?.finalized_at;
   const isPublished = !!season?.published;
-  const canEdit = isPublished && !isLocked; // either captain (home or away) can edit — Req 5.2 — but only once the season is published, for anyone including admin
+  // Either captain can edit scores — Req 5.2 — until the tie finalizes;
+  // admin can still edit scores after that (never ratings — see below).
+  const canEdit = isPublished && (isAdmin || !isFinalized);
+  const mySide = teamId && fixture ? (teamId === fixture.home_team_id ? 'home' : teamId === fixture.away_team_id ? 'away' : null) : null;
 
   // already-selected players across the tie, for eligibility filtering (Req 5.5)
   const alreadySelectedFor = (side) => ({
@@ -128,12 +142,25 @@ export default function ScoreEntryPage({ fixtureId }) {
       detail: { rubber_type: type, winner },
     });
 
-    // Once all 3 rubbers are in, stamp locked_at on all of them (Req 5.7)
-    const { data: allRubbers } = await supabase.from('rubbers').select('*').eq('fixture_id', fixtureId);
-    if (allRubbers?.length === 3 && allRubbers.every((r) => r.winner_side)) {
-      const lockAt = new Date(Date.now() + EDIT_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from('rubbers').update({ locked_at: lockAt }).eq('fixture_id', fixtureId).is('locked_at', null);
-    }
+    // A database trigger (0014) may have just finalized the fixture off
+    // this save (all 3 rubbers + both sides' ratings now complete) —
+    // re-fetch to pick that up rather than trying to recompute it here.
+    reloadFixture();
+  }
+
+  async function saveRating(playerId, ratedByTeamId, { overallRating, skills }) {
+    const row = {
+      fixture_id: fixtureId,
+      rated_player_id: playerId,
+      rated_by_team_id: ratedByTeamId,
+      overall_rating: overallRating,
+      ...Object.fromEntries(SKILLS.map((s) => [s.key, skills[s.key] || null])),
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from('tie_player_ratings').upsert(row, { onConflict: 'fixture_id,rated_player_id' }).select().single();
+    if (error) { alert(`Save failed: ${error.message}`); return; }
+    setRatings((prev) => [...prev.filter((r) => r.rated_player_id !== playerId), data]);
+    reloadFixture(); // may have just finalized the tie (0014)
   }
 
   if (!fixture) return <p className="p-6">Loading…</p>;
@@ -149,17 +176,19 @@ export default function ScoreEntryPage({ fixtureId }) {
       )}
 
       <p className="text-sm text-gray-600 mb-4">
-        Either captain can enter or edit any rubber.{' '}
-        {isAdmin ? (
-          <span className="text-teal-700">Editing as admin — this bypasses the normal captain edit window.</span>
-        ) : tieComplete && (
-          isLocked
-            ? <span className="text-red-600">This tie is locked — contact admin for any further changes.</span>
-            : <span className="text-teal-700">Editable until {earliestLock?.toLocaleDateString()} (7-day window, Req 5.7).</span>
+        Either captain can save or edit any rubber's score — Save is provisional, not final.{' '}
+        {isFinalized ? (
+          <span className="text-red-600 font-semibold">
+            This tie is finalized — {isAdmin ? 'admin can still fix a score, but ratings are locked for everyone.' : 'contact admin for any further changes.'}
+          </span>
+        ) : (
+          <span className="text-teal-700">
+            It stays open until all 3 rubbers are scored and both captains have rated the opposing players who played (Performance tab) — then it locks for good.
+          </span>
         )}
       </p>
 
-      <div className="flex border-b-2 border-accent-500 mb-4">
+      <div className="flex border-b-2 border-accent-500 mb-4 flex-wrap">
         {RUBBER_TYPES.map((type) => (
           <button
             key={type}
@@ -174,6 +203,14 @@ export default function ScoreEntryPage({ fixtureId }) {
             )}
           </button>
         ))}
+        <button
+          onClick={() => setActiveTab('performance')}
+          className={`px-4 py-2 text-sm font-extrabold uppercase tracking-wide rounded-t ${
+            activeTab === 'performance' ? 'bg-teal-900 text-white' : 'text-teal-800 hover:bg-teal-50'
+          }`}
+        >
+          Performance
+        </button>
       </div>
 
       {RUBBER_TYPES.map((type) => (
@@ -200,11 +237,191 @@ export default function ScoreEntryPage({ fixtureId }) {
           />
         </div>
       ))}
+
+      <div className={activeTab === 'performance' ? '' : 'hidden'}>
+        <PerformanceTab
+          fixture={fixture}
+          rubbers={rubbers}
+          roster={roster}
+          teamNames={teamNames}
+          ratings={ratings}
+          tieComplete={tieComplete}
+          isFinalized={isFinalized}
+          isAdmin={isAdmin}
+          mySide={mySide}
+          onSave={saveRating}
+        />
+      </div>
     </div>
   );
 }
 
 const RUBBER_LABELS = { singles: 'Singles', doubles1: 'Doubles 1', doubles2: 'Doubles 2' };
+
+/** Distinct player ids actually selected across the 3 rubbers, for one side — "who played", per Req 15.1/15.2. */
+function playersWhoPlayed(rubbers, side) {
+  const ids = new Set();
+  for (const type of RUBBER_TYPES) {
+    const r = rubbers[type];
+    if (!r) continue;
+    if (r[`${side}_player1_id`]) ids.add(r[`${side}_player1_id`]);
+    if (r[`${side}_player2_id`]) ids.add(r[`${side}_player2_id`]);
+  }
+  return [...ids];
+}
+
+/**
+ * Req 15.1/15.2/15.5/15.7 — the opposing captain rates each player who
+ * played, once per tie: a 5–10 overall score plus Strong/Weak/neutral
+ * tags on 4 named skills. Only the opposing captain can write here (see
+ * tie_player_ratings RLS) — admin never can, only ever a read-only view.
+ */
+function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieComplete, isFinalized, isAdmin, mySide, onSave }) {
+  if (!tieComplete) {
+    return <p className="text-sm text-gray-500 p-4">Enter and save all 3 rubbers' scores first — ratings open once the tie is complete.</p>;
+  }
+
+  const homePlayed = playersWhoPlayed(rubbers, 'home');
+  const awayPlayed = playersWhoPlayed(rubbers, 'away');
+  const ratingFor = (playerId) => ratings.find((r) => r.rated_player_id === playerId);
+
+  // Read-only for admin, or for whichever side isn't a captain at all (shouldn't happen given RequireRole, but no side to rate as a fallback).
+  if (isAdmin || !mySide) {
+    return (
+      <div className="space-y-6">
+        {isAdmin && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+            Admin view only — ratings can't be edited by admin, only by the opposing team's captain.
+          </p>
+        )}
+        <ReadOnlyRatings title={`${teamNames.home}'s players, rated by ${teamNames.away}`} playerIds={homePlayed} roster={roster.home} ratings={ratings} />
+        <ReadOnlyRatings title={`${teamNames.away}'s players, rated by ${teamNames.home}`} playerIds={awayPlayed} roster={roster.away} ratings={ratings} />
+      </div>
+    );
+  }
+
+  // A captain only ever rates the OTHER side's players who played.
+  const opponentSide = mySide === 'home' ? 'away' : 'home';
+  const opponentPlayers = opponentSide === 'home' ? homePlayed : awayPlayed;
+  const opponentRoster = opponentSide === 'home' ? roster.home : roster.away;
+  const myTeamId = fixture[`${mySide}_team_id`];
+
+  return (
+    <div>
+      <p className="text-sm text-gray-600 mb-3">
+        Rate {teamNames[opponentSide]}'s players who played this tie — a scouting aid for whoever plays them next.
+      </p>
+      {isFinalized && <p className="text-sm text-red-600 mb-3">This tie is finalized — ratings are locked.</p>}
+      {opponentPlayers.length === 0 ? (
+        <p className="text-sm text-gray-500">No opposing players recorded yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {opponentPlayers.map((playerId) => (
+            <PlayerRatingRow
+              key={playerId}
+              playerId={playerId}
+              playerName={opponentRoster.find((p) => p.id === playerId)?.name ?? '—'}
+              existing={ratingFor(playerId)}
+              disabled={isFinalized}
+              onSave={(payload) => onSave(playerId, myTeamId, payload)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReadOnlyRatings({ title, playerIds, roster, ratings }) {
+  if (playerIds.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide text-teal-900 mb-2">{title}</p>
+      <table className="w-full text-sm border rounded overflow-hidden">
+        <thead className="bg-teal-50">
+          <tr>
+            <th className="text-left p-2">Player</th>
+            <th className="p-2">Overall</th>
+            {SKILLS.map((s) => <th key={s.key} className="p-2">{s.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {playerIds.map((id) => {
+            const r = ratings.find((x) => x.rated_player_id === id);
+            return (
+              <tr key={id} className="border-t">
+                <td className="p-2 font-medium">{roster.find((p) => p.id === id)?.name ?? '—'}</td>
+                <td className="p-2 text-center">{r?.overall_rating ?? '—'}</td>
+                {SKILLS.map((s) => (
+                  <td key={s.key} className="p-2 text-center capitalize">{r?.[s.key] ?? '—'}</td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PlayerRatingRow({ playerId, playerName, existing, disabled, onSave }) {
+  const [overallRating, setOverallRating] = useState(existing?.overall_rating ?? '');
+  const [skills, setSkills] = useState(Object.fromEntries(SKILLS.map((s) => [s.key, existing?.[s.key] ?? null])));
+  const [saving, setSaving] = useState(false);
+
+  function toggleSkill(key, value) {
+    setSkills((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }));
+  }
+
+  async function save() {
+    const n = Number(overallRating);
+    if (!Number.isInteger(n) || n < 5 || n > 10) { alert('Overall rating must be a whole number from 5 to 10.'); return; }
+    setSaving(true);
+    await onSave({ overallRating: n, skills });
+    setSaving(false);
+  }
+
+  return (
+    <div className="border rounded p-3">
+      <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+        <p className="font-semibold">{playerName}</p>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500">Overall (5–10)</label>
+          <input
+            type="number" min="5" max="10" value={overallRating} disabled={disabled}
+            onChange={(e) => setOverallRating(e.target.value)}
+            className="border rounded px-2 py-1 w-16 text-center text-sm"
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-3 mb-2">
+        {SKILLS.map((s) => (
+          <div key={s.key} className="flex items-center gap-1 text-xs">
+            <span className="text-gray-600 w-16">{s.label}</span>
+            {['strong', 'weak'].map((v) => (
+              <button
+                key={v}
+                type="button"
+                disabled={disabled}
+                onClick={() => toggleSkill(s.key, v)}
+                className={`px-2 py-0.5 rounded uppercase font-bold text-[10px] disabled:opacity-40 ${
+                  skills[s.key] === v
+                    ? v === 'strong' ? 'bg-teal-700 text-white' : 'bg-amber-600 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+      <button onClick={save} disabled={disabled || saving} className="px-3 py-1 rounded bg-teal-700 text-white text-xs font-bold uppercase tracking-wide disabled:opacity-50">
+        {saving ? 'Saving…' : existing ? 'Update rating' : 'Save rating'}
+      </button>
+    </div>
+  );
+}
 
 function formatCardDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
