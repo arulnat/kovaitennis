@@ -422,14 +422,34 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
           )}
         </div>
       ) : (
-        <div className="flex flex-wrap items-end gap-4 mb-2">
-          <div className="flex gap-3">
-            <PlayerPicker label="Home" roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled} compact />
-            <PlayerPicker label="Away" roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled} compact />
-          </div>
-          <ScoreBox label="Set score" value={set1} onChange={setSet1} disabled={disabled} />
-          {!isSingles && <ScoreBox label="Set score" value={set2} onChange={setSet2} disabled={disabled} />}
-          {!isSingles && <ScoreBox label="Point score (super-TB, if 1-1)" value={set3} onChange={setSet3} disabled={disabled} />}
+        <div className="mb-2">
+          <table className="text-sm mb-3">
+            <thead>
+              <tr className="text-xs text-gray-500">
+                <th></th>
+                <th className="text-left px-2 pb-1 font-medium">Player</th>
+                <th className="px-2 pb-1 font-medium">Set score</th>
+                {!isSingles && <th className="px-2 pb-1 font-medium">Set score</th>}
+                {!isSingles && <th className="px-2 pb-1 font-medium">Point score</th>}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="pr-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Home</td>
+                <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled} compact /></td>
+                <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled} /></td>
+                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled} /></td>}
+                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.home} onChange={(v) => setSet3({ ...set3, home: v })} disabled={disabled} /></td>}
+              </tr>
+              <tr>
+                <td className="pr-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Away</td>
+                <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled} compact /></td>
+                <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled} /></td>
+                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled} /></td>}
+                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.away} onChange={(v) => setSet3({ ...set3, away: v })} disabled={disabled} /></td>}
+              </tr>
+            </tbody>
+          </table>
           <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
             Save
           </button>
@@ -459,7 +479,7 @@ function PlayerPicker({ label, roster, selectable, count, value, onChange, disab
   const selectableSet = new Set(selectable);
   return (
     <div className={compact ? 'w-40' : undefined}>
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      {label && <p className="text-xs text-gray-500 mb-1">{label}</p>}
       {[...Array(count)].map((_, i) => (
         <select
           key={i}
@@ -482,19 +502,14 @@ function PlayerPicker({ label, roster, selectable, count, value, onChange, disab
   );
 }
 
-/** Labeled two-input score box (games or points) — used inline as its own column: Players | Set score | Point score | Save. */
-function ScoreBox({ label, value, onChange, disabled }) {
+/** A single side's score for one set/point column — home and away are separate table rows, not a home-dash-away pair, so each cell only ever holds one number. */
+function ScoreCell({ value, onChange, disabled }) {
   return (
-    <div>
-      <p className="text-xs text-gray-500 mb-1 whitespace-nowrap">{label}</p>
-      <div className="flex items-center gap-1">
-        <input type="number" min="0" value={value.home} disabled={disabled}
-          onChange={(e) => onChange({ ...value, home: e.target.value })} className="border rounded px-2 py-1.5 w-14 text-center" />
-        <span className="text-gray-400">–</span>
-        <input type="number" min="0" value={value.away} disabled={disabled}
-          onChange={(e) => onChange({ ...value, away: e.target.value })} className="border rounded px-2 py-1.5 w-14 text-center" />
-      </div>
-    </div>
+    <input
+      type="number" min="0" value={value} disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className="border rounded px-2 py-1.5 w-14 text-center"
+    />
   );
 }
 
