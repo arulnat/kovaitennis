@@ -558,9 +558,13 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
   // Singles is decided by one set, recorded as 7-6 once it goes to the
   // 6-6 breaker — set1's own fields only ever hold that game score (7
   // and 6), so a real 7-6/6-7 finish needs a separate column for the
-  // breaker's own point score (e.g. 7-3), shown only when it applies.
+  // breaker's own point score (e.g. 7-3). The column stays open at all
+  // times (not just once 7-6 is reached) so it's never hidden mid-entry
+  // — handleSubmit is what enforces it's only ever filled in when the
+  // set actually went 6-7/7-6, erroring either way otherwise.
   const set1Home = Number(set1.home), set1Away = Number(set1.away);
-  const showTiebreak = !isWalkover && isSingles && ((set1Home === 7 && set1Away === 6) || (set1Home === 6 && set1Away === 7));
+  const showTiebreakColumn = !isWalkover && isSingles;
+  const isTiebreakSet = (set1Home === 7 && set1Away === 6) || (set1Home === 6 && set1Away === 7);
 
   function handleSubmit() {
     if (isWalkover) {
@@ -590,13 +594,18 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
     if (score.set3 && !isValidSuperTiebreakSet(score.set3.home, score.set3.away)) {
       alert('Invalid super-tiebreak score (min 10, win by 2 past 10-10).'); return;
     }
-    if (showTiebreak) {
-      const tbHome = Number(tiebreak.home), tbAway = Number(tiebreak.away);
-      if (tiebreak.home === '' || tiebreak.away === '' || !isValidSuperTiebreakSet(tbHome, tbAway)) {
-        alert('Enter a valid tiebreak point score (min 10, win by 2 past 10-10).'); return;
+    if (showTiebreakColumn) {
+      const tiebreakEntered = tiebreak.home !== '' || tiebreak.away !== '';
+      if (isTiebreakSet) {
+        const tbHome = Number(tiebreak.home), tbAway = Number(tiebreak.away);
+        if (!tiebreakEntered || !isValidSuperTiebreakSet(tbHome, tbAway)) {
+          alert('Set 1 went to 7-6 — enter a valid tiebreak point score (min 10, win by 2 past 10-10).'); return;
+        }
+        score.set1.tiebreakHome = tbHome;
+        score.set1.tiebreakAway = tbAway;
+      } else if (tiebreakEntered) {
+        alert('Tiebreak points can only be entered when set 1 finishes 7-6 (one side on 6, the other on 7).'); return;
       }
-      score.set1.tiebreakHome = tbHome;
-      score.set1.tiebreakAway = tbAway;
     }
 
     onSave({
@@ -642,7 +651,7 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
               {isWalkover && <th className="px-2 pb-1 font-medium">Winner</th>}
               <th className="text-left px-2 pb-1 font-medium">Player</th>
               <th className="px-2 pb-1 font-medium">Set 1</th>
-              {showTiebreak && <th className="px-2 pb-1 font-medium">Tiebreak</th>}
+              {showTiebreakColumn && <th className="px-2 pb-1 font-medium">Tiebreak</th>}
               {!isSingles && <th className="px-2 pb-1 font-medium">Set 2</th>}
               {!isSingles && <th className="px-2 pb-1 font-medium">Set 3</th>}
             </tr>
@@ -657,7 +666,7 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
               )}
               <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled || isWalkover} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled || isWalkover} /></td>
-              {showTiebreak && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} /></td>}
+              {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled || isWalkover} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.home} onChange={(v) => setSet3({ ...set3, home: v })} disabled={disabled || isWalkover} /></td>}
             </tr>
@@ -670,7 +679,7 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
               )}
               <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled || isWalkover} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled || isWalkover} /></td>
-              {showTiebreak && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} /></td>}
+              {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled || isWalkover} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.away} onChange={(v) => setSet3({ ...set3, away: v })} disabled={disabled || isWalkover} /></td>}
             </tr>
