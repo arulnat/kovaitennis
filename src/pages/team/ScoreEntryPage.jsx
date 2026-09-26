@@ -6,7 +6,7 @@
 // dispute step (v6). Eligibility (5.5) is enforced by filtering the
 // player selectors live via selectablePlayers().
 //
-// Nothing can be scored until the fixture's division is frozen (Fixtures
+// Nothing can be scored until the fixture's season is published (Fixtures
 // page) — this applies to admin too, not just captains: the schedule
 // isn't final until then, so a score entered against it could end up
 // orphaned by a later grouping change.
@@ -26,7 +26,7 @@ const EDIT_WINDOW_DAYS = 7; // Req 5.7
 export default function ScoreEntryPage({ fixtureId }) {
   const { teamId, isAdmin } = useAuth();
   const [fixture, setFixture] = useState(null);
-  const [division, setDivision] = useState(null);
+  const [season, setSeason] = useState(null);
   const [rubbers, setRubbers] = useState({}); // keyed by rubber_type
   const [roster, setRoster] = useState({ home: [], away: [] });
 
@@ -40,9 +40,9 @@ export default function ScoreEntryPage({ fixtureId }) {
   }, [fixtureId]);
 
   useEffect(() => {
-    if (!fixture?.division_id) return;
-    supabase.from('divisions').select('fixtures_frozen').eq('id', fixture.division_id).single().then(({ data }) => setDivision(data));
-  }, [fixture?.division_id]);
+    if (!fixture?.season_id) return;
+    supabase.from('seasons').select('published').eq('id', fixture.season_id).single().then(({ data }) => setSeason(data));
+  }, [fixture?.season_id]);
 
   useEffect(() => {
     if (!fixture) return;
@@ -66,8 +66,8 @@ export default function ScoreEntryPage({ fixtureId }) {
   }, [rubbers]);
 
   const isLocked = tieComplete && earliestLock && new Date() > earliestLock && !isAdmin;
-  const isFrozen = !!division?.fixtures_frozen;
-  const canEdit = isFrozen && !isLocked; // either captain (home or away) can edit — Req 5.2 — but only once frozen, for anyone including admin
+  const isPublished = !!season?.published;
+  const canEdit = isPublished && !isLocked; // either captain (home or away) can edit — Req 5.2 — but only once the season is published, for anyone including admin
 
   // already-selected players across the tie, for eligibility filtering (Req 5.5)
   const alreadySelectedFor = (side) => ({
@@ -132,9 +132,9 @@ export default function ScoreEntryPage({ fixtureId }) {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader title="Score Entry" />
 
-      {!isFrozen && (
+      {!isPublished && (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
-          This division's fixtures aren't frozen yet — scores can't be entered until an admin freezes them.
+          This season isn't published yet — scores can't be entered until an admin publishes it.
         </p>
       )}
 

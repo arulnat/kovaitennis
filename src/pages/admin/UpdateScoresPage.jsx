@@ -7,8 +7,8 @@
 // fixture and jump into its score entry, the same way a captain would
 // from their own team dashboard.
 //
-// A division's fixtures must be frozen (Fixtures page) before anyone —
-// captain or admin — can enter a score for it; ScoreEntryPage enforces
+// The whole season must be published (Fixtures page) before anyone —
+// captain or admin — can enter a score in it; ScoreEntryPage enforces
 // this too (defense in depth for anyone linking straight to a fixture),
 // but this page also disables the action up front so it's clear why.
 
@@ -20,7 +20,7 @@ import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 
 export default function UpdateScoresPage({ seasonId }) {
-  const { divisions } = useSeason();
+  const { divisions, activeSeason } = useSeason();
   const navigate = useNavigate();
   const [selectedDivisionId, setSelectedDivisionId] = useState('');
   const [fixtures, setFixtures] = useState(null); // null = loading
@@ -48,7 +48,7 @@ export default function UpdateScoresPage({ seasonId }) {
   }, [seasonId, selectedDivisionId]);
 
   const division = divisions.find((d) => d.id === selectedDivisionId) ?? null;
-  const frozen = !!division?.fixtures_frozen;
+  const published = !!activeSeason?.published;
 
   if (divisions.length === 0) {
     return <p className="p-6 text-gray-500">This season has no divisions yet — create one under Divisions first.</p>;
@@ -74,9 +74,9 @@ export default function UpdateScoresPage({ seasonId }) {
         </select>
       </label>
 
-      {division && !frozen && (
+      {division && !published && (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
-          This division isn't frozen yet — scores can't be entered until it is. Freeze it on the Fixtures page
+          This season isn't published yet — scores can't be entered until it is. Publish it on the Fixtures page
           once every division's fixtures are generated and no teams are left unassigned.
         </p>
       )}
@@ -116,8 +116,8 @@ export default function UpdateScoresPage({ seasonId }) {
                   <td className="p-2 text-right">
                     <button
                       onClick={() => navigate(`/score/${f.id}`)}
-                      disabled={!frozen}
-                      title={frozen ? undefined : 'Freeze this division first'}
+                      disabled={!published}
+                      title={published ? undefined : 'Publish the season first'}
                       className="text-xs text-teal-700 underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
                     >
                       {scored === 0 ? 'Enter score' : 'Edit score'}

@@ -13,15 +13,16 @@
 // unlocked can a swap be made, so a division can be locked once its
 // schedule is confirmed correct.
 //
-// Freeze is a separate, bigger step (divisions.fixtures_frozen): scores
-// can't be entered for a division at all — by anyone, captain or admin,
-// see ScoreEntryPage/UpdateScoresPage — until it's frozen. Freezing also
-// locks grouping (no more adding/removing teams), and can't be done
-// until the WHOLE SEASON is ready: no team left unassigned, and every
-// division already has fixtures generated — freezing one division while
-// the season's overall structure is still being set up would let scores
-// get entered against a schedule the rest of the season might still
-// reshuffle.
+// Publish is a separate, bigger step (seasons.published): scores can't
+// be entered for ANY division — by anyone, captain or admin, see
+// ScoreEntryPage/UpdateScoresPage — until the season is published. It's
+// one season-wide switch, not a per-division one, because the readiness
+// gate it's behind (no team left unassigned, every division already has
+// fixtures generated) is itself season-wide — publishing one division
+// while the season's overall structure is still being set up would let
+// scores get entered against a schedule the rest of the season might
+// still reshuffle. Publishing also locks every division's grouping (no
+// more adding/removing teams anywhere in the season).
 //
 // Switching divisions keeps the previously-shown schedule on screen
 // until the new one has loaded (instead of flashing to a "Loading…"
@@ -56,7 +57,7 @@ function groupByRound(fixtures) {
 }
 
 export default function FixtureGenerationPage({ seasonId }) {
-  const { divisions, refreshDivisions } = useSeason();
+  const { divisions, refreshDivisions, activeSeason, refresh } = useSeason();
   const { isAdmin } = useAuth();
   const [selectedDivisionId, setSelectedDivisionId] = useState('');
   const [teams, setTeams] = useState([]);
@@ -108,19 +109,19 @@ export default function FixtureGenerationPage({ seasonId }) {
     refreshDivisions();
   }
 
-  async function toggleFreeze() {
-    if (!division) return;
+  async function togglePublish() {
+    if (!activeSeason) return;
 
-    if (division.fixtures_frozen) {
-      if (!confirm(`Unfreeze "${division.name}"? Scores can no longer be entered for it until it's frozen again.`)) return;
-      const { error } = await supabase.from('divisions').update({ fixtures_frozen: false }).eq('id', division.id);
+    if (activeSeason.published) {
+      if (!confirm('Unpublish this season? Scores can no longer be entered anywhere in it until it\'s published again.')) return;
+      const { error } = await supabase.from('seasons').update({ published: false }).eq('id', activeSeason.id);
       if (error) { alert(error.message); return; }
-      refreshDivisions();
+      refresh();
       return;
     }
 
-    // Freezing is season-wide readiness, not just this division: nothing
-    // left unassigned, and every division already has fixtures generated.
+    // Publishing is a season-wide readiness gate: nothing left
+    // unassigned, and every division already has fixtures generated.
     const [{ count: unassignedCount, error: unassignedErr }, { data: allFixtures, error: fixturesErr }] = await Promise.all([
       supabase.from('team_seasons').select('id', { count: 'exact', head: true }).eq('season_id', seasonId).is('division_id', null),
       supabase.from('fixtures').select('division_id').eq('season_id', seasonId),
@@ -129,7 +130,7 @@ export default function FixtureGenerationPage({ seasonId }) {
     if (fixturesErr) { alert(fixturesErr.message); return; }
 
     if (unassignedCount > 0) {
-      alert(`${unassignedCount} team(s) are still in the unassigned pool — place every team into a division under Grouping before freezing.`);
+      alert(`${unassignedCount} team(s) are still in the unassigned pool — place every team into a division under Grouping before publishing.`);
       return;
     }
 
@@ -140,11 +141,13 @@ export default function FixtureGenerationPage({ seasonId }) {
       return;
     }
 
-    if (!confirm(`Freeze "${division.name}"? This locks its roster (no more adding or removing teams) and allows scores to be entered for it. This can be undone by unfreezing.`)) return;
+    if (!confirm('Publish this season? This locks every division\'s roster (no more adding or removing teams) and allows scores to be entered everywhere. This can be undone by unpublishing.')) return;
 
-    const { error } = await supabase.from('divisions').update({ fixtures_frozen: true, grouping_locked: true }).eq('id', division.id);
-    if (error) { alert(error.message); return; }
-    refreshDivisions();
+    const { error: seasonErr } = await supabase.from('seasons').update({ published: true }).eq('id', activeSeason.id);
+    if (seasonErr) { alert(seasonErr.message); return; }
+    const { error: divisionsErr } = await supabase.from('divisions').update({ grouping_locked: true }).eq('season_id', seasonId);
+    if (divisionsErr) { alert(divisionsErr.message); return; }
+    refresh();
   }
 
   async function swapHomeAway(tie) {
@@ -168,7 +171,21 @@ export default function FixtureGenerationPage({ seasonId }) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <PageHeader title="Fixtures" />
+      <PageHeader
+        title="Fixtures"
+        actions={
+          activeSeason && (
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold uppercase tracking-wide px-2 py-1 rounded ${activeSeason.published ? 'bg-accent-500 text-teal-950' : 'bg-gray-100 text-gray-600'}`}>
+                {activeSeason.published ? 'Published' : 'Not Published'}
+              </span>
+              <button onClick={togglePublish} className="text-xs font-bold text-teal-700 underline">
+                {activeSeason.published ? 'Unpublish Season' : 'Publish Season'}
+              </button>
+            </div>
+          )
+        }
+      />
 
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <label className="text-sm text-gray-700">
@@ -185,30 +202,20 @@ export default function FixtureGenerationPage({ seasonId }) {
         </label>
 
         {division && (
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-medium px-2 py-1 rounded ${division.fixtures_locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                Swaps {division.fixtures_locked ? 'Locked' : 'Unlocked'}
-              </span>
-              <button onClick={toggleFixturesLock} className="text-xs text-teal-700 underline">
-                {division.fixtures_locked ? 'Unlock swaps' : 'Lock swaps'}
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-medium px-2 py-1 rounded ${division.fixtures_frozen ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                {division.fixtures_frozen ? 'Frozen' : 'Not Frozen'}
-              </span>
-              <button onClick={toggleFreeze} className="text-xs text-teal-700 underline">
-                {division.fixtures_frozen ? 'Unfreeze' : 'Freeze'}
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-medium px-2 py-1 rounded ${division.fixtures_locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+              Swaps {division.fixtures_locked ? 'Locked' : 'Unlocked'}
+            </span>
+            <button onClick={toggleFixturesLock} className="text-xs text-teal-700 underline">
+              {division.fixtures_locked ? 'Unlock swaps' : 'Lock swaps'}
+            </button>
           </div>
         )}
       </div>
 
-      {division && !division.fixtures_frozen && (
+      {activeSeason && !activeSeason.published && (
         <p className="text-xs text-gray-500 mb-4">
-          Scores can't be entered for this division until it's frozen — see Update Scores.
+          Scores can't be entered anywhere in this season until it's published — see the Publish Season button above.
         </p>
       )}
 

@@ -26,9 +26,10 @@
 // an admin deliberately unlocks it again (e.g. to add a late team).
 // While unlocked, Generate Fixtures becomes Regenerate Fixtures if a
 // schedule already exists: it deletes the old one and builds a fresh
-// one from the current roster, then re-locks. Blocked while frozen
-// (divisions.fixtures_frozen) as an extra safety net, though in
-// practice a frozen division is always also grouping_locked already.
+// one from the current roster, then re-locks. Blocked while the season
+// is published (seasons.published) as an extra safety net, though in
+// practice a published season already has every division grouping_locked
+// too.
 //
 // Holiday weekends (season_holidays) are dates with no matches — set up
 // front, or added later for a rain-out. Generate Fixtures always uses the
@@ -353,7 +354,7 @@ export default function GroupingPage({ seasonId }) {
 
   async function generateFixtures(division) {
     if (division.grouping_locked) { alert(`"${division.name}" is locked. Unlock it first to generate (or regenerate) fixtures.`); return; }
-    if (division.fixtures_frozen) { alert(`"${division.name}" is frozen — unfreeze it first (Fixtures page) before regenerating.`); return; }
+    if (activeSeason?.published) { alert(`The season is published — unpublish it first (Fixtures page) before regenerating.`); return; }
     if (!activeSeason?.start_weekend) { alert('Set the tournament start date above first.'); return; }
     const teamIds = teamSeasons
       .filter((ts) => ts.division_id === division.id)

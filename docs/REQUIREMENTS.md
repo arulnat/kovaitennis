@@ -50,7 +50,7 @@ Status legend: ✅ built · 🔁 built, modified from the original ask · ⏸ de
 | 4.12 | Home/away balance verifiable, visible to admins | 🔁 (added) | `homeAwayBalanceReport` + admin-only summary table on the Fixtures page — not in the original numbered spec, added on request |
 | — | Holiday weekends skip a round, shifting subsequent rounds out | 🔁 (added) | `season_holidays` table, `computeMatchWeekends`'s skip logic, `rescheduleAroundHolidays` — not in the original numbered spec |
 | — | A division locks once fixtures are generated; can be unlocked to add a late team and regenerated | 🔁 (added) | `divisions.grouping_locked`, auto-set on generate, manual unlock re-enables "Regenerate Fixtures" |
-| — | Separate "Freeze" step, season-wide readiness gate before scores can be entered | 🔁 (added) | `divisions.fixtures_frozen`, checked in `toggleFreeze` (every division must have fixtures, no team left unassigned) |
+| — | Separate "Publish Season" step, season-wide readiness gate before scores can be entered | 🔁 (added) | `seasons.published`, checked in `togglePublish` (every division must have fixtures, no team left unassigned) — originally a per-division "Freeze" flag (`divisions.fixtures_frozen`), replaced since the readiness gate was always season-wide anyway, so a per-division switch never actually did anything independently per division |
 
 ## 5. Score Entry
 
@@ -58,7 +58,7 @@ Status legend: ✅ built · 🔁 built, modified from the original ask · ⏸ de
 |---|---|---|---|
 | 5.1 | Rain/weather extension moves a week's deadline without touching fixtures | ✅ (schema) | `fixtures.deadline_extended_to` |
 | 5.2 | Either captain can enter/edit a score; admin can do it on their behalf | ✅ | `ScoreEntryPage.jsx`, `UpdateScoresPage.jsx` (admin) |
-| 5.2 | Scores can't be entered until the division is frozen | 🔁 (added) | gate added alongside the Freeze feature above; not in the original numbered spec |
+| 5.2 | Scores can't be entered until the season is published | 🔁 (added) | gate added alongside the Publish Season feature above; not in the original numbered spec |
 | 5.3 | Singles is a single set to 6, 7-point tiebreak at 6-6 | ✅ | `isValidSinglesSet` |
 | 5.4 | Doubles is best-of-3 "sets," 3rd set is a 10-point super-tiebreak | ✅ | `isValidDoublesRegularSet`, `isValidSuperTiebreak` |
 | 5.5 | A player may play singles + at most one doubles rubber, never both doubles | ✅ | `isEligibleForRubber` |

@@ -6,10 +6,10 @@
 // individual division views. Public — no login required, same as
 // Standings — since the whole point is to circulate it widely.
 //
-// Only shows divisions that are frozen (divisions.fixtures_frozen): an
-// unfrozen division's schedule can still change (Fixtures page), so it
-// isn't ready to hand out yet. As each division gets frozen it appears
-// here automatically — no separate "publish" step.
+// Only shows anything once the season is published (seasons.published):
+// an unpublished season's schedule can still change (Fixtures page), so
+// it isn't ready to hand out yet. The moment an admin publishes, every
+// division with fixtures appears here automatically.
 //
 // "Download" is the browser's own Print -> Save as PDF, not a CSV: a
 // spreadsheet can't carry the color-coded, styled layout this page uses,
@@ -63,11 +63,11 @@ const PRINT_AREA_WIDTH_PX = 1123 - 2 * 38;
 const PRINT_AREA_HEIGHT_PX = 794 - 2 * 38;
 
 export default function FixturesCalendarPage({ seasonId }) {
-  const { divisions } = useSeason();
+  const { divisions, activeSeason } = useSeason();
   const [fixturesByDivision, setFixturesByDivision] = useState(null); // null = loading
   const printableRef = useRef(null);
 
-  const frozenDivisions = divisions.filter((d) => d.fixtures_frozen);
+  const shownDivisions = activeSeason?.published ? divisions : [];
 
   // Shrink the whole schedule to fit one printed page, whatever its actual
   // size — measured fresh right before printing (not on every render,
@@ -102,7 +102,7 @@ export default function FixturesCalendarPage({ seasonId }) {
   }, [fixturesByDivision]);
 
   useEffect(() => {
-    if (!seasonId || frozenDivisions.length === 0) { setFixturesByDivision({}); return; }
+    if (!seasonId || shownDivisions.length === 0) { setFixturesByDivision({}); return; }
     setFixturesByDivision(null);
 
     supabase
@@ -113,25 +113,25 @@ export default function FixturesCalendarPage({ seasonId }) {
         teams_away:teams!fixtures_away_team_id_fkey(id, name)
       `)
       .eq('season_id', seasonId)
-      .in('division_id', frozenDivisions.map((d) => d.id))
+      .in('division_id', shownDivisions.map((d) => d.id))
       .order('round_number')
       .then(({ data }) => {
         const byDivision = {};
-        for (const d of frozenDivisions) byDivision[d.id] = [];
+        for (const d of shownDivisions) byDivision[d.id] = [];
         for (const f of data || []) byDivision[f.division_id]?.push(f);
         setFixturesByDivision(byDivision);
       });
-  }, [seasonId, divisions]);
+  }, [seasonId, divisions, activeSeason?.published]);
 
   return (
     <div className="max-w-4xl mx-auto p-6">
       <PageHeader
         title="Fixtures Calendar"
-        subtitle="Every division's fixtures once frozen, all in one place — Home vs Away for each round. Divisions not yet frozen aren't shown here."
+        subtitle="Every division's fixtures once the season is published, all in one place — Home vs Away for each round. Nothing shows here until then."
         actions={
           <button
             onClick={() => window.print()}
-            disabled={!fixturesByDivision || frozenDivisions.length === 0}
+            disabled={!fixturesByDivision || shownDivisions.length === 0}
             className="no-print px-4 py-2 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide hover:bg-teal-800 disabled:opacity-50 shadow"
           >
             Print / Save as PDF
@@ -139,17 +139,17 @@ export default function FixturesCalendarPage({ seasonId }) {
         }
       />
 
-      {frozenDivisions.length === 0 && (
-        <p className="text-slate-500 text-sm">No divisions have been frozen yet.</p>
+      {shownDivisions.length === 0 && (
+        <p className="text-slate-500 text-sm">The season hasn't been published yet.</p>
       )}
 
-      {fixturesByDivision === null && frozenDivisions.length > 0 && (
+      {fixturesByDivision === null && shownDivisions.length > 0 && (
         <p className="text-slate-500 text-sm">Loading…</p>
       )}
 
       {fixturesByDivision && (
         <div ref={printableRef}>
-          {frozenDivisions.map((d) => (
+          {shownDivisions.map((d) => (
             <div key={d.id} className="mb-8">
               <h2 className="text-white bg-teal-900 rounded-t px-3 py-2 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
               <div className="border border-t-0 border-teal-100 rounded-b p-3">
