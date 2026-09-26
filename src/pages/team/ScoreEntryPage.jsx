@@ -520,6 +520,25 @@ function RubberEditor({
   const [set3, setSet3] = useState(rubber?.set3_home != null ? { home: rubber.set3_home, away: rubber.set3_away } : { home: '', away: '' });
   const [timePlayed, setTimePlayed] = useState(rubber?.time_played_minutes ?? '');
 
+  // The form is always mounted now (no more collapsing to a summary
+  // card), which means it can mount BEFORE the parent's initial rubbers
+  // fetch resolves — the useState initializers above see `rubber`
+  // undefined and lock in blank fields forever, since React only runs
+  // them once at mount. Re-sync whenever `rubber` actually changes (the
+  // initial load resolving, or this editor's own Save/Update completing)
+  // so a re-visit shows what was actually saved.
+  useEffect(() => {
+    setIsWalkover(rubber?.is_walkover ?? false);
+    setWalkoverSide(rubber?.walkover_winner_side ?? '');
+    setSet1(rubber ? { home: rubber.set1_home, away: rubber.set1_away } : { home: '', away: '' });
+    setTiebreak(
+      rubber?.set1_tiebreak_home != null ? { home: rubber.set1_tiebreak_home, away: rubber.set1_tiebreak_away } : { home: '', away: '' }
+    );
+    setSet2(rubber?.set2_home != null ? { home: rubber.set2_home, away: rubber.set2_away } : { home: '', away: '' });
+    setSet3(rubber?.set3_home != null ? { home: rubber.set3_home, away: rubber.set3_away } : { home: '', away: '' });
+    setTimePlayed(rubber?.time_played_minutes ?? '');
+  }, [rubber]);
+
   // Singles is decided by one set, recorded as 7-6 once it goes to the
   // 6-6 breaker — set1's own fields only ever hold that game score (7
   // and 6), so a real 7-6/6-7 finish needs a separate column for the
