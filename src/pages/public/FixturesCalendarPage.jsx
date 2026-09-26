@@ -168,31 +168,31 @@ export default function FixturesCalendarPage({ seasonId }) {
           {shownDivisions.map((d) => {
             const grid = buildTeamDateGrid(fixturesByDivision[d.id] || []);
             return (
-              <div key={d.id} className="mb-12">
-                <h2 className="text-white bg-teal-900 rounded-t px-3 py-2 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
-                <div className="border border-t-0 border-teal-100 rounded-b px-3 pb-3 pt-1 overflow-x-auto">
+              <div key={d.id} className="mb-4">
+                <h2 className="text-white bg-teal-900 rounded-t px-3 py-1.5 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
+                <div className="border border-t-0 border-teal-100 rounded-b px-3 pb-1 pt-1 overflow-x-auto">
                   {grid.teamRows.length === 0 ? (
                     <p className="text-slate-500 text-sm">No fixtures.</p>
                   ) : (
                     <table className="text-sm border-collapse">
                       <thead className="bg-teal-100">
                         <tr>
-                          <th className="text-left p-2 text-teal-900 whitespace-nowrap">Team</th>
+                          <th className="text-left py-1 px-2 text-teal-900 whitespace-nowrap">Team</th>
                           {grid.rounds.map((r) => (
-                            <th key={r} className="p-2 text-teal-900 text-xs whitespace-nowrap">{formatWeekDate(grid.roundDates.get(r))}</th>
+                            <th key={r} className="py-1 px-2 text-teal-900 text-xs whitespace-nowrap">{formatWeekDate(grid.roundDates.get(r))}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {grid.teamRows.map((team, i) => (
                           <tr key={team.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                            <td className="p-2 font-semibold text-slate-800 border-t border-slate-200 whitespace-nowrap">
+                            <td className="py-0.5 px-2 font-semibold text-slate-800 border-t border-slate-200 whitespace-nowrap">
                               <TeamLink teamId={team.id}>{team.name}</TeamLink>
                             </td>
                             {grid.rounds.map((r) => {
                               const cell = grid.cells.get(`${team.id}:${r}`);
                               return (
-                                <td key={r} className="p-2 text-center border-t border-slate-200 whitespace-nowrap">
+                                <td key={r} className="py-0.5 px-2 text-center border-t border-slate-200 whitespace-nowrap">
                                   {cell === 'bye' ? (
                                     <span className="text-slate-400 italic text-xs">Rest</span>
                                   ) : cell ? (
