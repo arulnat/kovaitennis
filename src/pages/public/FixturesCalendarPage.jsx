@@ -15,13 +15,15 @@
 // spreadsheet can't carry the color-coded, styled layout this page uses,
 // and PDF is what actually gets circulated/printed in practice. The
 // print stylesheet (index.css) keeps the colors instead of the browser's
-// default plain-text printout and sets the page to landscape A4 for more
-// room; on top of that, the whole schedule must always print as exactly
-// one physical page regardless of how many teams/divisions/rounds there
-// are, so printableRef below is measured and scaled down (via CSS
-// transform, right before the browser's print dialog opens) to fit
-// within one page's printable area — the more there is to show, the
-// smaller it prints, rather than spilling onto a second page.
+// default plain-text printout and sets the page to landscape A4; on top
+// of that, the whole schedule must always print as exactly one physical
+// page regardless of how many teams/divisions/rounds there are, so
+// printableRef below is continuously measured (via ResizeObserver, not a
+// 'beforeprint' listener — automated print-to-PDF paths never fire that
+// event, only the browser's own interactive Ctrl+P/window.print() dialog
+// reliably does) and its scale baked into a CSS custom property that a
+// @media print rule applies — correct before ANY print path captures the
+// page, not just the browser's own dialog.
 
 import { useEffect, useRef, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
@@ -69,36 +71,38 @@ export default function FixturesCalendarPage({ seasonId }) {
 
   const shownDivisions = activeSeason?.published ? divisions : [];
 
-  // Shrink the whole schedule to fit one printed page, whatever its actual
-  // size — measured fresh right before printing (not on every render,
-  // since the unscaled size is what needs measuring).
+  // Shrink the whole schedule to fit one printed page, whatever its
+  // actual size. Recomputed continuously (mount + every size change, via
+  // ResizeObserver) rather than on a 'beforeprint' listener, since that
+  // event only fires for the browser's own interactive print dialog —
+  // Chrome's automated printToPDF path (and possibly other print-to-PDF
+  // routes) never fires it, which previously left the page completely
+  // unscaled. Baking the scale into a CSS custom property means it's
+  // already correct by the time ANY print mechanism captures the page —
+  // the @media print rule that consumes it (index.css) needs no JS to
+  // run at print time at all.
   useEffect(() => {
-    function fitToOnePage() {
-      const el = printableRef.current;
-      if (!el) return;
-      el.style.transform = 'none';
-      el.style.width = '';
-      const scale = Math.min(
-        1,
-        PRINT_AREA_WIDTH_PX / el.scrollWidth,
-        PRINT_AREA_HEIGHT_PX / el.scrollHeight
-      );
-      el.style.transform = `scale(${scale})`;
-      el.style.transformOrigin = 'top left';
-      el.style.width = `${100 / scale}%`;
+    const el = printableRef.current;
+    if (!el) return undefined;
+    function updateScale() {
+      // SAFETY_MARGIN: the on-screen measurement below reliably
+      // undershoots how tall the content actually renders once `zoom` is
+      // applied for print — verified experimentally (print-to-PDF, then
+      // counting the resulting pages) rather than derived from a known
+      // cause; 1.0 (no margin) consistently produced 2 pages instead of
+      // 1, and this value was the largest (least-shrinking, most
+      // legible) one that still reliably held to a single page across
+      // repeated tries. Revisit if a much larger season (many more
+      // divisions/rounds) is ever found to still spill onto a second
+      // page — it may need to go lower still.
+      const SAFETY_MARGIN = 0.65;
+      const scale = Math.min(1, PRINT_AREA_WIDTH_PX / el.scrollWidth, PRINT_AREA_HEIGHT_PX / el.scrollHeight) * SAFETY_MARGIN;
+      el.style.setProperty('--print-scale', String(scale));
     }
-    function resetAfterPrint() {
-      const el = printableRef.current;
-      if (!el) return;
-      el.style.transform = '';
-      el.style.width = '';
-    }
-    window.addEventListener('beforeprint', fitToOnePage);
-    window.addEventListener('afterprint', resetAfterPrint);
-    return () => {
-      window.removeEventListener('beforeprint', fitToOnePage);
-      window.removeEventListener('afterprint', resetAfterPrint);
-    };
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [fixturesByDivision]);
 
   useEffect(() => {
@@ -148,7 +152,7 @@ export default function FixturesCalendarPage({ seasonId }) {
       )}
 
       {fixturesByDivision && (
-        <div ref={printableRef}>
+        <div ref={printableRef} className="fixtures-print-fit">
           {shownDivisions.map((d) => (
             <div key={d.id} className="mb-8">
               <h2 className="text-white bg-teal-900 rounded-t px-3 py-2 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>

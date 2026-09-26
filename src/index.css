@@ -27,9 +27,26 @@
 }
 
 /* Landscape gives the Fixtures Calendar the most room to work with before
-   FixturesCalendarPage's own scale-to-fit-one-page logic kicks in — the
-   PRINT_AREA_WIDTH_PX/HEIGHT_PX constants there assume this exact size. */
+   its own scale-to-fit-one-page logic kicks in — the PRINT_AREA_WIDTH_PX/
+   HEIGHT_PX constants there assume this exact size. */
 @page {
   size: A4 landscape;
   margin: 10mm;
+}
+
+/* FixturesCalendarPage.jsx keeps --print-scale up to date via
+   ResizeObserver (not a 'beforeprint' listener, which automated
+   print-to-PDF paths skip) — this rule is the only place that scale
+   actually gets applied, and only during print, so the on-screen view is
+   always full-size regardless of what the variable holds. Deliberately
+   `zoom`, not `transform: scale()`: a transform only repaints the
+   element smaller, it doesn't shrink the box a print engine reserves
+   space for — a block whose untransformed layout needs 4 pages of
+   height still gets paginated across 4 pages even once painted at a
+   quarter of the size, mostly blank. `zoom` actually rescales the box
+   model itself, so pagination sees the same short box it paints. */
+@media print {
+  .fixtures-print-fit {
+    zoom: var(--print-scale, 1);
+  }
 }
