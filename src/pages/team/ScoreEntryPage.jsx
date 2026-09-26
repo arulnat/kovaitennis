@@ -65,11 +65,6 @@ export default function ScoreEntryPage({ fixtureId }) {
     doubles2: { home: [], away: [] },
   });
   const [roster, setRoster] = useState({ home: [], away: [] });
-  // Which rubber types are showing the editable form right now, rather
-  // than the read-only result card — a rubber with a score already
-  // starts collapsed to its card; "Edit" (or having nothing saved yet)
-  // is what opens the form back up.
-  const [editingTypes, setEditingTypes] = useState({});
   const [teamNames, setTeamNames] = useState({ home: '', away: '' });
   const [ratings, setRatings] = useState([]); // tie_player_ratings rows for this fixture
   const [activeTab, setActiveTab] = useState('singles');
@@ -181,7 +176,6 @@ export default function ScoreEntryPage({ fixtureId }) {
     if (error) { alert(`Save failed: ${error.message}`); return; }
 
     setRubbers((prev) => ({ ...prev, [type]: data }));
-    setEditingTypes((prev) => ({ ...prev, [type]: false }));
 
     await supabase.from('audit_log').insert({
       action: 'rubber.save', entity_type: 'rubber', entity_id: data.id,
@@ -206,7 +200,6 @@ export default function ScoreEntryPage({ fixtureId }) {
     if (error) { alert(`Update failed: ${error.message}`); return; }
 
     setRubbers((prev) => ({ ...prev, [type]: data }));
-    setEditingTypes((prev) => ({ ...prev, [type]: false }));
 
     await supabase.from('audit_log').insert({
       action: 'rubber.confirm', entity_type: 'rubber', entity_id: data.id,
@@ -291,48 +284,25 @@ export default function ScoreEntryPage({ fixtureId }) {
       </div>
 
       {RUBBER_TYPES.map((type) => {
-        const hasResult = !!rubbers[type]?.winner_side;
-        const isEditing = editingTypes[type] || !hasResult;
         return (
           <div key={type} className={activeTab === type ? '' : 'hidden'}>
-            {hasResult && (
-              <RubberResultCard
-                rubber={rubbers[type]}
-                homeTeamName={teamNames.home}
-                awayTeamName={teamNames.away}
-                homeRoster={roster.home}
-                awayRoster={roster.away}
-                weekDate={fixture.week_date}
-              />
-            )}
-            {hasResult && !isEditing ? (
-              canEdit && (
-                <button
-                  onClick={() => setEditingTypes((prev) => ({ ...prev, [type]: true }))}
-                  className="px-4 py-1.5 rounded border border-teal-700 text-teal-700 text-sm font-bold uppercase tracking-wide hover:bg-teal-50"
-                >
-                  Edit
-                </button>
-              )
-            ) : (
-              <RubberEditor
-                type={type}
-                rubber={rubbers[type]}
-                homeRoster={roster.home}
-                awayRoster={roster.away}
-                homeTeamName={teamNames.home}
-                awayTeamName={teamNames.away}
-                homePlayers={playerSelections[type].home}
-                awayPlayers={playerSelections[type].away}
-                onHomePlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], home: v } }))}
-                onAwayPlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], away: v } }))}
-                selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
-                selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
-                disabled={!canEdit}
-                onSave={(payload) => saveRubber(type, payload)}
-                onUpdate={() => confirmRubber(type)}
-              />
-            )}
+            <RubberEditor
+              type={type}
+              rubber={rubbers[type]}
+              homeRoster={roster.home}
+              awayRoster={roster.away}
+              homeTeamName={teamNames.home}
+              awayTeamName={teamNames.away}
+              homePlayers={playerSelections[type].home}
+              awayPlayers={playerSelections[type].away}
+              onHomePlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], home: v } }))}
+              onAwayPlayersChange={(v) => setPlayerSelections((prev) => ({ ...prev, [type]: { ...prev[type], away: v } }))}
+              selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
+              selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
+              disabled={!canEdit}
+              onSave={(payload) => saveRubber(type, payload)}
+              onUpdate={() => confirmRubber(type)}
+            />
           </div>
         );
       })}
@@ -532,56 +502,6 @@ function PlayerRatingRow({ playerId, playerName, existing, onSave }) {
   );
 }
 
-function formatCardDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-}
-
-/** Bold at-a-glance result summary for an already-scored rubber — winner checkmarked, a colored status banner (gold "Completed" / red "Walkover"), set scores per side. */
-function RubberResultCard({ rubber, homeTeamName, awayTeamName, homeRoster, awayRoster, weekDate }) {
-  const nameOf = (roster, id) => roster.find((p) => p.id === id)?.name;
-  const homeNames = [rubber.home_player1_id, rubber.home_player2_id].filter(Boolean).map((id) => nameOf(homeRoster, id)).filter(Boolean);
-  const awayNames = [rubber.away_player1_id, rubber.away_player2_id].filter(Boolean).map((id) => nameOf(awayRoster, id)).filter(Boolean);
-  const sets = [1, 2, 3]
-    .map((n) => ({ home: rubber[`set${n}_home`], away: rubber[`set${n}_away`] }))
-    .filter((s) => s.home != null);
-  const homeWon = rubber.winner_side === 'home';
-  const confirmed = !!rubber.confirmed_at;
-
-  const Row = ({ won, teamName, players, side }) => (
-    <div className="flex items-center justify-between gap-3 px-4 py-3 bg-teal-950 text-white">
-      <div className="min-w-0">
-        <p className={`font-extrabold uppercase text-sm truncate ${won ? 'text-accent-400' : 'text-white'}`}>{teamName}</p>
-        <p className="text-xs text-slate-300 truncate">{players.join(' / ') || '—'}</p>
-      </div>
-      <div className="flex items-center gap-3 shrink-0">
-        {won && <span className="w-5 h-5 rounded-full bg-accent-500 text-teal-950 flex items-center justify-center text-xs font-bold">✓</span>}
-        {sets.map((s, i) => (
-          <span key={i} className="w-6 text-center font-extrabold">{side === 'home' ? s.home : s.away}</span>
-        ))}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="rounded-lg overflow-hidden shadow-lg mb-4">
-      {weekDate && (
-        <div className="bg-accent-500 text-teal-950 text-xs font-extrabold uppercase tracking-wide px-3 py-1.5">
-          {formatCardDate(weekDate)}
-        </div>
-      )}
-      <Row won={homeWon} teamName={homeTeamName} players={homeNames} side="home" />
-      <div className={`text-center text-xs font-extrabold uppercase tracking-wide py-1.5 ${
-        rubber.is_walkover ? 'bg-red-600 text-white' : confirmed ? 'bg-accent-500 text-teal-950' : 'bg-amber-400 text-teal-950'
-      }`}>
-        {rubber.is_walkover
-          ? `${homeWon ? 'Away' : 'Home'} team gave walkover${confirmed ? '' : ' — click Update to confirm'}`
-          : confirmed ? 'Completed' : 'Saved — click Update to confirm'}
-      </div>
-      <Row won={!homeWon} teamName={awayTeamName} players={awayNames} side="away" />
-    </div>
-  );
-}
-
 function RubberEditor({
   type, rubber, homeRoster, awayRoster, homeTeamName, awayTeamName,
   homePlayers, awayPlayers, onHomePlayersChange, onAwayPlayersChange,
@@ -731,7 +651,7 @@ function RubberEditor({
         </table>
         <div className="flex flex-col gap-2 pt-6">
           <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
-            Save
+            {rubber?.confirmed_at ? 'Edit' : 'Save'}
           </button>
           {updateButton}
         </div>
