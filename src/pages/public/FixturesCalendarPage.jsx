@@ -17,9 +17,10 @@
 // it isn't ready to hand out yet. The moment an admin publishes, every
 // division with fixtures appears here automatically.
 //
-// "Download" is the browser's own Print -> Save as PDF, not a CSV: a
-// spreadsheet can't carry the color-coded, styled layout this page uses,
-// and PDF is what actually gets circulated/printed in practice. The
+// The small "Save" button (top right, no heading/description clutter on
+// this page by design) is the browser's own Print -> Save as PDF, not a
+// CSV: a spreadsheet can't carry the color-coded, styled layout this
+// page uses, and PDF is what actually gets circulated/printed. The
 // print stylesheet (index.css) keeps the colors instead of the browser's
 // default plain-text printout and sets the page to landscape A4; on top
 // of that, the whole schedule must always print as exactly one physical
@@ -35,10 +36,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
-import PageHeader from '../../components/PageHeader.jsx';
 
 function formatWeekDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 /**
@@ -145,19 +145,15 @@ export default function FixturesCalendarPage({ seasonId }) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <PageHeader
-        title="Fixtures Calendar"
-        subtitle="Every division's fixtures once the season is published, all in one place — one row per team, one column per match date. Nothing shows here until then."
-        actions={
-          <button
-            onClick={() => window.print()}
-            disabled={!fixturesByDivision || shownDivisions.length === 0}
-            className="no-print px-4 py-2 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide hover:bg-teal-800 disabled:opacity-50 shadow"
-          >
-            Print / Save as PDF
-          </button>
-        }
-      />
+      <div className="flex justify-end mb-4 no-print">
+        <button
+          onClick={() => window.print()}
+          disabled={!fixturesByDivision || shownDivisions.length === 0}
+          className="px-3 py-1 rounded bg-teal-700 text-white text-xs font-bold uppercase tracking-wide hover:bg-teal-800 disabled:opacity-50 shadow"
+        >
+          Save
+        </button>
+      </div>
 
       {shownDivisions.length === 0 && (
         <p className="text-slate-500 text-sm">The season hasn't been published yet.</p>
@@ -167,22 +163,14 @@ export default function FixturesCalendarPage({ seasonId }) {
         <p className="text-slate-500 text-sm">Loading…</p>
       )}
 
-      {fixturesByDivision && shownDivisions.length > 0 && (
-        <p className="text-xs text-slate-600 mb-4 no-print">
-          Each row is a team; each column a match date. A cell shows who they play —{' '}
-          <span className="font-bold text-teal-700">home</span> or{' '}
-          <span className="font-bold text-accent-600">away</span>.
-        </p>
-      )}
-
       {fixturesByDivision && (
         <div ref={printableRef} className="fixtures-print-fit">
           {shownDivisions.map((d) => {
             const grid = buildTeamDateGrid(fixturesByDivision[d.id] || []);
             return (
-              <div key={d.id} className="mb-8">
+              <div key={d.id} className="mb-12">
                 <h2 className="text-white bg-teal-900 rounded-t px-3 py-2 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
-                <div className="border border-t-0 border-teal-100 rounded-b p-3 overflow-x-auto">
+                <div className="border border-t-0 border-teal-100 rounded-b px-3 pb-3 pt-1 overflow-x-auto">
                   {grid.teamRows.length === 0 ? (
                     <p className="text-slate-500 text-sm">No fixtures.</p>
                   ) : (
