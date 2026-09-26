@@ -29,6 +29,8 @@ export default function ScoreEntryPage({ fixtureId }) {
   const [season, setSeason] = useState(null);
   const [rubbers, setRubbers] = useState({}); // keyed by rubber_type
   const [roster, setRoster] = useState({ home: [], away: [] });
+  const [teamNames, setTeamNames] = useState({ home: '', away: '' });
+  const [activeTab, setActiveTab] = useState('singles');
 
   useEffect(() => {
     supabase.from('fixtures').select('*').eq('id', fixtureId).single().then(({ data }) => setFixture(data));
@@ -38,6 +40,14 @@ export default function ScoreEntryPage({ fixtureId }) {
       setRubbers(byType);
     });
   }, [fixtureId]);
+
+  useEffect(() => {
+    if (!fixture?.home_team_id || !fixture?.away_team_id) return;
+    Promise.all([
+      supabase.from('teams').select('name').eq('id', fixture.home_team_id).single(),
+      supabase.from('teams').select('name').eq('id', fixture.away_team_id).single(),
+    ]).then(([h, a]) => setTeamNames({ home: h.data?.name ?? 'Home', away: a.data?.name ?? 'Away' }));
+  }, [fixture?.home_team_id, fixture?.away_team_id]);
 
   useEffect(() => {
     if (!fixture?.season_id) return;
@@ -149,19 +159,94 @@ export default function ScoreEntryPage({ fixtureId }) {
         )}
       </p>
 
+      <div className="flex border-b-2 border-accent-500 mb-4">
+        {RUBBER_TYPES.map((type) => (
+          <button
+            key={type}
+            onClick={() => setActiveTab(type)}
+            className={`px-4 py-2 text-sm font-extrabold uppercase tracking-wide rounded-t flex items-center gap-1.5 ${
+              activeTab === type ? 'bg-teal-900 text-white' : 'text-teal-800 hover:bg-teal-50'
+            }`}
+          >
+            {RUBBER_LABELS[type]}
+            {rubbers[type]?.winner_side && (
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${activeTab === type ? 'bg-accent-500 text-teal-950' : 'bg-teal-700 text-white'}`}>✓</span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {RUBBER_TYPES.map((type) => (
-        <RubberEditor
-          key={type}
-          type={type}
-          rubber={rubbers[type]}
-          homeRoster={roster.home}
-          awayRoster={roster.away}
-          selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
-          selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
-          disabled={!canEdit}
-          onSave={(payload) => saveRubber(type, payload)}
-        />
+        <div key={type} className={activeTab === type ? '' : 'hidden'}>
+          {rubbers[type]?.winner_side && (
+            <RubberResultCard
+              rubber={rubbers[type]}
+              homeTeamName={teamNames.home}
+              awayTeamName={teamNames.away}
+              homeRoster={roster.home}
+              awayRoster={roster.away}
+              weekDate={fixture.week_date}
+            />
+          )}
+          <RubberEditor
+            type={type}
+            rubber={rubbers[type]}
+            homeRoster={roster.home}
+            awayRoster={roster.away}
+            selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
+            selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
+            disabled={!canEdit}
+            onSave={(payload) => saveRubber(type, payload)}
+          />
+        </div>
       ))}
+    </div>
+  );
+}
+
+const RUBBER_LABELS = { singles: 'Singles', doubles1: 'Doubles 1', doubles2: 'Doubles 2' };
+
+function formatCardDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+}
+
+/** Bold at-a-glance result summary for an already-scored rubber — winner checkmarked, a colored status banner (gold "Completed" / red "Walkover"), set scores per side. */
+function RubberResultCard({ rubber, homeTeamName, awayTeamName, homeRoster, awayRoster, weekDate }) {
+  const nameOf = (roster, id) => roster.find((p) => p.id === id)?.name;
+  const homeNames = [rubber.home_player1_id, rubber.home_player2_id].filter(Boolean).map((id) => nameOf(homeRoster, id)).filter(Boolean);
+  const awayNames = [rubber.away_player1_id, rubber.away_player2_id].filter(Boolean).map((id) => nameOf(awayRoster, id)).filter(Boolean);
+  const sets = [1, 2, 3]
+    .map((n) => ({ home: rubber[`set${n}_home`], away: rubber[`set${n}_away`] }))
+    .filter((s) => s.home != null);
+  const homeWon = rubber.winner_side === 'home';
+
+  const Row = ({ won, teamName, players, side }) => (
+    <div className="flex items-center justify-between gap-3 px-4 py-3 bg-teal-950 text-white">
+      <div className="min-w-0">
+        <p className={`font-extrabold uppercase text-sm truncate ${won ? 'text-accent-400' : 'text-white'}`}>{teamName}</p>
+        <p className="text-xs text-slate-300 truncate">{players.join(' / ') || '—'}</p>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        {won && <span className="w-5 h-5 rounded-full bg-accent-500 text-teal-950 flex items-center justify-center text-xs font-bold">✓</span>}
+        {sets.map((s, i) => (
+          <span key={i} className="w-6 text-center font-extrabold">{side === 'home' ? s.home : s.away}</span>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="rounded-lg overflow-hidden shadow-lg mb-4">
+      {weekDate && (
+        <div className="bg-accent-500 text-teal-950 text-xs font-extrabold uppercase tracking-wide px-3 py-1.5">
+          {formatCardDate(weekDate)}
+        </div>
+      )}
+      <Row won={homeWon} teamName={homeTeamName} players={homeNames} side="home" />
+      <div className={`text-center text-xs font-extrabold uppercase tracking-wide py-1.5 ${rubber.is_walkover ? 'bg-red-600 text-white' : 'bg-accent-500 text-teal-950'}`}>
+        {rubber.is_walkover ? `${homeWon ? 'Away' : 'Home'} team gave walkover` : 'Completed'}
+      </div>
+      <Row won={!homeWon} teamName={awayTeamName} players={awayNames} side="away" />
     </div>
   );
 }
@@ -183,7 +268,7 @@ const DOUBLES_WALKOVER_STAGES = [
 
 function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, selectableAway, disabled, onSave }) {
   const isSingles = type === 'singles';
-  const label = type === 'singles' ? 'Singles' : type === 'doubles1' ? 'Doubles 1' : 'Doubles 2';
+  const label = RUBBER_LABELS[type];
 
   const [homePlayers, setHomePlayers] = useState(
     rubber ? [rubber.home_player1_id, rubber.home_player2_id].filter(Boolean) : []
@@ -203,7 +288,6 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
   const [set3, setSet3] = useState(rubber?.set3_home != null ? { home: rubber.set3_home, away: rubber.set3_away } : { home: '', away: '' });
   const [timePlayed, setTimePlayed] = useState(rubber?.time_played_minutes ?? '');
 
-  const nameOf = (roster, id) => roster.find((p) => p.id === id)?.name ?? '';
   const walkoverStages = isSingles ? SINGLES_WALKOVER_STAGES : DOUBLES_WALKOVER_STAGES;
 
   /** Builds the `progress` object applyWalkover() needs for the selected stage, validating along the way. Returns null (having alerted) if incomplete/invalid. */
@@ -352,12 +436,6 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
           className="border rounded px-2 py-1 text-sm w-20"
         />
       </div>
-
-      {rubber?.winner_side && (
-        <p className="text-sm text-teal-700 mb-2">
-          Winner: {rubber.winner_side === 'home' ? nameOf(homeRoster, rubber.home_player1_id) || 'Home' : nameOf(awayRoster, rubber.away_player1_id) || 'Away'}
-        </p>
-      )}
 
       <button onClick={handleSubmit} disabled={disabled} className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm disabled:opacity-50">
         Save {label}
