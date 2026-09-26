@@ -9,6 +9,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from './supabaseClient.js';
 import { useAuth } from './auth.jsx';
+import Dropdown from '../components/Dropdown.jsx';
 
 const SeasonContext = createContext(null);
 
@@ -95,14 +96,11 @@ export function SeasonSelector() {
   }
 
   return (
-    <select
+    <Dropdown
       value={seasonId ?? ''}
-      onChange={(e) => setSeasonId(e.target.value)}
-      className="border rounded px-2 py-1 text-xs"
-    >
-      {seasons.map((s) => (
-        <option key={s.id} value={s.id}>{s.name}{s.is_test ? ' (test)' : ''}</option>
-      ))}
-    </select>
+      onChange={setSeasonId}
+      options={seasons.map((s) => ({ value: s.id, label: `${s.name}${s.is_test ? ' (test)' : ''}` }))}
+      className="text-xs w-40"
+    />
   );
 }

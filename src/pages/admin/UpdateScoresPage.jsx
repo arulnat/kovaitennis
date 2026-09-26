@@ -18,6 +18,7 @@ import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import Dropdown from '../../components/Dropdown.jsx';
 
 export default function UpdateScoresPage({ seasonId }) {
   const { divisions, activeSeason } = useSeason();
@@ -63,15 +64,12 @@ export default function UpdateScoresPage({ seasonId }) {
 
       <label className="text-sm text-gray-700 block mb-4">
         Division
-        <select
+        <Dropdown
           value={selectedDivisionId}
-          onChange={(e) => setSelectedDivisionId(e.target.value)}
-          className="border rounded px-2 py-1 text-sm ml-2"
-        >
-          {divisions.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </select>
+          onChange={setSelectedDivisionId}
+          options={divisions.map((d) => ({ value: d.id, label: d.name }))}
+          className="ml-2 w-40"
+        />
       </label>
 
       {division && !published && (

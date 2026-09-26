@@ -43,6 +43,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { homeAwayBalanceReport } from '../../lib/scheduler.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import Dropdown from '../../components/Dropdown.jsx';
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -257,18 +258,15 @@ export default function FixtureGenerationPage({ seasonId }) {
       ) : (
         <>
           <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-            <label className="text-sm text-gray-700">
-              Division
-              <select
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <span>Division</span>
+              <Dropdown
                 value={selectedDivisionId}
-                onChange={(e) => setSelectedDivisionId(e.target.value)}
-                className="border rounded px-2 py-1 text-sm ml-2"
-              >
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </label>
+                onChange={setSelectedDivisionId}
+                options={divisions.map((d) => ({ value: d.id, label: d.name }))}
+                className="w-40"
+              />
+            </div>
 
             {division && (
               <div className="flex items-center gap-2">

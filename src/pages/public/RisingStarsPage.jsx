@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { computeIndividualStandings } from '../../lib/standings.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import Dropdown from '../../components/Dropdown.jsx';
 
 const ALL_DIVISIONS = '__all__';
 const ALL_TEAMS = '__all__';
@@ -162,15 +163,19 @@ export default function RisingStarsPage({ seasonId }) {
           ))}
         </div>
 
-        <select value={divisionId} onChange={(e) => setDivisionId(e.target.value)} className="border rounded px-2 py-1.5 text-sm">
-          <option value={ALL_DIVISIONS}>Show All (every division)</option>
-          {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
+        <Dropdown
+          value={divisionId}
+          onChange={setDivisionId}
+          options={[{ value: ALL_DIVISIONS, label: 'Show All (every division)' }, ...divisions.map((d) => ({ value: d.id, label: d.name }))]}
+          className="w-48"
+        />
 
-        <select value={teamId} onChange={(e) => setTeamId(e.target.value)} className="border rounded px-2 py-1.5 text-sm">
-          <option value={ALL_TEAMS}>All Teams</option>
-          {teamsInScope.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <Dropdown
+          value={teamId}
+          onChange={setTeamId}
+          options={[{ value: ALL_TEAMS, label: 'All Teams' }, ...teamsInScope.map((t) => ({ value: t.id, label: t.name }))]}
+          className="w-40"
+        />
 
         <input
           type="text"

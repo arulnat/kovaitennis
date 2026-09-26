@@ -46,6 +46,7 @@ import { planAutoGroup } from '../../lib/grouping.js';
 import { buildFixtureRows, buildPriorMeetingMap, computeMatchWeekends } from '../../lib/scheduler.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import Dropdown from '../../components/Dropdown.jsx';
 
 function randomSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
@@ -571,19 +572,21 @@ function GroupColumn({
 
       {selectable && (
         <div className="flex items-center gap-1 px-2 py-1 border-b bg-gray-50">
-          <select
+          <Dropdown
             value={bulkMoveTarget}
-            onChange={(e) => onBulkMoveTargetChange(e.target.value)}
-            className="border rounded px-1 py-0.5 text-xs flex-1 min-w-0"
-          >
-            <option value="">Move {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'selected'} to…</option>
-            {isDivision && <option value={UNASSIGNED_TARGET}>Unassigned pool</option>}
-            {divisions.filter((d) => d.id !== currentDivisionId).map((d) => (
-              <option key={d.id} value={d.id} disabled={d.grouping_locked}>
-                {d.name}{d.grouping_locked ? ' (locked)' : ''}
-              </option>
-            ))}
-          </select>
+            onChange={onBulkMoveTargetChange}
+            placeholder={`Move ${selectedIds.size > 0 ? `${selectedIds.size} selected` : 'selected'} to…`}
+            options={[
+              { value: '', label: `Move ${selectedIds.size > 0 ? `${selectedIds.size} selected` : 'selected'} to…` },
+              ...(isDivision ? [{ value: UNASSIGNED_TARGET, label: 'Unassigned pool' }] : []),
+              ...divisions.filter((d) => d.id !== currentDivisionId).map((d) => ({
+                value: d.id,
+                label: `${d.name}${d.grouping_locked ? ' (locked)' : ''}`,
+                disabled: d.grouping_locked,
+              })),
+            ]}
+            className="text-xs flex-1 min-w-0"
+          />
           <button
             onClick={onBulkMove}
             disabled={selectedIds.size === 0 || !bulkMoveTarget}
@@ -656,18 +659,19 @@ function GroupColumn({
               <TeamLink teamId={ts.teams?.id}>{ts.teams?.name}</TeamLink>
             </p>
             <div className="flex items-center gap-1 shrink-0">
-              <select
+              <Dropdown
                 value={currentDivisionId ?? ''}
-                onChange={(e) => onMove(ts.id, e.target.value)}
-                className="border rounded px-1 py-0.5 text-xs"
-              >
-                <option value="">Pool</option>
-                {divisions.map((d) => (
-                  <option key={d.id} value={d.id} disabled={d.grouping_locked && d.id !== currentDivisionId}>
-                    {d.name}{d.grouping_locked ? ' (locked)' : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => onMove(ts.id, v)}
+                options={[
+                  { value: '', label: 'Pool' },
+                  ...divisions.map((d) => ({
+                    value: d.id,
+                    label: `${d.name}${d.grouping_locked ? ' (locked)' : ''}`,
+                    disabled: d.grouping_locked && d.id !== currentDivisionId,
+                  })),
+                ]}
+                className="text-xs"
+              />
               {currentDivisionId && (
                 <button
                   onClick={() => onMove(ts.id, null)}

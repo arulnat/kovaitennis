@@ -30,6 +30,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { useAuth } from '../../lib/auth.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import Dropdown from '../../components/Dropdown.jsx';
 import {
   RUBBER_TYPES, winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
   isValidSuperTiebreakSet, applyWalkover, selectablePlayers, isValidTimePlayed,
@@ -617,16 +618,24 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
 
       {isWalkover ? (
         <div className="space-y-2 mb-2">
-          <select value={walkoverSide} onChange={(e) => setWalkoverSide(e.target.value)} disabled={disabled} className="border rounded px-2 py-1 text-sm">
-            <option value="home">Home wins (walkover)</option>
-            <option value="away">Away wins (walkover)</option>
-          </select>
+          <Dropdown
+            value={walkoverSide}
+            onChange={setWalkoverSide}
+            disabled={disabled}
+            options={[
+              { value: 'home', label: 'Home wins (walkover)' },
+              { value: 'away', label: 'Away wins (walkover)' },
+            ]}
+          />
 
           <div>
             <label className="text-sm text-gray-600 block mb-1">How far had the match gotten? (Req 5.6)</label>
-            <select value={walkoverStage} onChange={(e) => setWalkoverStage(e.target.value)} disabled={disabled} className="border rounded px-2 py-1 text-sm">
-              {walkoverStages.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+            <Dropdown
+              value={walkoverStage}
+              onChange={setWalkoverStage}
+              disabled={disabled}
+              options={walkoverStages.map((s) => ({ value: s.value, label: s.label }))}
+            />
           </div>
 
           {(walkoverStage === 'set1_complete' || walkoverStage === 'mid_set2' || walkoverStage === 'mid_super_tiebreak') && !isSingles && (
@@ -718,22 +727,24 @@ function PlayerPicker({ label, roster, selectable, count, value, onChange, disab
     <div className={compact ? 'w-40' : undefined}>
       {label && <p className="text-xs text-gray-500 mb-1">{label}</p>}
       {[...Array(count)].map((_, i) => (
-        <select
+        <Dropdown
           key={i}
           value={value[i] ?? ''}
           disabled={disabled}
-          onChange={(e) => {
+          placeholder="Select player…"
+          onChange={(v) => {
             const next = [...value];
-            next[i] = e.target.value;
+            next[i] = v;
             onChange(next);
           }}
-          className="border rounded px-2 py-1 text-sm w-full mb-1"
-        >
-          <option value="">Select player…</option>
-          {roster
-            .filter((p) => selectableSet.has(p.id) || p.id === value[i])
-            .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+          className="w-full mb-1"
+          options={[
+            { value: '', label: 'Select player…' },
+            ...roster
+              .filter((p) => selectableSet.has(p.id) || p.id === value[i])
+              .map((p) => ({ value: p.id, label: p.name })),
+          ]}
+        />
       ))}
     </div>
   );
