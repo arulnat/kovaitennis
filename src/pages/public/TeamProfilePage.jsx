@@ -45,13 +45,15 @@ function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/** Same tie-result derivation StandingsPage uses, kept local since here it's evaluated relative to one team's side. */
+/** Same tie-result derivation StandingsPage uses, kept local since here it's evaluated relative to one team's side. Returns the rubber score (e.g. "2 - 1") from this team's own side, not just W/L. */
 function tieOutcomeForTeam(fixture, isHome) {
   const rubbers = fixture.rubbers ?? [];
   if (rubbers.length !== 3 || !rubbers.every((r) => r.winner_side && r.confirmed_at)) return null;
   const homeWins = rubbers.filter((r) => r.winner_side === 'home').length;
-  const won = isHome ? homeWins >= 2 : homeWins < 2;
-  return won ? 'W' : 'L';
+  const awayWins = rubbers.length - homeWins;
+  const myWins = isHome ? homeWins : awayWins;
+  const oppWins = isHome ? awayWins : homeWins;
+  return { won: myWins > oppWins, score: `${myWins} - ${oppWins}` };
 }
 
 export default function TeamProfilePage({ seasonId, teamId }) {
@@ -340,8 +342,8 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                             {opponent?.name ?? '—'}
                           </Link>
                         </td>
-                        <td className={`p-2 text-center border-t font-extrabold ${outcome === 'W' ? 'text-green-700' : outcome === 'L' ? 'text-red-700' : 'text-gray-400'}`}>
-                          {outcome ?? '—'}
+                        <td className={`p-2 text-center border-t font-extrabold ${!outcome ? 'text-gray-400' : outcome.won ? 'text-green-700' : 'text-red-700'}`}>
+                          {outcome?.score ?? '—'}
                         </td>
                       </tr>
                     );
