@@ -241,6 +241,8 @@ export default function ScoreEntryPage({ fixtureId }) {
             rubber={rubbers[type]}
             homeRoster={roster.home}
             awayRoster={roster.away}
+            homeTeamName={teamNames.home}
+            awayTeamName={teamNames.away}
             selectableHome={selectablePlayers(roster.home.map((p) => p.id), alreadySelectedFor('home'), type)}
             selectableAway={selectablePlayers(roster.away.map((p) => p.id), alreadySelectedFor('away'), type)}
             disabled={!canEdit}
@@ -489,22 +491,7 @@ function RubberResultCard({ rubber, homeTeamName, awayTeamName, homeRoster, away
   );
 }
 
-// Which walkover stages apply to each match kind, and what extra info each
-// needs to reconstruct the resulting score via applyWalkover() (Req 5.6).
-const SINGLES_WALKOVER_STAGES = [
-  { value: 'not_started', label: 'Before any games played' },
-  { value: 'mid_set1', label: 'Mid-set, before the 6-6 breaker' },
-  { value: 'mid_super_tiebreak', label: 'During the 6-6 breaker' },
-];
-const DOUBLES_WALKOVER_STAGES = [
-  { value: 'not_started', label: 'Before any games played' },
-  { value: 'mid_set1', label: 'Mid-set 1' },
-  { value: 'set1_complete', label: 'Set 1 complete, set 2 not started' },
-  { value: 'mid_set2', label: 'Mid-set 2' },
-  { value: 'mid_super_tiebreak', label: 'During the super-tiebreak (1-1 after 2 sets)' },
-];
-
-function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, selectableAway, disabled, onSave }) {
+function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, awayTeamName, selectableHome, selectableAway, disabled, onSave }) {
   const isSingles = type === 'singles';
   const label = RUBBER_LABELS[type];
 
@@ -516,86 +503,42 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
   );
   const [isWalkover, setIsWalkover] = useState(rubber?.is_walkover ?? false);
   const [walkoverSide, setWalkoverSide] = useState(rubber?.walkover_winner_side ?? 'home');
-  const [walkoverStage, setWalkoverStage] = useState('not_started');
-  const [walkoverSet1, setWalkoverSet1] = useState({ home: '', away: '' });
-  const [walkoverSet2, setWalkoverSet2] = useState({ home: '', away: '' });
-  const [walkoverLoserGames, setWalkoverLoserGames] = useState('');
-  const [walkoverLoserPoints, setWalkoverLoserPoints] = useState('');
   const [set1, setSet1] = useState(rubber ? { home: rubber.set1_home, away: rubber.set1_away } : { home: '', away: '' });
   const [set2, setSet2] = useState(rubber?.set2_home != null ? { home: rubber.set2_home, away: rubber.set2_away } : { home: '', away: '' });
   const [set3, setSet3] = useState(rubber?.set3_home != null ? { home: rubber.set3_home, away: rubber.set3_away } : { home: '', away: '' });
   const [timePlayed, setTimePlayed] = useState(rubber?.time_played_minutes ?? '');
 
-  const walkoverStages = isSingles ? SINGLES_WALKOVER_STAGES : DOUBLES_WALKOVER_STAGES;
-
-  /** Builds the `progress` object applyWalkover() needs for the selected stage, validating along the way. Returns null (having alerted) if incomplete/invalid. */
-  function buildWalkoverProgress() {
-    const loserGames = Number(walkoverLoserGames);
-    const loserPoints = Number(walkoverLoserPoints);
-    const s1 = { home: Number(walkoverSet1.home), away: Number(walkoverSet1.away) };
-    const s2 = { home: Number(walkoverSet2.home), away: Number(walkoverSet2.away) };
-
-    switch (walkoverStage) {
-      case 'not_started':
-        return { stage: 'not_started' };
-
-      case 'mid_set1':
-        if (walkoverLoserGames === '' || !Number.isInteger(loserGames) || loserGames < 0) {
-          alert("Enter the losing side's game count at the point of retirement."); return null;
-        }
-        return { stage: 'mid_set1', loserGames };
-
-      case 'set1_complete':
-        if (!isValidDoublesRegularSet(s1.home, s1.away)) { alert('Enter a valid set 1 score.'); return null; }
-        return { stage: 'set1_complete', set1: s1 };
-
-      case 'mid_set2':
-        if (!isValidDoublesRegularSet(s1.home, s1.away)) { alert('Enter a valid set 1 score.'); return null; }
-        if (walkoverLoserGames === '' || !Number.isInteger(loserGames) || loserGames < 0) {
-          alert("Enter the losing side's set 2 game count at the point of retirement."); return null;
-        }
-        return { stage: 'mid_set2', set1: s1, loserGames };
-
-      case 'mid_super_tiebreak':
-        if (walkoverLoserPoints === '' || !Number.isInteger(loserPoints) || loserPoints < 0) {
-          alert("Enter the losing side's super-tiebreak point count at the point of retirement."); return null;
-        }
-        if (isSingles) return { stage: 'mid_super_tiebreak', loserPoints };
-        if (!isValidDoublesRegularSet(s1.home, s1.away)) { alert('Enter a valid set 1 score.'); return null; }
-        if (!isValidDoublesRegularSet(s2.home, s2.away)) { alert('Enter a valid set 2 score.'); return null; }
-        return { stage: 'mid_super_tiebreak', set1: s1, set2: s2, loserPoints };
-
-      default:
-        return { stage: 'not_started' };
-    }
-  }
-
   function handleSubmit() {
+    if (isWalkover) {
+      // The other side simply didn't turn up — no players, no partial
+      // score to reconstruct, just which team gets the clean shutout
+      // (6-0 singles, 6-0/6-0 doubles).
+      onSave({
+        homePlayers: [], awayPlayers: [], score: null, isWalkover, walkoverSide,
+        walkoverStage: { stage: 'not_started' },
+        timePlayed: null,
+      });
+      return;
+    }
+
     const score = { set1: { home: Number(set1.home), away: Number(set1.away) } };
     if (!isSingles && set2.home !== '') score.set2 = { home: Number(set2.home), away: Number(set2.away) };
     if (!isSingles && set3.home !== '') score.set3 = { home: Number(set3.home), away: Number(set3.away) };
 
-    let progress = { stage: 'not_started' };
-    if (isWalkover) {
-      const built = buildWalkoverProgress();
-      if (!built) return; // invalid/incomplete input — alert already shown
-      progress = built;
-    } else {
-      const set1Valid = isSingles
-        ? isValidSinglesSet(score.set1.home, score.set1.away)
-        : isValidDoublesRegularSet(score.set1.home, score.set1.away);
-      if (!set1Valid) { alert('Invalid set 1 score.'); return; }
-      if (!isSingles && score.set2 && !isValidDoublesRegularSet(score.set2.home, score.set2.away)) {
-        alert('Invalid set 2 score.'); return;
-      }
-      if (score.set3 && !isValidSuperTiebreakSet(score.set3.home, score.set3.away)) {
-        alert('Invalid super-tiebreak score (min 10, win by 2 past 10-10).'); return;
-      }
+    const set1Valid = isSingles
+      ? isValidSinglesSet(score.set1.home, score.set1.away)
+      : isValidDoublesRegularSet(score.set1.home, score.set1.away);
+    if (!set1Valid) { alert('Invalid set 1 score.'); return; }
+    if (!isSingles && score.set2 && !isValidDoublesRegularSet(score.set2.home, score.set2.away)) {
+      alert('Invalid set 2 score.'); return;
+    }
+    if (score.set3 && !isValidSuperTiebreakSet(score.set3.home, score.set3.away)) {
+      alert('Invalid super-tiebreak score (min 10, win by 2 past 10-10).'); return;
     }
 
     onSave({
       homePlayers, awayPlayers, score, isWalkover, walkoverSide,
-      walkoverStage: progress,
+      walkoverStage: { stage: 'not_started' },
       timePlayed: timePlayed === '' ? null : Number(timePlayed),
     });
   }
@@ -610,62 +553,20 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
       </label>
 
       {isWalkover ? (
-        <div className="grid grid-cols-2 gap-4 mb-2">
-          <PlayerPicker label="Home" roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled} />
-          <PlayerPicker label="Away" roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled} />
-        </div>
-      ) : null}
-
-      {isWalkover ? (
         <div className="space-y-2 mb-2">
+          <p className="text-xs text-gray-500">The other team didn't turn up — pick who gets the walkover. Score is filled in automatically ({isSingles ? '6-0' : '6-0, 6-0'}).</p>
           <Dropdown
             value={walkoverSide}
             onChange={setWalkoverSide}
             disabled={disabled}
             options={[
-              { value: 'home', label: 'Home wins (walkover)' },
-              { value: 'away', label: 'Away wins (walkover)' },
+              { value: 'home', label: homeTeamName || 'Home' },
+              { value: 'away', label: awayTeamName || 'Away' },
             ]}
           />
-
-          <div>
-            <label className="text-sm text-gray-600 block mb-1">How far had the match gotten? (Req 5.6)</label>
-            <Dropdown
-              value={walkoverStage}
-              onChange={setWalkoverStage}
-              disabled={disabled}
-              options={walkoverStages.map((s) => ({ value: s.value, label: s.label }))}
-            />
-          </div>
-
-          {(walkoverStage === 'set1_complete' || walkoverStage === 'mid_set2' || walkoverStage === 'mid_super_tiebreak') && !isSingles && (
-            <SetInput label="Set 1 (as played)" value={walkoverSet1} onChange={setWalkoverSet1} disabled={disabled} />
-          )}
-          {walkoverStage === 'mid_super_tiebreak' && !isSingles && (
-            <SetInput label="Set 2 (as played)" value={walkoverSet2} onChange={setWalkoverSet2} disabled={disabled} />
-          )}
-          {(walkoverStage === 'mid_set1' || walkoverStage === 'mid_set2') && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="w-48 text-gray-600">Losing side's games when retired:</span>
-              <input
-                type="number" min="0" value={walkoverLoserGames}
-                onChange={(e) => setWalkoverLoserGames(e.target.value)}
-                disabled={disabled}
-                className="border rounded px-2 py-1 w-16"
-              />
-            </div>
-          )}
-          {walkoverStage === 'mid_super_tiebreak' && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="w-48 text-gray-600">Losing side's breaker points when retired:</span>
-              <input
-                type="number" min="0" value={walkoverLoserPoints}
-                onChange={(e) => setWalkoverLoserPoints(e.target.value)}
-                disabled={disabled}
-                className="border rounded px-2 py-1 w-16"
-              />
-            </div>
-          )}
+          <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
+            Save
+          </button>
         </div>
       ) : (
         <div className="mb-2">
@@ -702,20 +603,16 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, selectableHome, se
         </div>
       )}
 
-      <div className="flex items-center gap-2 mb-2">
-        <label className="text-sm">Time played (min, max 180):</label>
-        <input
-          type="number" min="0" max="180" value={timePlayed}
-          onChange={(e) => setTimePlayed(e.target.value)}
-          disabled={disabled}
-          className="border rounded px-2 py-1 text-sm w-20"
-        />
-      </div>
-
-      {isWalkover && (
-        <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
-          Save
-        </button>
+      {!isWalkover && (
+        <div className="flex items-center gap-2 mb-2">
+          <label className="text-sm">Time played (min, max 180):</label>
+          <input
+            type="number" min="0" max="180" value={timePlayed}
+            onChange={(e) => setTimePlayed(e.target.value)}
+            disabled={disabled}
+            className="border rounded px-2 py-1 text-sm w-20"
+          />
+        </div>
       )}
     </div>
   );
@@ -761,15 +658,3 @@ function ScoreCell({ value, onChange, disabled }) {
   );
 }
 
-function SetInput({ label, value, onChange, disabled }) {
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="w-32 text-gray-600">{label}</span>
-      <input type="number" min="0" value={value.home} disabled={disabled}
-        onChange={(e) => onChange({ ...value, home: e.target.value })} className="border rounded px-2 py-1 w-16" />
-      <span>–</span>
-      <input type="number" min="0" value={value.away} disabled={disabled}
-        onChange={(e) => onChange({ ...value, away: e.target.value })} className="border rounded px-2 py-1 w-16" />
-    </div>
-  );
-}
