@@ -168,9 +168,9 @@ export default function FixturesCalendarPage({ seasonId }) {
           {shownDivisions.map((d) => {
             const grid = buildTeamDateGrid(fixturesByDivision[d.id] || []);
             return (
-              <div key={d.id} className="mb-4">
+              <div key={d.id} className="mb-2">
                 <h2 className="text-white bg-teal-900 rounded-t px-3 py-1.5 text-base font-extrabold uppercase tracking-wide border-b-2 border-accent-500">{d.name}</h2>
-                <div className="border border-t-0 border-teal-100 rounded-b px-3 pb-1 pt-1 overflow-x-auto">
+                <div className="border border-t-0 border-teal-100 rounded-b px-3 pt-1 overflow-x-auto">
                   {grid.teamRows.length === 0 ? (
                     <p className="text-slate-500 text-sm">No fixtures.</p>
                   ) : (
