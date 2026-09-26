@@ -560,7 +560,7 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
   // and 6), so a real 7-6/6-7 finish needs a separate column for the
   // breaker's own point score (e.g. 7-3), shown only when it applies.
   const set1Home = Number(set1.home), set1Away = Number(set1.away);
-  const showTiebreak = isSingles && ((set1Home === 7 && set1Away === 6) || (set1Home === 6 && set1Away === 7));
+  const showTiebreak = !isWalkover && isSingles && ((set1Home === 7 && set1Away === 6) || (set1Home === 6 && set1Away === 7));
 
   function handleSubmit() {
     if (isWalkover) {
@@ -628,66 +628,61 @@ function RubberEditor({ type, rubber, homeRoster, awayRoster, homeTeamName, away
         Walkover
       </label>
 
-      {isWalkover ? (
-        <div className="space-y-2 mb-2">
-          <p className="text-xs text-gray-500">The other team didn't turn up — pick who gets the walkover. Score is filled in automatically ({isSingles ? '6-0' : '6-0, 6-0'}).</p>
-          <Dropdown
-            value={walkoverSide}
-            onChange={setWalkoverSide}
-            disabled={disabled}
-            placeholder="Select team…"
-            options={[
-              { value: 'home', label: homeTeamName || 'Home' },
-              { value: 'away', label: awayTeamName || 'Away' },
-            ]}
-          />
-          <div className="flex items-center gap-2">
-            <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
-              Save
-            </button>
-            {updateButton}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-2 flex items-start gap-4 flex-wrap">
-          <table className="text-sm mb-3">
-            <thead>
-              <tr className="text-xs text-gray-500">
-                <th></th>
-                <th className="text-left px-2 pb-1 font-medium">Player</th>
-                <th className="px-2 pb-1 font-medium">Set 1</th>
-                {showTiebreak && <th className="px-2 pb-1 font-medium">Tiebreak</th>}
-                {!isSingles && <th className="px-2 pb-1 font-medium">Set 2</th>}
-                {!isSingles && <th className="px-2 pb-1 font-medium">Set 3</th>}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="pr-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Home</td>
-                <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled} compact /></td>
-                <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled} /></td>
-                {showTiebreak && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} /></td>}
-                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled} /></td>}
-                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.home} onChange={(v) => setSet3({ ...set3, home: v })} disabled={disabled} /></td>}
-              </tr>
-              <tr>
-                <td className="pr-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Away</td>
-                <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled} compact /></td>
-                <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled} /></td>
-                {showTiebreak && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} /></td>}
-                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled} /></td>}
-                {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.away} onChange={(v) => setSet3({ ...set3, away: v })} disabled={disabled} /></td>}
-              </tr>
-            </tbody>
-          </table>
-          <div className="flex flex-col gap-2 pt-6">
-            <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
-              Save
-            </button>
-            {updateButton}
-          </div>
-        </div>
+      {isWalkover && (
+        <p className="text-xs text-gray-500 mb-2">
+          The other team didn't turn up — pick who gets the walkover in the Winner column below. Score fills in automatically ({isSingles ? '6-0' : '6-0, 6-0'}).
+        </p>
       )}
+
+      <div className="mb-2 flex items-start gap-4 flex-wrap">
+        <table className="text-sm mb-3">
+          <thead>
+            <tr className="text-xs text-gray-500">
+              <th></th>
+              {isWalkover && <th className="px-2 pb-1 font-medium">Winner</th>}
+              <th className="text-left px-2 pb-1 font-medium">Player</th>
+              <th className="px-2 pb-1 font-medium">Set 1</th>
+              {showTiebreak && <th className="px-2 pb-1 font-medium">Tiebreak</th>}
+              {!isSingles && <th className="px-2 pb-1 font-medium">Set 2</th>}
+              {!isSingles && <th className="px-2 pb-1 font-medium">Set 3</th>}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="pr-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Home</td>
+              {isWalkover && (
+                <td className="px-2 pb-1 text-center">
+                  <input type="radio" name={`walkover-winner-${type}`} checked={walkoverSide === 'home'} onChange={() => setWalkoverSide('home')} disabled={disabled} />
+                </td>
+              )}
+              <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={setHomePlayers} disabled={disabled || isWalkover} compact /></td>
+              <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled || isWalkover} /></td>
+              {showTiebreak && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled || isWalkover} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.home} onChange={(v) => setSet3({ ...set3, home: v })} disabled={disabled || isWalkover} /></td>}
+            </tr>
+            <tr>
+              <td className="pr-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Away</td>
+              {isWalkover && (
+                <td className="px-2 pb-1 text-center">
+                  <input type="radio" name={`walkover-winner-${type}`} checked={walkoverSide === 'away'} onChange={() => setWalkoverSide('away')} disabled={disabled} />
+                </td>
+              )}
+              <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={setAwayPlayers} disabled={disabled || isWalkover} compact /></td>
+              <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled || isWalkover} /></td>
+              {showTiebreak && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled || isWalkover} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.away} onChange={(v) => setSet3({ ...set3, away: v })} disabled={disabled || isWalkover} /></td>}
+            </tr>
+          </tbody>
+        </table>
+        <div className="flex flex-col gap-2 pt-6">
+          <button onClick={handleSubmit} disabled={disabled} className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide disabled:opacity-50">
+            Save
+          </button>
+          {updateButton}
+        </div>
+      </div>
 
       {!isWalkover && (
         <div className="flex items-center gap-2 mb-2">
