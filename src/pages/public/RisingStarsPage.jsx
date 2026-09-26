@@ -71,6 +71,7 @@ export default function RisingStarsPage({ seasonId }) {
   const [kind, setKind] = useState('singles'); // 'singles' | 'doubles'
   const [divisionId, setDivisionId] = useState(ALL_DIVISIONS);
   const [teamId, setTeamId] = useState(ALL_TEAMS);
+  const [nameSearch, setNameSearch] = useState('');
   const [rows, setRows] = useState(null); // null = loading
   const [teamsInScope, setTeamsInScope] = useState([]);
 
@@ -140,7 +141,9 @@ export default function RisingStarsPage({ seasonId }) {
     return () => { cancelled = true; };
   }, [seasonId, kind, divisionId]);
 
-  const shownRows = teamId === ALL_TEAMS ? rows : (rows ?? []).filter((r) => r.teamId === teamId);
+  const teamFiltered = teamId === ALL_TEAMS ? rows : (rows ?? []).filter((r) => r.teamId === teamId);
+  const search = nameSearch.trim().toLowerCase();
+  const shownRows = search ? (teamFiltered ?? []).filter((r) => r.playerName?.toLowerCase().includes(search)) : teamFiltered;
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -168,12 +171,20 @@ export default function RisingStarsPage({ seasonId }) {
           <option value={ALL_TEAMS}>All Teams</option>
           {teamsInScope.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
+
+        <input
+          type="text"
+          value={nameSearch}
+          onChange={(e) => setNameSearch(e.target.value)}
+          placeholder="Search for a player…"
+          className="border rounded px-2 py-1.5 text-sm flex-1 min-w-[10rem]"
+        />
       </div>
 
       {shownRows === null ? (
         <p className="text-gray-500 text-sm">Loading…</p>
       ) : shownRows.length === 0 ? (
-        <p className="text-gray-500 text-sm">No {kind} results yet.</p>
+        <p className="text-gray-500 text-sm">{search ? `No ${kind} players matching "${nameSearch}".` : `No ${kind} results yet.`}</p>
       ) : (
         <table className="w-full text-sm border rounded overflow-hidden shadow">
           <thead className="bg-teal-900 text-teal-50">
