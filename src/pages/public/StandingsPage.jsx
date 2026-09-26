@@ -3,14 +3,22 @@
 // Req 6.1, 6.5, 6.9: per-group team standings, top-2/bottom-2 highlighted.
 // Computed live from `rubbers`/`fixtures` via standings.js — never cached,
 // so a same-day score correction (Req 5.7) shows up immediately.
+//
+// Switches division via an in-page tab row (every division in the
+// season, always visible) rather than sending people up to the nav
+// bar's division dropdown — that dropdown still exists (other pages
+// still depend on it), and clicking a tab here moves it too, so the two
+// stay in sync instead of becoming a second, disconnected selector.
 
 import { useEffect, useState } from 'react';
+import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings, highlightBands } from '../../lib/standings.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 
-export default function StandingsPage({ seasonId, divisionId }) {
+export default function StandingsPage() {
+  const { seasonId, divisions, divisionId, setDivisionId } = useSeason();
   const [rows, setRows] = useState(null);
   const [teamNames, setTeamNames] = useState({});
 
@@ -63,11 +71,29 @@ export default function StandingsPage({ seasonId, divisionId }) {
     return () => { cancelled = true; };
   }, [seasonId, divisionId]);
 
-  if (!rows) return <p className="p-6">Loading standings…</p>;
-
   return (
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader title="Standings" />
+
+      {divisions.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {divisions.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => setDivisionId(d.id)}
+              className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wide transition-colors ${
+                d.id === divisionId ? 'bg-teal-900 text-white' : 'bg-teal-50 text-teal-800 hover:bg-teal-100'
+              }`}
+            >
+              {d.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!rows ? (
+        <p className="text-gray-500 text-sm">Loading standings…</p>
+      ) : (
       <table className="w-full text-sm border rounded overflow-hidden shadow">
         <thead className="bg-teal-900 text-teal-50">
           <tr>
@@ -82,13 +108,14 @@ export default function StandingsPage({ seasonId, divisionId }) {
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr
-              key={r.teamId}
-              className={
-                r.highlight === 'top' ? 'bg-accent-400/30' : r.highlight === 'bottom' ? 'bg-red-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'
-              }
-            >
-              <td className="p-2 font-bold border-t"><TeamLink teamId={r.teamId}>{teamNames[r.teamId]}</TeamLink></td>
+            <tr key={r.teamId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+              <td
+                className={`p-2 font-bold border-t ${
+                  r.highlight === 'top' ? 'border-l-4 border-l-accent-500' : r.highlight === 'bottom' ? 'border-l-4 border-l-red-500' : ''
+                }`}
+              >
+                <TeamLink teamId={r.teamId}>{teamNames[r.teamId]}</TeamLink>
+              </td>
               <td className="p-2 text-center border-t">{r.played}</td>
               <td className="p-2 text-center border-t">{r.wins}</td>
               <td className="p-2 text-center border-t">{r.losses}</td>
@@ -99,9 +126,12 @@ export default function StandingsPage({ seasonId, divisionId }) {
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-gray-500 mt-2">
-        Top 2 (gold) and bottom 2 (red) highlighted per Req 6.5. Teams tied after every tiebreak level share the same rank (Req 6.4).
-      </p>
+      )}
+      {rows && (
+        <p className="text-xs text-gray-500 mt-2">
+          Top 2 (gold) and bottom 2 (red) marked with a colored edge, per Req 6.5. Teams tied after every tiebreak level share the same rank (Req 6.4).
+        </p>
+      )}
     </div>
   );
 }

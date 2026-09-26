@@ -152,10 +152,9 @@ function NeedsDivision({ children }) {
 }
 
 function StandingsRouteWrapper() {
-  const { seasonId, divisionId } = useSeason();
   return (
     <NeedsDivision>
-      <StandingsPage seasonId={seasonId} divisionId={divisionId} />
+      <StandingsPage />
     </NeedsDivision>
   );
 }
