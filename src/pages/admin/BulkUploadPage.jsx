@@ -71,8 +71,8 @@ export default function BulkUploadPage({ seasonId }) {
       </ul>
       <p className="text-sm text-gray-600 mb-4">
         The captain is added to the roster automatically, so a team needs at least 3 other players (4 total
-        including the captain — Req 1.5). Repeat for each additional team — a 2-team file is 4 rows total.
-        Gender, photos, ID proof, and date of birth are not collected here (Req 1.7/1.6 deferred). If any block
+        including the captain). Repeat for each additional team — a 2-team file is 4 rows total.
+        Gender, photos, ID proof, and date of birth are not collected here. If any block
         has a problem, nothing is imported — fix the file and re-upload.
       </p>
 

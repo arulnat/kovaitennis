@@ -65,7 +65,7 @@ export function validateBulkUpload(rows) {
     if (!countIsValid) {
       errors.push(`Row ${infoLineNo}: player count "${playerCountRaw}" must be a positive whole number`);
     } else if (playerCount < 3) {
-      errors.push(`Row ${infoLineNo}: team "${teamName || '(unnamed)'}" has ${playerCount + 1} player(s) including the captain — minimum is 4 (Req 1.5)`);
+      errors.push(`Row ${infoLineNo}: team "${teamName || '(unnamed)'}" has ${playerCount + 1} player(s) including the captain — minimum is 4`);
     }
 
     if (teamName) {

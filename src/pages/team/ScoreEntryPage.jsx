@@ -131,7 +131,7 @@ export default function ScoreEntryPage({ fixtureId }) {
     };
 
     if (!isValidTimePlayed(row.time_played_minutes)) {
-      alert('Time played must be between 0 and 180 minutes (3-hour cap, Req 5.9).');
+      alert('Time played must be between 0 and 180 minutes (3-hour cap).');
       return;
     }
 

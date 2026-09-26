@@ -40,7 +40,7 @@ function RulesEditor() {
 
   return (
     <section className="border rounded p-4">
-      <h2 className="font-medium mb-2">Rules &amp; Regulations (Req 13.1)</h2>
+      <h2 className="font-medium mb-2">Rules &amp; Regulations</h2>
       <input value={title} onChange={(e) => setTitle(e.target.value)} className="border rounded px-2 py-1 text-sm w-full mb-2" />
       <textarea
         value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)}
@@ -72,7 +72,7 @@ function WelcomeNoteEditor({ seasonId }) {
 
   return (
     <section className="border rounded p-4">
-      <h2 className="font-medium mb-2">Welcome Note (Req 13.2) — this season only</h2>
+      <h2 className="font-medium mb-2">Welcome Note — this season only</h2>
       <textarea
         value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)}
         rows={6} placeholder="Written by the secretary, signed by office bearers"

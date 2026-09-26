@@ -42,7 +42,7 @@ export default function MissingScoresReportPage({ seasonId }) {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader
         title="Missing / Pending Scores Report"
-        subtitle="Run manually (Req 12.8) — use this to follow up directly with teams whose scores are missing or incomplete. There is no automatic dispute mechanism; this report is it."
+        subtitle="Run manually — use this to follow up directly with teams whose scores are missing or incomplete. There is no automatic dispute mechanism; this report is it."
       />
 
       <div className="flex items-center gap-2 mb-4">

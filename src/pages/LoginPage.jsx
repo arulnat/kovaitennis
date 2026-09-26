@@ -52,7 +52,7 @@ export default function LoginPage() {
             <h1 className="text-lg font-extrabold uppercase tracking-wide text-white">Set a new password</h1>
           </div>
           <form onSubmit={handlePasswordChange} className="p-6">
-            <p className="text-sm text-gray-600 mb-4">Required on first login (Req 2.3/10.2).</p>
+            <p className="text-sm text-gray-600 mb-4">Required on first login.</p>
             <input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
             <input type="password" placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
             {error && <p className="text-red-600 text-sm mb-2">{error}</p>}

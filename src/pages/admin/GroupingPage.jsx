@@ -372,7 +372,7 @@ export default function GroupingPage({ seasonId }) {
     if (!confirm(
       `${verb} fixtures for "${division.name}" (${teamIds.length} teams)?` +
       (alreadyGenerated ? ' This replaces the existing schedule entirely.' : '') +
-      ' Home/away is automatically balanced (Req 4.6), and the division will be locked afterward.'
+      ' Home/away is automatically balanced, and the division will be locked afterward.'
     )) return;
 
     if (alreadyGenerated) {

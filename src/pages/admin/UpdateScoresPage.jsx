@@ -59,7 +59,7 @@ export default function UpdateScoresPage({ seasonId }) {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader
         title="Update Scores"
-        subtitle="Pick a fixture to enter or edit its score — same as either captain can, including after their normal 7-day edit window has locked it (Req 5.2, 5.7)."
+        subtitle="Pick a fixture to enter or edit its score — same as either captain can, including after their normal 7-day edit window has locked it."
       />
 
       <label className="text-sm text-gray-700 block mb-4">

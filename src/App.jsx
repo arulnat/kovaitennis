@@ -150,7 +150,7 @@ function NeedsDivision({ children }) {
   const { seasonId, divisionId, loading } = useSeason();
   if (loading) return <p className="p-6 text-gray-500">Loading…</p>;
   if (!seasonId) return <p className="p-6 text-gray-500">No season yet — create one under Seasons first.</p>;
-  if (!divisionId) return <p className="p-6 text-gray-500">This season has no divisions yet — create one first (Req 4.1).</p>;
+  if (!divisionId) return <p className="p-6 text-gray-500">This season has no divisions yet — create one first.</p>;
   return children;
 }
 

@@ -148,7 +148,7 @@ export default function RisingStarsPage({ seasonId }) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <PageHeader title="Rising Stars" subtitle="Individual leaderboard — most wins first, tied on wins broken by sets +/-, then games +/- (Req 6.6, 6.8)." />
+      <PageHeader title="Rising Stars" subtitle="Individual leaderboard — most wins first, tied on wins broken by sets +/-, then games +/-." />
 
       <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="flex border-2 border-accent-500 rounded overflow-hidden">

@@ -55,7 +55,7 @@ export default function LoginCredentialsPage() {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader
         title="Team Logins"
-        subtitle="Every team's login ID and default password, across all bulk uploads. Circulate these to captains (Req 2.2, 10.2) — each is forced to change their password on first login."
+        subtitle="Every team's login ID and default password, across all bulk uploads. Circulate these to captains — each is forced to change their password on first login."
       />
 
       <div className="flex gap-3 items-center mb-4 flex-wrap">

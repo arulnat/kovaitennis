@@ -129,7 +129,7 @@ export default function StandingsPage() {
       )}
       {rows && (
         <p className="text-xs text-gray-500 mt-2">
-          Top 2 (gold) and bottom 2 (red) marked with a colored edge, per Req 6.5. Teams tied after every tiebreak level share the same rank (Req 6.4).
+          Top 2 (gold) and bottom 2 (red) marked with a colored edge. Teams tied after every tiebreak level share the same rank.
         </p>
       )}
     </div>
