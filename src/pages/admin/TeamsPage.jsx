@@ -25,17 +25,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
-
-/** delete-team returns a non-2xx status with a JSON {error} body for
- * expected failures (e.g. still grouped) — supabase-js doesn't parse
- * that into error.message itself, so pull it from the raw response. */
-async function extractFunctionErrorMessage(error) {
-  try {
-    const body = await error.context.json();
-    if (body?.error) return body.error;
-  } catch { /* fall back to error.message below */ }
-  return error.message;
-}
+import { extractFunctionErrorMessage } from '../../lib/functionsError.js';
 
 export default function TeamsPage({ seasonId }) {
   const { divisions } = useSeason();

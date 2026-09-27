@@ -11,6 +11,7 @@ import { useSeason } from '../../lib/seasonContext.jsx';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import PageHeader from '../../components/PageHeader.jsx';
+import { extractFunctionErrorMessage } from '../../lib/functionsError.js';
 
 export default function SeasonsPage() {
   const { refresh: refreshGlobalSeasons } = useSeason(); // keeps the nav bar's dropdown in sync
@@ -48,18 +49,33 @@ export default function SeasonsPage() {
       alert('This season is locked. Unlock it first before purging.');
       return;
     }
-    if (!confirm(`This permanently deletes every team, player, fixture, and score under "${season.name}". This cannot be undone. Continue?`)) return;
+    if (!confirm(`This permanently deletes every team, player, login, fixture, and score under "${season.name}". This cannot be undone. Continue?`)) return;
 
-    // Cascade deletes rely on FK ON DELETE CASCADE from fixtures/rubbers/
-    // team_seasons/team_players back to seasons(id). Teams/players created
-    // ONLY for this season should also be cleaned up — in production, tag
-    // dummy teams/players so this purge doesn't touch anything shared.
-    // This scaffold purges season-scoped rows only.
+    // Which teams were in this season, captured BEFORE the team_seasons
+    // rows below are removed — used afterward to fully tear down each
+    // team's login/players/credentials via delete-team, which is also
+    // the real gate against wiping a team that's still placed in some
+    // OTHER season: it refuses (and we keep it) if so.
+    const { data: teamSeasonRows } = await supabase.from('team_seasons').select('team_id').eq('season_id', season.id);
+    const teamIds = [...new Set((teamSeasonRows || []).map((r) => r.team_id))];
+
+    // Cascade deletes rely on FK ON DELETE CASCADE from fixtures/rubbers
+    // back to seasons(id).
     await supabase.from('team_seasons').delete().eq('season_id', season.id);
     await supabase.from('fixtures').delete().eq('season_id', season.id); // rubbers cascade
     await supabase.from('team_players').delete().eq('season_id', season.id);
+
+    const kept = [];
+    for (const teamId of teamIds) {
+      const { error } = await supabase.functions.invoke('delete-team', { body: { teamId } });
+      if (error) kept.push(await extractFunctionErrorMessage(error));
+    }
+
     const { error } = await supabase.from('seasons').delete().eq('id', season.id);
     if (error) { alert(error.message); return; }
+    if (kept.length > 0) {
+      alert(`Season purged. Some teams are still placed in another season and were kept, logins included:\n${kept.join('\n')}`);
+    }
     refresh();
   }
 
@@ -67,7 +83,7 @@ export default function SeasonsPage() {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader
         title="Seasons"
-        subtitle="Create and manage seasons. Purge Data permanently deletes a season and everything under it — locked by default, so you must deliberately unlock a season before it can be purged."
+        subtitle="Create and manage seasons. Purge Data permanently deletes a season and everything under it — including its teams' logins, unless a team is also placed in another season — locked by default, so you must deliberately unlock a season before it can be purged."
       />
 
       <div className="border rounded p-4 mb-4">
