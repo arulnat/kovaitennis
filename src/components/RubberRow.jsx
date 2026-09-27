@@ -20,14 +20,18 @@ export default function RubberRow({ type, rubber: r, nameOf, mySide = 'home' }) 
   const sets = [1, 2, 3].map((n) => ({ home: r[`set${n}_home`], away: r[`set${n}_away`] })).filter((s) => s.home != null);
   const homeWon = r.winner_side === 'home';
 
+  // A walkover has no players on either side and no real score played —
+  // only the winning side gets its (automatic clean-shutout) number
+  // shown; the losing side is left blank rather than a "—" placeholder,
+  // since there's nothing to report for a side that never showed up.
   const Side = ({ won, names, side }) => (
     <div className="flex items-center justify-between gap-3 py-0.5">
       <span className={`text-sm truncate ${won ? 'font-bold text-teal-900' : 'text-gray-600'}`}>
         {won && <span className="inline-block w-4 text-teal-700">✓</span>}
-        {names.join(' / ') || '—'}
+        {names.join(' / ') || (r.is_walkover ? '' : '—')}
       </span>
       <div className="flex items-center gap-3 shrink-0">
-        {sets.map((s, i) => (
+        {(!r.is_walkover || won) && sets.map((s, i) => (
           <span key={i} className="w-6 text-center text-sm font-semibold">{side === 'home' ? s.home : s.away}</span>
         ))}
       </div>

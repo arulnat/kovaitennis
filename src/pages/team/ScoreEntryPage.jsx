@@ -559,9 +559,18 @@ function RubberEditor({
       if (!walkoverSide) { alert('Select which team gets the walkover.'); return; }
       // The other side simply didn't turn up — no players, no partial
       // score to reconstruct, just which team gets the clean shutout
-      // (6-0 singles, 6-0/6-0 doubles).
+      // (6-0 singles, 6-0/6-0 doubles). The winning side's player(s) are
+      // still recorded, so the result can show who actually gets the
+      // win — the losing side never had anyone to name.
+      const winnerCount = isSingles ? 1 : 2;
+      const winnerPlayers = (walkoverSide === 'home' ? homePlayers : awayPlayers).filter(Boolean);
+      if (winnerPlayers.length < winnerCount) {
+        alert(`Select the winning player${winnerCount > 1 ? 's' : ''}.`); return;
+      }
       onSave({
-        homePlayers: [], awayPlayers: [], score: null, isWalkover, walkoverSide,
+        homePlayers: walkoverSide === 'home' ? homePlayers : [],
+        awayPlayers: walkoverSide === 'away' ? awayPlayers : [],
+        score: null, isWalkover, walkoverSide,
         walkoverStage: { stage: 'not_started' },
         timePlayed: null,
       });
@@ -626,7 +635,7 @@ function RubberEditor({
 
       {isWalkover && (
         <p className="text-xs text-gray-500 mb-2">
-          The other team didn't turn up — pick who gets the walkover in the Winner column below. Score fills in automatically ({isSingles ? '6-0' : '6-0, 6-0'}).
+          The other team didn't turn up — pick who gets the walkover in the Winner column below, then select the winning player{isSingles ? '' : 's'}. Score fills in automatically ({isSingles ? '6-0' : '6-0, 6-0'}).
         </p>
       )}
 
@@ -651,7 +660,7 @@ function RubberEditor({
                   <input type="radio" name={`walkover-winner-${type}`} checked={walkoverSide === 'home'} onChange={() => setWalkoverSide('home')} disabled={disabled} />
                 </td>
               )}
-              <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={onHomePlayersChange} disabled={disabled || isWalkover} compact /></td>
+              <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={onHomePlayersChange} disabled={disabled || (isWalkover && walkoverSide !== 'home')} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled || isWalkover} max={7} /></td>
               {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} max={50} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled || isWalkover} max={7} /></td>}
@@ -664,7 +673,7 @@ function RubberEditor({
                   <input type="radio" name={`walkover-winner-${type}`} checked={walkoverSide === 'away'} onChange={() => setWalkoverSide('away')} disabled={disabled} />
                 </td>
               )}
-              <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={onAwayPlayersChange} disabled={disabled || isWalkover} compact /></td>
+              <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={onAwayPlayersChange} disabled={disabled || (isWalkover && walkoverSide !== 'away')} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled || isWalkover} max={7} /></td>
               {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} max={50} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled || isWalkover} max={7} /></td>}
