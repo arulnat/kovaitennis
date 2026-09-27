@@ -21,6 +21,8 @@ import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
 import TeamProfilePage from './pages/public/TeamProfilePage.jsx';
 import PlayerProfilePage from './pages/public/PlayerProfilePage.jsx';
 import RisingStarsPage from './pages/public/RisingStarsPage.jsx';
+import ClubsPage from './pages/public/ClubsPage.jsx';
+import ClubProfilePage from './pages/public/ClubProfilePage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
@@ -40,6 +42,8 @@ export default function App() {
             <Route path="/rising-stars" element={<RisingStarsRouteWrapper />} />
             <Route path="/team/:teamId" element={<TeamProfileRouteWrapper />} />
             <Route path="/player/:playerId" element={<PlayerProfileRouteWrapper />} />
+            <Route path="/clubs" element={<ClubsRouteWrapper />} />
+            <Route path="/club/:clubId" element={<ClubProfileRouteWrapper />} />
 
             {/* Score entry — either captain, or an admin doing it on their behalf (Req 5.2) */}
             <Route path="/score/:fixtureId" element={<RequireRole roles={['team', 'tournament_admin', 'super_admin']}><ScoreEntryRouteWrapper /></RequireRole>} />
@@ -117,6 +121,7 @@ function Nav() {
       <Link to="/results" className={navLinkClass}>Results</Link>
       <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
+      <Link to="/clubs" className={navLinkClass}>Clubs</Link>
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <SetupMenu />
@@ -198,6 +203,13 @@ function PlayerProfileRouteWrapper() {
   const { seasonId } = useSeason();
   const { playerId } = useParams();
   return <PlayerProfilePage seasonId={seasonId} playerId={playerId} />;
+}
+function ClubsRouteWrapper() {
+  return <ClubsPage />;
+}
+function ClubProfileRouteWrapper() {
+  const { clubId } = useParams();
+  return <ClubProfilePage clubId={clubId} />;
 }
 function ScoreEntryRouteWrapper() {
   const fixtureId = window.location.pathname.split('/').pop();

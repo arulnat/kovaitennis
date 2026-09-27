@@ -66,14 +66,16 @@ export default function BulkUploadPage({ seasonId }) {
         CSV file, no header row — two rows per team, one block after another:
       </p>
       <ul className="text-sm text-gray-600 mb-4 list-disc pl-5 space-y-1">
-        <li><strong>Row 1</strong> (team info): team name, captain name, captain phone, number of other players (not counting the captain)</li>
+        <li><strong>Row 1</strong> (team info): team name, captain name, captain phone, number of other players (not counting the captain), club name (optional — leave blank if none)</li>
         <li><strong>Row 2</strong> (roster): that many player names, one per column</li>
       </ul>
       <p className="text-sm text-gray-600 mb-4">
         The captain is added to the roster automatically, so a team needs at least 3 other players (4 total
         including the captain). Repeat for each additional team — a 2-team file is 4 rows total.
-        Gender, photos, ID proof, and date of birth are not collected here. If any block
-        has a problem, nothing is imported — fix the file and re-upload.
+        A club name is matched case-insensitively against clubs already on file, so "City Club" and "city club"
+        become the same club rather than two — a new one is only created if nothing matches. Club can also be
+        added or corrected later from the Teams page. Gender, photos, ID proof, and date of birth are not
+        collected here. If any block has a problem, nothing is imported — fix the file and re-upload.
       </p>
 
       <button
@@ -104,7 +106,7 @@ export default function BulkUploadPage({ seasonId }) {
           <ul className="border rounded divide-y">
             {teams.map((t) => (
               <li key={t.teamName} className="p-3 flex justify-between text-sm">
-                <span>{t.teamName} — captain {t.captainName}</span>
+                <span>{t.teamName} — captain {t.captainName}{t.clubName ? ` (${t.clubName})` : ''}</span>
                 <span className="text-gray-500">{t.players.length} players</span>
               </li>
             ))}

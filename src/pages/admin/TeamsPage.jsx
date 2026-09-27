@@ -49,7 +49,7 @@ export default function TeamsPage({ seasonId }) {
     setLoading(true);
     const { data: teamSeasons, error } = await supabase
       .from('team_seasons')
-      .select('id, team_id, division_id, order_index, status, teams(id, name, captain_name, captain_phone)')
+      .select('id, team_id, division_id, order_index, status, teams(id, name, captain_name, captain_phone, club_id, clubs(id, name))')
       .eq('season_id', seasonId);
 
     if (error) { alert(error.message); setLoading(false); return; }
@@ -104,6 +104,25 @@ export default function TeamsPage({ seasonId }) {
     setSelected(allDeletableSelected ? new Set() : new Set(deletableRows.map((r) => r.id)));
   }
 
+  /** Find-or-create a club by name (case-insensitive) and point the team at it — same matching the bulk-create-teams Edge Function does, so a typo fix here never creates a duplicate club. Blank clears the team's club. */
+  async function updateClub(teamId, clubName) {
+    const trimmed = clubName.trim();
+    let clubId = null;
+    if (trimmed) {
+      const { data: existing } = await supabase.from('clubs').select('id').ilike('name', trimmed).maybeSingle();
+      if (existing) {
+        clubId = existing.id;
+      } else {
+        const { data: created, error: createErr } = await supabase.from('clubs').insert({ name: trimmed }).select().single();
+        if (createErr) { alert(createErr.message); return; }
+        clubId = created.id;
+      }
+    }
+    const { error } = await supabase.from('teams').update({ club_id: clubId }).eq('id', teamId);
+    if (error) { alert(error.message); return; }
+    load();
+  }
+
   async function deleteTeams(targets) {
     if (targets.length === 0) return;
     const names = targets.map((r) => r.teams?.name).join(', ');
@@ -122,7 +141,7 @@ export default function TeamsPage({ seasonId }) {
     load();
   }
 
-  const columnCount = 6 + (isAdmin ? 1 : 0); // checkbox, team, captain, phone, players, delete [+ status]
+  const columnCount = 7 + (isAdmin ? 1 : 0); // checkbox, team, captain, phone, club, players, delete [+ status]
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -162,6 +181,7 @@ export default function TeamsPage({ seasonId }) {
                 <th className="text-left p-2">Team</th>
                 <th className="text-left p-2">Captain</th>
                 <th className="text-left p-2">Phone</th>
+                <th className="text-left p-2">Club</th>
                 <th className="p-2">Players</th>
                 {isAdmin && <th className="text-left p-2">Status</th>}
                 <th className="p-2">Delete</th>
@@ -189,6 +209,9 @@ export default function TeamsPage({ seasonId }) {
                       <td className="p-2 font-medium"><TeamLink teamId={r.team_id}>{r.teams?.name}</TeamLink></td>
                       <td className="p-2">{r.teams?.captain_name}</td>
                       <td className="p-2">{r.teams?.captain_phone}</td>
+                      <td className="p-2">
+                        <ClubCell teamId={r.team_id} initialName={r.teams?.clubs?.name ?? ''} onSave={updateClub} />
+                      </td>
                       <td className="p-2 text-center">{r.playerCount}</td>
                       {isAdmin && (
                         <td className="p-2">
@@ -216,6 +239,35 @@ export default function TeamsPage({ seasonId }) {
             </tbody>
           </table>
         </>
+      )}
+    </div>
+  );
+}
+
+/** Inline club-name editor for one team row — Save only appears once the text actually changes, so nothing writes on every keystroke. */
+function ClubCell({ teamId, initialName, onSave }) {
+  const [draft, setDraft] = useState(initialName);
+  const [saving, setSaving] = useState(false);
+  const dirty = draft.trim() !== initialName;
+
+  async function save() {
+    setSaving(true);
+    await onSave(teamId, draft);
+    setSaving(false);
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="No club"
+        className="border rounded px-1.5 py-0.5 text-xs w-32"
+      />
+      {dirty && (
+        <button onClick={save} disabled={saving} className="text-xs text-teal-700 underline shrink-0 disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
       )}
     </div>
   );

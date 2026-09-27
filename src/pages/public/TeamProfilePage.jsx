@@ -79,7 +79,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
 
       const { data: teamRow, error: teamErr } = await supabase
         .from('teams')
-        .select('id, name, captain_name, captain_phone, alternate_contact_phone, club_id, clubs(name)')
+        .select('id, name, captain_name, captain_phone, alternate_contact_phone, club_id, clubs(id, name)')
         .eq('id', teamId)
         .maybeSingle();
       if (cancelled) return;
@@ -210,7 +210,10 @@ export default function TeamProfilePage({ seasonId, teamId }) {
   const shownFixtures = tab === 'completed' ? scoredFixtures : upcomingFixtures;
 
   const statRows = [
-    ...(team.clubs?.name ? [{ label: 'Club', value: team.clubs.name }] : []),
+    ...(team.clubs?.name ? [{
+      label: 'Club',
+      value: <Link to={`/club/${team.clubs.id}`} className="hover:underline">{team.clubs.name}</Link>,
+    }] : []),
     { label: 'Captain', value: team.captain_name || '—' },
     ...(team.captain_phone ? [{ label: 'Phone', value: team.captain_phone }] : []),
     ...(teamSeason?.divisions?.name ? [{ label: 'Division', value: teamSeason.divisions.name, highlight: true }] : []),

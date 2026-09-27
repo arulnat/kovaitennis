@@ -65,6 +65,28 @@ Deno.serve(async (req) => {
         const defaultPassword = generateDefaultPassword();
         const email = `${loginId}@teams.internal`;
 
+        // 0. Find-or-create the club by name (case-insensitive) — never
+        // creates a second row for "Aces Club" vs "aces club".
+        let clubId = null;
+        if (team.clubName) {
+          const { data: existingClub } = await admin
+            .from('clubs')
+            .select('id')
+            .ilike('name', team.clubName)
+            .maybeSingle();
+          if (existingClub) {
+            clubId = existingClub.id;
+          } else {
+            const { data: newClub, error: clubErr } = await admin
+              .from('clubs')
+              .insert({ name: team.clubName })
+              .select()
+              .single();
+            if (clubErr) throw clubErr;
+            clubId = newClub.id;
+          }
+        }
+
         // 1. Create the team row
         const { data: teamRow, error: teamErr } = await admin
           .from('teams')
@@ -73,6 +95,7 @@ Deno.serve(async (req) => {
             login_id: loginId,
             captain_name: team.captainName,
             captain_phone: team.captainPhone,
+            club_id: clubId,
           })
           .select()
           .single();

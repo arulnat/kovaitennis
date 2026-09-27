@@ -8,12 +8,16 @@
 // importer.
 //
 // Expected CSV shape — NO header row; two rows per team, repeated:
-//   Row 1 (team info): team_name | captain_name | captain_phone | player_count
+//   Row 1 (team info): team_name | captain_name | captain_phone | player_count | club_name?
 //   Row 2 (roster):    player_name_1 | player_name_2 | ... | player_name_N
 // where N is the player_count given in Row 1 — OTHER players, not counting
 // the captain. The captain is added to the roster automatically (Req 1.5's
 // 4-player minimum includes the captain), so player_count must be at least
-// 3. A 2-team file is 4 rows total.
+// 3. club_name (5th column) is optional — leave it blank for a team with no
+// club. It's matched case-insensitively against existing clubs server-side
+// (bulk-create-teams Edge Function), creating a new club only if no match
+// exists, so "Aces Club" and "aces club" never end up as two different
+// clubs. A 2-team file is 4 rows total.
 //
 // Uses SheetJS (`xlsx`) to parse the CSV — parsing itself is kept separate
 // from validation (and the `xlsx` import is dynamic, inside parseWorkbook and
@@ -55,6 +59,7 @@ export function validateBulkUpload(rows) {
     const captainPhone = String(infoRow[2] ?? '').trim();
     const playerCountRaw = infoRow[3];
     const playerCount = Number(playerCountRaw);
+    const clubName = String(infoRow[4] ?? '').trim() || null;
     const countIsValid = Number.isInteger(playerCount) && playerCount > 0;
 
     if (!teamName) errors.push(`Row ${infoLineNo}: team name is required`);
@@ -92,7 +97,7 @@ export function validateBulkUpload(rows) {
 
     if (teamName && captainName && countIsValid && playerNames.length === playerCount) {
       teams.push({
-        teamName, captainName, captainPhone,
+        teamName, captainName, captainPhone, clubName,
         players: [
           { name: captainName, gender: null },
           ...playerNames.map((name) => ({ name, gender: null })),
@@ -115,9 +120,9 @@ export function validateBulkUpload(rows) {
  */
 export function sampleTemplateRows() {
   return [
-    ['Aces', 'Priya Kumar', '9876543210', 3],
+    ['Aces', 'Priya Kumar', '9876543210', 3, 'City Sports Club'],
     ['Arjun Rao', 'Divya Shah', 'Karthik Iyer'],
-    ['Smashers', 'Anita Menon', '9123456780', 4],
+    ['Smashers', 'Anita Menon', '9123456780', 4, ''],
     ['Rahul Verma', 'Sneha Pillai', 'Vikram Singh', 'Lakshmi Narayan'],
   ];
 }
