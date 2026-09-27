@@ -653,9 +653,9 @@ function RubberEditor({
               )}
               <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={onHomePlayersChange} disabled={disabled || isWalkover} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled || isWalkover} max={7} /></td>
-              {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} /></td>}
+              {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} max={50} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled || isWalkover} max={7} /></td>}
-              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.home} onChange={(v) => setSet3({ ...set3, home: v })} disabled={disabled || isWalkover} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.home} onChange={(v) => setSet3({ ...set3, home: v })} disabled={disabled || isWalkover} max={50} /></td>}
             </tr>
             <tr>
               <td className="pr-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Away</td>
@@ -666,9 +666,9 @@ function RubberEditor({
               )}
               <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={onAwayPlayersChange} disabled={disabled || isWalkover} compact /></td>
               <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled || isWalkover} max={7} /></td>
-              {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} /></td>}
+              {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} max={50} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled || isWalkover} max={7} /></td>}
-              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.away} onChange={(v) => setSet3({ ...set3, away: v })} disabled={disabled || isWalkover} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.away} onChange={(v) => setSet3({ ...set3, away: v })} disabled={disabled || isWalkover} max={50} /></td>}
             </tr>
           </tbody>
         </table>
@@ -730,12 +730,16 @@ function PlayerPicker({ label, roster, selectable, count, value, onChange, disab
   );
 }
 
-/** A single side's score for one set/point column — home and away are separate table rows, not a home-dash-away pair, so each cell only ever holds one number. */
+/** A single side's score for one set/point column — home and away are separate table rows, not a home-dash-away pair, so each cell only ever holds one number. `max`, when given, is enforced on typed input too, not just the spinner arrows (the HTML attribute alone only blocks the arrows). */
 function ScoreCell({ value, onChange, disabled, max }) {
   return (
     <input
       type="number" min="0" max={max} value={value} disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (max != null && v !== '' && Number(v) > max) return;
+        onChange(v);
+      }}
       className="border rounded px-2 py-1.5 w-14 text-center"
     />
   );
