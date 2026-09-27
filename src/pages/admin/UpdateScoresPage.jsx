@@ -36,7 +36,7 @@ export default function UpdateScoresPage({ seasonId }) {
     supabase
       .from('fixtures')
       .select(`
-        id, round_number, week_date, home_team_id, away_team_id,
+        id, week_date, home_team_id, away_team_id,
         teams_home:teams!fixtures_home_team_id_fkey(name),
         teams_away:teams!fixtures_away_team_id_fkey(name),
         rubbers(winner_side, confirmed_at)
@@ -44,7 +44,7 @@ export default function UpdateScoresPage({ seasonId }) {
       .eq('season_id', seasonId)
       .eq('division_id', selectedDivisionId)
       .eq('is_bye', false)
-      .order('round_number')
+      .order('week_date')
       .then(({ data }) => setFixtures(data || []));
   }, [seasonId, selectedDivisionId]);
 
@@ -89,7 +89,6 @@ export default function UpdateScoresPage({ seasonId }) {
         <table className="w-full text-sm border">
           <thead className="bg-teal-50">
             <tr>
-              <th className="p-2">Round</th>
               <th className="text-left p-2">Week</th>
               <th className="text-left p-2">Fixture</th>
               <th className="text-left p-2">Status</th>
@@ -103,7 +102,6 @@ export default function UpdateScoresPage({ seasonId }) {
               const statusColor = scored === 3 ? 'text-green-700' : scored === 0 ? 'text-red-700' : 'text-amber-700';
               return (
                 <tr key={f.id} className="border-t">
-                  <td className="p-2 text-center">{f.round_number}</td>
                   <td className="p-2">{f.week_date}</td>
                   <td className="p-2">
                     <TeamLink teamId={f.home_team_id}>{f.teams_home?.name}</TeamLink>

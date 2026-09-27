@@ -43,7 +43,7 @@ export default function ResultsPage() {
       const { data: fixtureRows } = await supabase
         .from('fixtures')
         .select(`
-          id, round_number, week_date, home_team_id, away_team_id,
+          id, week_date, home_team_id, away_team_id,
           teams_home:teams!fixtures_home_team_id_fkey(id, name),
           teams_away:teams!fixtures_away_team_id_fkey(id, name),
           rubbers(*)
@@ -131,7 +131,7 @@ function ResultCard({ fixture: f }) {
   return (
     <div className="rounded-lg overflow-hidden shadow-lg mb-5">
       <div className="bg-accent-500 text-teal-950 text-xs font-extrabold uppercase tracking-wide px-3 py-1.5">
-        {formatWeekDate(f.week_date)} — Round {f.round_number}
+        {formatWeekDate(f.week_date)}
       </div>
       <div className="flex items-center justify-between gap-3 px-4 py-3 bg-teal-950 text-white">
         <span className={`font-extrabold uppercase truncate ${homeWonTie ? 'text-accent-400' : ''}`}>

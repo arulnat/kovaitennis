@@ -342,7 +342,7 @@ function RoundsTable({ rounds, teamName, onSwap }) {
       {rounds.map(({ round, weekDate, ties, bye }) => (
         <div key={round} className="mb-4">
           <p className="text-sm font-semibold text-gray-700 mb-1">
-            Round {round} — Week of {formatWeekDate(weekDate)}
+            Week of {formatWeekDate(weekDate)}
           </p>
           <table className="w-full text-sm border mb-1">
             <thead className="bg-teal-50">

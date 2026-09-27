@@ -156,14 +156,14 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       const { data: fixtureRows } = await supabase
         .from('fixtures')
         .select(`
-          id, round_number, week_date, is_bye, home_team_id, away_team_id,
+          id, week_date, is_bye, home_team_id, away_team_id,
           teams_home:teams!fixtures_home_team_id_fkey(id, name),
           teams_away:teams!fixtures_away_team_id_fkey(id, name),
           rubbers(*)
         `)
         .eq('season_id', seasonId)
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-        .order('round_number');
+        .order('week_date');
       if (cancelled) return;
       setFixtures(fixtureRows || []);
 
@@ -340,7 +340,6 @@ export default function TeamProfilePage({ seasonId, teamId }) {
               <table className="w-full text-sm border rounded overflow-hidden">
                 <thead className="bg-teal-900 text-teal-50">
                   <tr>
-                    <th className="p-2 font-bold uppercase text-xs tracking-wide">Round</th>
                     <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Week</th>
                     <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Opponent</th>
                     <th className="p-2 font-bold uppercase text-xs tracking-wide">Result</th>
@@ -351,7 +350,6 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                     if (f.is_bye) {
                       return (
                         <tr key={f.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="p-2 text-center border-t">{f.round_number}</td>
                           <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
                           <td className="p-2 text-gray-500 italic border-t" colSpan={2}>Rest (bye)</td>
                         </tr>
@@ -367,7 +365,6 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                           onClick={outcome ? () => toggleFixture(f.id) : undefined}
                           className={`${outcome ? 'cursor-pointer hover:bg-teal-50' : ''} ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
                         >
-                          <td className="p-2 text-center border-t font-semibold">{f.round_number}</td>
                           <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
                           <td className="p-2 border-t">
                             {outcome && <span className="text-gray-400 mr-1 inline-block w-3">{isOpen ? '▾' : '▸'}</span>}
@@ -382,7 +379,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                         </tr>
                         {isOpen && (
                           <tr>
-                            <td colSpan={4} className="p-3 border-t bg-teal-50/40">
+                            <td colSpan={3} className="p-3 border-t bg-teal-50/40">
                               <div className="rounded border divide-y overflow-hidden bg-white">
                                 {RUBBER_ORDER.map((type) => {
                                   const rubber = f.rubbers.find((x) => x.rubber_type === type);
