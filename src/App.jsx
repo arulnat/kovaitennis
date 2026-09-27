@@ -16,6 +16,7 @@ import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
 import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
+import ResultsPage from './pages/public/ResultsPage.jsx';
 import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
 import TeamProfilePage from './pages/public/TeamProfilePage.jsx';
 import PlayerProfilePage from './pages/public/PlayerProfilePage.jsx';
@@ -34,6 +35,7 @@ export default function App() {
 
             {/* Public (Req 10.5 — no login required) */}
             <Route path="/standings" element={<StandingsRouteWrapper />} />
+            <Route path="/results" element={<ResultsRouteWrapper />} />
             <Route path="/fixtures-calendar" element={<FixturesCalendarRouteWrapper />} />
             <Route path="/rising-stars" element={<RisingStarsRouteWrapper />} />
             <Route path="/team/:teamId" element={<TeamProfileRouteWrapper />} />
@@ -112,6 +114,7 @@ function Nav() {
       <Link to="/standings" className="font-extrabold uppercase text-white text-lg tracking-wide mr-1">
         Tennis League
       </Link>
+      <Link to="/results" className={navLinkClass}>Results</Link>
       <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
       {(role === 'tournament_admin' || role === 'super_admin') && (
@@ -160,6 +163,13 @@ function StandingsRouteWrapper() {
   return (
     <NeedsDivision>
       <StandingsPage />
+    </NeedsDivision>
+  );
+}
+function ResultsRouteWrapper() {
+  return (
+    <NeedsDivision>
+      <ResultsPage />
     </NeedsDivision>
   );
 }
