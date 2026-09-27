@@ -512,11 +512,15 @@ function RubberEditor({
 
   const [isWalkover, setIsWalkover] = useState(rubber?.is_walkover ?? false);
   const [walkoverSide, setWalkoverSide] = useState(rubber?.walkover_winner_side ?? '');
-  const [set1, setSet1] = useState(rubber ? { home: rubber.set1_home, away: rubber.set1_away } : { home: '', away: '' });
+  // Set 1/2 default to 0-0 rather than blank — a set score always needs
+  // both sides filled in anyway, and starting from 0 means the spinner's
+  // up-arrow counts 0,1,2,... instead of jumping to 1 first and having
+  // to be stepped back down to reach 0.
+  const [set1, setSet1] = useState(rubber ? { home: rubber.set1_home, away: rubber.set1_away } : { home: 0, away: 0 });
   const [tiebreak, setTiebreak] = useState(
     rubber?.set1_tiebreak_home != null ? { home: rubber.set1_tiebreak_home, away: rubber.set1_tiebreak_away } : { home: '', away: '' }
   );
-  const [set2, setSet2] = useState(rubber?.set2_home != null ? { home: rubber.set2_home, away: rubber.set2_away } : { home: '', away: '' });
+  const [set2, setSet2] = useState(rubber?.set2_home != null ? { home: rubber.set2_home, away: rubber.set2_away } : { home: 0, away: 0 });
   const [set3, setSet3] = useState(rubber?.set3_home != null ? { home: rubber.set3_home, away: rubber.set3_away } : { home: '', away: '' });
   const [timePlayed, setTimePlayed] = useState(rubber?.time_played_minutes ?? '');
 
@@ -530,11 +534,11 @@ function RubberEditor({
   useEffect(() => {
     setIsWalkover(rubber?.is_walkover ?? false);
     setWalkoverSide(rubber?.walkover_winner_side ?? '');
-    setSet1(rubber ? { home: rubber.set1_home, away: rubber.set1_away } : { home: '', away: '' });
+    setSet1(rubber ? { home: rubber.set1_home, away: rubber.set1_away } : { home: 0, away: 0 });
     setTiebreak(
       rubber?.set1_tiebreak_home != null ? { home: rubber.set1_tiebreak_home, away: rubber.set1_tiebreak_away } : { home: '', away: '' }
     );
-    setSet2(rubber?.set2_home != null ? { home: rubber.set2_home, away: rubber.set2_away } : { home: '', away: '' });
+    setSet2(rubber?.set2_home != null ? { home: rubber.set2_home, away: rubber.set2_away } : { home: 0, away: 0 });
     setSet3(rubber?.set3_home != null ? { home: rubber.set3_home, away: rubber.set3_away } : { home: '', away: '' });
     setTimePlayed(rubber?.time_played_minutes ?? '');
   }, [rubber]);
@@ -648,9 +652,9 @@ function RubberEditor({
                 </td>
               )}
               <td className="px-2 pb-1"><PlayerPicker roster={homeRoster} selectable={selectableHome} count={isSingles ? 1 : 2} value={homePlayers} onChange={onHomePlayersChange} disabled={disabled || isWalkover} compact /></td>
-              <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled || isWalkover} /></td>
+              <td className="px-2 pb-1"><ScoreCell value={set1.home} onChange={(v) => setSet1({ ...set1, home: v })} disabled={disabled || isWalkover} max={7} /></td>
               {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.home} onChange={(v) => setTiebreak({ ...tiebreak, home: v })} disabled={disabled} /></td>}
-              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled || isWalkover} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.home} onChange={(v) => setSet2({ ...set2, home: v })} disabled={disabled || isWalkover} max={7} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.home} onChange={(v) => setSet3({ ...set3, home: v })} disabled={disabled || isWalkover} /></td>}
             </tr>
             <tr>
@@ -661,9 +665,9 @@ function RubberEditor({
                 </td>
               )}
               <td className="px-2 pb-1"><PlayerPicker roster={awayRoster} selectable={selectableAway} count={isSingles ? 1 : 2} value={awayPlayers} onChange={onAwayPlayersChange} disabled={disabled || isWalkover} compact /></td>
-              <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled || isWalkover} /></td>
+              <td className="px-2 pb-1"><ScoreCell value={set1.away} onChange={(v) => setSet1({ ...set1, away: v })} disabled={disabled || isWalkover} max={7} /></td>
               {showTiebreakColumn && <td className="px-2 pb-1"><ScoreCell value={tiebreak.away} onChange={(v) => setTiebreak({ ...tiebreak, away: v })} disabled={disabled} /></td>}
-              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled || isWalkover} /></td>}
+              {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set2.away} onChange={(v) => setSet2({ ...set2, away: v })} disabled={disabled || isWalkover} max={7} /></td>}
               {!isSingles && <td className="px-2 pb-1"><ScoreCell value={set3.away} onChange={(v) => setSet3({ ...set3, away: v })} disabled={disabled || isWalkover} /></td>}
             </tr>
           </tbody>
@@ -727,10 +731,10 @@ function PlayerPicker({ label, roster, selectable, count, value, onChange, disab
 }
 
 /** A single side's score for one set/point column — home and away are separate table rows, not a home-dash-away pair, so each cell only ever holds one number. */
-function ScoreCell({ value, onChange, disabled }) {
+function ScoreCell({ value, onChange, disabled, max }) {
   return (
     <input
-      type="number" min="0" value={value} disabled={disabled}
+      type="number" min="0" max={max} value={value} disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       className="border rounded px-2 py-1.5 w-14 text-center"
     />
