@@ -74,7 +74,7 @@ export default function SeasonsPage() {
     const { error } = await supabase.from('seasons').delete().eq('id', season.id);
     if (error) { alert(error.message); return; }
     if (kept.length > 0) {
-      alert(`Season purged. Some teams are still placed in another season and were kept, logins included:\n${kept.join('\n')}`);
+      alert(`Season purged. ${kept.length} team(s) could not be fully removed (login kept) — usually because they're still placed in another season:\n${kept.join('\n')}`);
     }
     refresh();
   }
