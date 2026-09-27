@@ -225,11 +225,10 @@ function BulkUploadRouteWrapper() {
 }
 function TeamsRouteWrapper() {
   const { seasonId } = useSeason();
-  return (
-    <NeedsSeason>
-      <TeamsPage seasonId={seasonId} />
-    </NeedsSeason>
-  );
+  // Not wrapped in NeedsSeason — orphaned teams (in no season at all,
+  // e.g. left behind by a purge) need to be visible and deletable here
+  // even when there's currently no season to select at all.
+  return <TeamsPage seasonId={seasonId} />;
 }
 function GroupingRouteWrapper() {
   const { seasonId } = useSeason();

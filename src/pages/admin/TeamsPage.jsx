@@ -39,28 +39,36 @@ export default function TeamsPage({ seasonId }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: teamSeasons, error } = await supabase
-      .from('team_seasons')
-      .select('id, team_id, division_id, order_index, status, teams(id, name, captain_name, captain_phone, club_id, clubs(id, name))')
-      .eq('season_id', seasonId);
 
-    if (error) { alert(error.message); setLoading(false); return; }
+    // No season selected (or none exist at all) — nothing season-scoped
+    // to show, but orphaned teams below still need to be reachable.
+    if (!seasonId) {
+      setRows([]);
+      setSelected(new Set());
+    } else {
+      const { data: teamSeasons, error } = await supabase
+        .from('team_seasons')
+        .select('id, team_id, division_id, order_index, status, teams(id, name, captain_name, captain_phone, club_id, clubs(id, name))')
+        .eq('season_id', seasonId);
 
-    const teamIds = (teamSeasons || []).map((ts) => ts.team_id);
-    const playerCounts = {};
-    if (teamIds.length > 0) {
-      const { data: teamPlayers } = await supabase
-        .from('team_players')
-        .select('team_id')
-        .eq('season_id', seasonId)
-        .in('team_id', teamIds);
-      for (const tp of teamPlayers || []) {
-        playerCounts[tp.team_id] = (playerCounts[tp.team_id] || 0) + 1;
+      if (error) { alert(error.message); setLoading(false); return; }
+
+      const teamIds = (teamSeasons || []).map((ts) => ts.team_id);
+      const playerCounts = {};
+      if (teamIds.length > 0) {
+        const { data: teamPlayers } = await supabase
+          .from('team_players')
+          .select('team_id')
+          .eq('season_id', seasonId)
+          .in('team_id', teamIds);
+        for (const tp of teamPlayers || []) {
+          playerCounts[tp.team_id] = (playerCounts[tp.team_id] || 0) + 1;
+        }
       }
-    }
 
-    setRows((teamSeasons || []).map((ts) => ({ ...ts, playerCount: playerCounts[ts.team_id] || 0 })));
-    setSelected(new Set());
+      setRows((teamSeasons || []).map((ts) => ({ ...ts, playerCount: playerCounts[ts.team_id] || 0 })));
+      setSelected(new Set());
+    }
 
     // Teams with no team_seasons row in ANY season — e.g. left behind by
     // an old Purge Data that only cleared season-scoped rows. Invisible
@@ -183,7 +191,9 @@ export default function TeamsPage({ seasonId }) {
           </div>
         )}
 
-      {rows.length === 0 ? (
+      {!seasonId ? (
+        <p className="text-gray-500">No season selected — create one under Seasons to see teams placed in one.</p>
+      ) : rows.length === 0 ? (
         <p className="text-gray-500">No teams yet — use Bulk Upload to add some.</p>
       ) : (
         <>
