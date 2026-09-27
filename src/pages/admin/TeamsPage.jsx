@@ -31,8 +31,10 @@ export default function TeamsPage({ seasonId }) {
   const { divisions } = useSeason();
   const { isAdmin } = useAuth();
   const [rows, setRows] = useState([]);
+  const [orphanTeams, setOrphanTeams] = useState([]); // teams in NO season at all — invisible otherwise, e.g. after a purge
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(new Set()); // team_seasons row ids
+
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -59,6 +61,19 @@ export default function TeamsPage({ seasonId }) {
 
     setRows((teamSeasons || []).map((ts) => ({ ...ts, playerCount: playerCounts[ts.team_id] || 0 })));
     setSelected(new Set());
+
+    // Teams with no team_seasons row in ANY season — e.g. left behind by
+    // an old Purge Data that only cleared season-scoped rows. Invisible
+    // in the season-scoped query above no matter which season is
+    // selected, so this is the only way to ever surface (and delete)
+    // them again.
+    const [{ data: allTeams }, { data: allTeamSeasons }] = await Promise.all([
+      supabase.from('teams').select('id, name, captain_name, captain_phone, club_id, clubs(id, name)'),
+      supabase.from('team_seasons').select('team_id'),
+    ]);
+    const teamIdsWithAnySeason = new Set((allTeamSeasons || []).map((r) => r.team_id));
+    setOrphanTeams((allTeams || []).filter((t) => !teamIdsWithAnySeason.has(t.id)));
+
     setLoading(false);
   }, [seasonId]);
 
@@ -142,7 +157,33 @@ export default function TeamsPage({ seasonId }) {
 
       {loading ? (
         <p className="text-gray-500">Loading…</p>
-      ) : rows.length === 0 ? (
+      ) : (
+      <>
+        {orphanTeams.length > 0 && (
+          <div className="mb-6 border-2 border-red-300 rounded p-3 bg-red-50">
+            <h2 className="font-semibold text-red-800 mb-1">Orphaned teams — not in any season ({orphanTeams.length})</h2>
+            <p className="text-xs text-red-700 mb-2">
+              Not part of any season, usually left behind by an old Purge Data — invisible above no matter which
+              season is selected. Their login still works until deleted here.
+            </p>
+            <ul className="divide-y border rounded bg-white">
+              {orphanTeams.map((t) => (
+                <li key={t.id} className="p-2 flex items-center justify-between text-sm">
+                  <span><TeamLink teamId={t.id}>{t.name}</TeamLink> — captain {t.captain_name}</span>
+                  <button
+                    onClick={() => deleteTeams([{ team_id: t.id, teams: t }])}
+                    disabled={deleting}
+                    className="text-red-600 text-xs underline disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+      {rows.length === 0 ? (
         <p className="text-gray-500">No teams yet — use Bulk Upload to add some.</p>
       ) : (
         <>
@@ -229,6 +270,8 @@ export default function TeamsPage({ seasonId }) {
             </tbody>
           </table>
         </>
+      )}
+      </>
       )}
     </div>
   );
