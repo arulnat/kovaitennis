@@ -23,6 +23,8 @@ import PlayerProfilePage from './pages/public/PlayerProfilePage.jsx';
 import RisingStarsPage from './pages/public/RisingStarsPage.jsx';
 import ClubsPage from './pages/public/ClubsPage.jsx';
 import ClubProfilePage from './pages/public/ClubProfilePage.jsx';
+import AboutPage from './pages/AboutPage.jsx';
+import DatabaseAdminPage from './pages/admin/DatabaseAdminPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 export default function App() {
@@ -59,6 +61,8 @@ export default function App() {
             <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
             <Route path="/admin/seasons" element={<RequireRole roles={['tournament_admin', 'super_admin']}><SeasonsPage /></RequireRole>} />
+            <Route path="/about" element={<RequireRole roles={['tournament_admin', 'super_admin']}><AboutPage /></RequireRole>} />
+            <Route path="/admin/database" element={<RequireRole roles={['super_admin']}><DatabaseAdminPage /></RequireRole>} />
           </Routes>
         </BrowserRouter>
       </SeasonProvider>
@@ -131,6 +135,7 @@ function Nav() {
           <Link to="/admin/update-scores" className={navLinkClass}>Update Scores</Link>
           <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
           <Link to="/admin/content" className={navLinkClass}>Content</Link>
+          <Link to="/about" className={navLinkClass}>About</Link>
         </>
       )}
       <SeasonSelector />
