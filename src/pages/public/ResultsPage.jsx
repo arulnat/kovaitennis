@@ -17,10 +17,10 @@ import { supabase } from '../../lib/supabaseClient.js';
 import PageHeader from '../../components/PageHeader.jsx';
 import Dropdown from '../../components/Dropdown.jsx';
 import TeamLink from '../../components/TeamLink.jsx';
+import RubberRow from '../../components/RubberRow.jsx';
 
 const ALL_WEEKS = '__all__';
 const RUBBER_ORDER = ['singles', 'doubles1', 'doubles2'];
-const RUBBER_LABELS = { singles: 'Singles', doubles1: 'Doubles 1', doubles2: 'Doubles 2' };
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
@@ -149,38 +149,6 @@ function ResultCard({ fixture: f }) {
           return <RubberRow key={type} type={type} rubber={r} nameOf={f.nameOf} />;
         })}
       </div>
-    </div>
-  );
-}
-
-function RubberRow({ type, rubber: r, nameOf }) {
-  const homeNames = [r.home_player1_id, r.home_player2_id].filter(Boolean).map((id) => nameOf[id]).filter(Boolean);
-  const awayNames = [r.away_player1_id, r.away_player2_id].filter(Boolean).map((id) => nameOf[id]).filter(Boolean);
-  const sets = [1, 2, 3].map((n) => ({ home: r[`set${n}_home`], away: r[`set${n}_away`] })).filter((s) => s.home != null);
-  const homeWon = r.winner_side === 'home';
-
-  const Side = ({ won, names, side }) => (
-    <div className="flex items-center justify-between gap-3 py-0.5">
-      <span className={`text-sm truncate ${won ? 'font-bold text-teal-900' : 'text-gray-600'}`}>
-        {won && <span className="inline-block w-4 text-teal-700">✓</span>}
-        {names.join(' / ') || '—'}
-      </span>
-      <div className="flex items-center gap-3 shrink-0">
-        {sets.map((s, i) => (
-          <span key={i} className="w-6 text-center text-sm font-semibold">{side === 'home' ? s.home : s.away}</span>
-        ))}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="px-4 py-2 bg-white">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700 mb-1">
-        {RUBBER_LABELS[type]}
-        {r.is_walkover && <span className="text-red-600 ml-2">Walkover</span>}
-      </p>
-      <Side won={homeWon} names={homeNames} side="home" />
-      <Side won={!homeWon} names={awayNames} side="away" />
     </div>
   );
 }

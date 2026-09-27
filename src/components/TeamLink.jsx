@@ -7,10 +7,10 @@
 
 import { Link } from 'react-router-dom';
 
-export default function TeamLink({ teamId, children, className }) {
+export default function TeamLink({ teamId, children, className, onClick }) {
   if (!teamId || !children) return <>{children}</>;
   return (
-    <Link to={`/team/${teamId}`} className={className ?? 'hover:underline hover:text-teal-700'}>
+    <Link to={`/team/${teamId}`} className={className ?? 'hover:underline hover:text-teal-700'} onClick={onClick}>
       {children}
     </Link>
   );

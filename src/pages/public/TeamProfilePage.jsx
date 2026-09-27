@@ -13,13 +13,16 @@
 // components/StatPanel.jsx and Avatar.jsx, shared with other pages for a
 // consistent "nice look and feel" across the whole app.
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings } from '../../lib/standings.js';
 import StatPanel from '../../components/StatPanel.jsx';
 import Avatar from '../../components/Avatar.jsx';
 import PlayerLink from '../../components/PlayerLink.jsx';
+import RubberRow from '../../components/RubberRow.jsx';
+
+const RUBBER_ORDER = ['singles', 'doubles1', 'doubles2'];
 
 const SKILLS = [
   { key: 'serve', label: 'Serve' },
@@ -64,8 +67,10 @@ export default function TeamProfilePage({ seasonId, teamId }) {
   const [ratingsByPlayer, setRatingsByPlayer] = useState({}); // player_id -> summarizeRatings() result
   const [standingRow, setStandingRow] = useState(null); // { rank, totalTeams, ...record } or null
   const [fixtures, setFixtures] = useState([]);
+  const [playerNameOf, setPlayerNameOf] = useState({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('upcoming'); // 'upcoming' | 'completed'
+  const [expandedFixtures, setExpandedFixtures] = useState(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -154,7 +159,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
           id, round_number, week_date, is_bye, home_team_id, away_team_id,
           teams_home:teams!fixtures_home_team_id_fkey(id, name),
           teams_away:teams!fixtures_away_team_id_fkey(id, name),
-          rubbers(winner_side, confirmed_at)
+          rubbers(*)
         `)
         .eq('season_id', seasonId)
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
@@ -162,11 +167,33 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       if (cancelled) return;
       setFixtures(fixtureRows || []);
 
+      const playerIds = new Set();
+      for (const f of fixtureRows || []) {
+        for (const r of f.rubbers ?? []) {
+          for (const pid of [r.home_player1_id, r.home_player2_id, r.away_player1_id, r.away_player2_id]) {
+            if (pid) playerIds.add(pid);
+          }
+        }
+      }
+      const { data: fixturePlayerRows } = playerIds.size > 0
+        ? await supabase.from('players').select('id, name').in('id', [...playerIds])
+        : { data: [] };
+      if (cancelled) return;
+      setPlayerNameOf(Object.fromEntries((fixturePlayerRows || []).map((p) => [p.id, p.name])));
+
       setLoading(false);
     }
     load();
     return () => { cancelled = true; };
   }, [seasonId, teamId]);
+
+  function toggleFixture(fixtureId) {
+    setExpandedFixtures((prev) => {
+      const next = new Set(prev);
+      if (next.has(fixtureId)) next.delete(fixtureId); else next.add(fixtureId);
+      return next;
+    });
+  }
 
   if (team === null) return <p className="p-6 text-gray-500">Loading…</p>;
   if (team === false) {
@@ -333,20 +360,40 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                     const isHome = f.home_team_id === teamId;
                     const opponent = isHome ? f.teams_away : f.teams_home;
                     const outcome = tieOutcomeForTeam(f, isHome);
+                    const isOpen = expandedFixtures.has(f.id);
                     return (
-                      <tr key={f.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="p-2 text-center border-t font-semibold">{f.round_number}</td>
-                        <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
-                        <td className="p-2 border-t">
-                          {isHome ? 'vs ' : '@ '}
-                          <Link to={`/team/${opponent?.id}`} className="font-semibold hover:underline hover:text-teal-700">
-                            {opponent?.name ?? '—'}
-                          </Link>
-                        </td>
-                        <td className={`p-2 text-center border-t font-extrabold ${!outcome ? 'text-gray-400' : outcome.won ? 'text-green-700' : 'text-red-700'}`}>
-                          {outcome?.score ?? '—'}
-                        </td>
-                      </tr>
+                      <Fragment key={f.id}>
+                        <tr
+                          onClick={outcome ? () => toggleFixture(f.id) : undefined}
+                          className={`${outcome ? 'cursor-pointer hover:bg-teal-50' : ''} ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                        >
+                          <td className="p-2 text-center border-t font-semibold">{f.round_number}</td>
+                          <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
+                          <td className="p-2 border-t">
+                            {outcome && <span className="text-gray-400 mr-1 inline-block w-3">{isOpen ? '▾' : '▸'}</span>}
+                            {isHome ? 'vs ' : '@ '}
+                            <Link to={`/team/${opponent?.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold hover:underline hover:text-teal-700">
+                              {opponent?.name ?? '—'}
+                            </Link>
+                          </td>
+                          <td className={`p-2 text-center border-t font-extrabold ${!outcome ? 'text-gray-400' : outcome.won ? 'text-green-700' : 'text-red-700'}`}>
+                            {outcome?.score ?? '—'}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr>
+                            <td colSpan={4} className="p-3 border-t bg-teal-50/40">
+                              <div className="rounded border divide-y overflow-hidden bg-white">
+                                {RUBBER_ORDER.map((type) => {
+                                  const rubber = f.rubbers.find((x) => x.rubber_type === type);
+                                  if (!rubber) return null;
+                                  return <RubberRow key={type} type={type} rubber={rubber} nameOf={playerNameOf} mySide={isHome ? 'home' : 'away'} />;
+                                })}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     );
                   })}
                 </tbody>

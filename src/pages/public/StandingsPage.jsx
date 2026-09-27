@@ -9,18 +9,32 @@
 // bar's division dropdown — that dropdown still exists (other pages
 // still depend on it), and clicking a tab here moves it too, so the two
 // stay in sync instead of becoming a second, disconnected selector.
+//
+// Clicking a team's row expands it in place to that team's completed
+// ties this division/season (score vs opponent, then each rubber's
+// players and set score, via the same RubberRow used on the public
+// Results page) — click again to collapse. Any number of rows can be
+// open at once.
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings, highlightBands } from '../../lib/standings.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import RubberRow from '../../components/RubberRow.jsx';
+
+const RUBBER_ORDER = ['singles', 'doubles1', 'doubles2'];
 
 export default function StandingsPage() {
   const { seasonId, divisions, divisionId, setDivisionId } = useSeason();
   const [rows, setRows] = useState(null);
   const [teamNames, setTeamNames] = useState({});
+  const [matchesByTeam, setMatchesByTeam] = useState({});
+  const [nameOf, setNameOf] = useState({});
+  const [expanded, setExpanded] = useState(new Set());
+
+  useEffect(() => { setExpanded(new Set()); }, [divisionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,40 +57,74 @@ export default function StandingsPage() {
       // is a separate scheduling field that's never actually transitioned to 'complete'
       // anywhere, so filtering on it here silently hid every finished tie.
 
-      const ties = (fixtures || [])
-        .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at))
-        .map((f) => {
-          const homeWins = f.rubbers.filter((r) => r.winner_side === 'home').length;
-          const winner = homeWins >= 2 ? 'home' : 'away';
-          let homeSetsWon = 0, homeSetsLost = 0, homeGamesWon = 0, homeGamesLost = 0;
-          for (const r of f.rubbers) {
-            const sets = [[r.set1_home, r.set1_away], [r.set2_home, r.set2_away], [r.set3_home, r.set3_away]]
-              .filter(([h]) => h != null);
-            for (const [h, a] of sets) {
-              homeGamesWon += h; homeGamesLost += a;
-              if (h > a) homeSetsWon++; else homeSetsLost++;
-            }
+      const completed = (fixtures || [])
+        .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at));
+
+      const ties = completed.map((f) => {
+        const homeWins = f.rubbers.filter((r) => r.winner_side === 'home').length;
+        const winner = homeWins >= 2 ? 'home' : 'away';
+        let homeSetsWon = 0, homeSetsLost = 0, homeGamesWon = 0, homeGamesLost = 0;
+        for (const r of f.rubbers) {
+          const sets = [[r.set1_home, r.set1_away], [r.set2_home, r.set2_away], [r.set3_home, r.set3_away]]
+            .filter(([h]) => h != null);
+          for (const [h, a] of sets) {
+            homeGamesWon += h; homeGamesLost += a;
+            if (h > a) homeSetsWon++; else homeSetsLost++;
           }
-          return {
-            homeTeamId: f.home_team_id, awayTeamId: f.away_team_id, winner,
-            homeRubbersWon: homeWins,
-            homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost,
-          };
-        });
+        }
+        return {
+          homeTeamId: f.home_team_id, awayTeamId: f.away_team_id, winner,
+          homeRubbersWon: homeWins,
+          homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost,
+        };
+      });
+
+      // Each completed tie, from both sides' own point of view, for the
+      // expandable match history.
+      const byTeam = {};
+      for (const f of completed) {
+        const homeWins = f.rubbers.filter((r) => r.winner_side === 'home').length;
+        const awayWins = 3 - homeWins;
+        (byTeam[f.home_team_id] ??= []).push({ fixtureId: f.id, opponentId: f.away_team_id, myWins: homeWins, oppWins: awayWins, rubbers: f.rubbers, mySide: 'home' });
+        (byTeam[f.away_team_id] ??= []).push({ fixtureId: f.id, opponentId: f.home_team_id, myWins: awayWins, oppWins: homeWins, rubbers: f.rubbers, mySide: 'away' });
+      }
+
+      const playerIds = new Set();
+      for (const f of completed) {
+        for (const r of f.rubbers) {
+          for (const pid of [r.home_player1_id, r.home_player2_id, r.away_player1_id, r.away_player2_id]) {
+            if (pid) playerIds.add(pid);
+          }
+        }
+      }
+      const { data: playerRows } = playerIds.size > 0
+        ? await supabase.from('players').select('id, name').in('id', [...playerIds])
+        : { data: [] };
+      if (cancelled) return;
 
       if (!cancelled) {
         const standings = computeTeamStandings(teamIds, ties);
         setRows(highlightBands(standings, teamIds.length));
         setTeamNames(names);
+        setMatchesByTeam(byTeam);
+        setNameOf(Object.fromEntries((playerRows || []).map((p) => [p.id, p.name])));
       }
     }
     load();
     return () => { cancelled = true; };
   }, [seasonId, divisionId]);
 
+  function toggle(teamId) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(teamId)) next.delete(teamId); else next.add(teamId);
+      return next;
+    });
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <PageHeader title="Standings" />
+      <PageHeader title="Standings" subtitle="Click a team to see its completed matches, rubber by rubber." />
 
       {divisions.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-4">
@@ -112,25 +160,61 @@ export default function StandingsPage() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.teamId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-              <td
-                className={`p-2 font-bold border-t ${
-                  r.highlight === 'top' ? 'border-l-4 border-l-accent-500' : r.highlight === 'bottom' ? 'border-l-4 border-l-red-500' : ''
-                }`}
-              >
-                <TeamLink teamId={r.teamId}>{teamNames[r.teamId]}</TeamLink>
-              </td>
-              <td className="p-2 text-center border-t">{r.played}</td>
-              <td className="p-2 text-center border-t">{r.wins}</td>
-              <td className="p-2 text-center border-t">{r.losses}</td>
-              <td className="p-2 text-center border-t font-extrabold">{r.points}</td>
-              <td className="p-2 text-center border-t">{r.setsWon}</td>
-              <td className="p-2 text-center border-t">{r.setsLost}</td>
-              <td className="p-2 text-center border-t">{r.gamesWon}</td>
-              <td className="p-2 text-center border-t">{r.gamesLost}</td>
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const isOpen = expanded.has(r.teamId);
+            const matches = matchesByTeam[r.teamId] ?? [];
+            return (
+              <Fragment key={r.teamId}>
+                <tr
+                  onClick={() => toggle(r.teamId)}
+                  className={`cursor-pointer hover:bg-teal-50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                >
+                  <td
+                    className={`p-2 font-bold border-t ${
+                      r.highlight === 'top' ? 'border-l-4 border-l-accent-500' : r.highlight === 'bottom' ? 'border-l-4 border-l-red-500' : ''
+                    }`}
+                  >
+                    <span className="text-gray-400 mr-1 inline-block w-3">{isOpen ? '▾' : '▸'}</span>
+                    <TeamLink teamId={r.teamId} onClick={(e) => e.stopPropagation()}>{teamNames[r.teamId]}</TeamLink>
+                  </td>
+                  <td className="p-2 text-center border-t">{r.played}</td>
+                  <td className="p-2 text-center border-t">{r.wins}</td>
+                  <td className="p-2 text-center border-t">{r.losses}</td>
+                  <td className="p-2 text-center border-t font-extrabold">{r.points}</td>
+                  <td className="p-2 text-center border-t">{r.setsWon}</td>
+                  <td className="p-2 text-center border-t">{r.setsLost}</td>
+                  <td className="p-2 text-center border-t">{r.gamesWon}</td>
+                  <td className="p-2 text-center border-t">{r.gamesLost}</td>
+                </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={9} className="p-0 border-t bg-teal-50/40">
+                      {matches.length === 0 ? (
+                        <p className="text-gray-500 text-sm p-3">No completed matches yet.</p>
+                      ) : (
+                        <div className="divide-y">
+                          {matches.map((m) => (
+                            <div key={m.fixtureId} className="p-3">
+                              <p className="text-sm font-bold text-teal-900 mb-1">
+                                {m.myWins} – {m.oppWins} vs <TeamLink teamId={m.opponentId} onClick={(e) => e.stopPropagation()}>{teamNames[m.opponentId]}</TeamLink>
+                              </p>
+                              <div className="rounded border divide-y overflow-hidden">
+                                {RUBBER_ORDER.map((type) => {
+                                  const rubber = m.rubbers.find((x) => x.rubber_type === type);
+                                  if (!rubber) return null;
+                                  return <RubberRow key={type} type={type} rubber={rubber} nameOf={nameOf} mySide={m.mySide} />;
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
       )}
