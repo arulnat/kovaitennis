@@ -95,9 +95,16 @@ export function computeTeamStandings(teamIds, ties) {
 
 /**
  * Individual standings (Req 6.6, 6.8): ranked by wins -> sets diff ->
- * games diff, with residual ties sharing rank. Used both for a single
- * group's singles/doubles list (6.6) and the combined cross-group singles
- * leaderboard (6.8) — just pass the right slice of `records` for each.
+ * games diff -> rubbers played, with residual ties sharing rank. Used
+ * both for a single group's singles/doubles list (6.6) and the combined
+ * cross-group singles leaderboard (6.8) — just pass the right slice of
+ * `records` for each.
+ *
+ * The final "played" level means a player with more rubbers played
+ * outranks one with fewer, even if the one with fewer has a better
+ * win/loss record — e.g. 3 played/3 won ranks below 7 played/3 won/4
+ * lost once wins, sets diff and games diff all come out equal, since
+ * the one who played more is considered the more active/tested player.
  *
  * @param {{playerId:string, wins:number, losses:number, setsWon:number,
  *   setsLost:number, gamesWon:number, gamesLost:number}[]} records
@@ -109,17 +116,19 @@ export function computeIndividualStandings(records) {
     ...r,
     setsDiff: r.setsWon - r.setsLost,
     gamesDiff: r.gamesWon - r.gamesLost,
+    played: r.wins + r.losses,
   }));
 
   rows.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.setsDiff !== a.setsDiff) return b.setsDiff - a.setsDiff;
     if (b.gamesDiff !== a.gamesDiff) return b.gamesDiff - a.gamesDiff;
+    if (b.played !== a.played) return b.played - a.played;
     return 0;
   });
 
   assignSharedRanks(rows, (a, b) =>
-    a.wins === b.wins && a.setsDiff === b.setsDiff && a.gamesDiff === b.gamesDiff
+    a.wins === b.wins && a.setsDiff === b.setsDiff && a.gamesDiff === b.gamesDiff && a.played === b.played
   );
 
   return rows;

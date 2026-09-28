@@ -340,6 +340,21 @@ test('individual standings: residual tie after wins/sets/games all equal -> shar
   assert.equal(standings[2].rank, 3); // next distinct rank is 3, not 2 (competition ranking)
 });
 
+test('individual standings: equal wins/sets-diff/games-diff -> more rubbers played ranks higher', () => {
+  // p1: 7 played (3 won, 4 lost); p2: 3 played (3 won, 0 lost) — same wins,
+  // same sets diff, same games diff, but p1 played more, so p1 ranks first
+  // even though p2 is undefeated.
+  const records = [
+    { playerId: 'p1', wins: 3, losses: 4, setsWon: 8, setsLost: 6, gamesWon: 50, gamesLost: 40 },
+    { playerId: 'p2', wins: 3, losses: 0, setsWon: 8, setsLost: 6, gamesWon: 50, gamesLost: 40 },
+  ];
+  const standings = computeIndividualStandings(records);
+  assert.equal(standings[0].playerId, 'p1');
+  assert.equal(standings[0].rank, 1);
+  assert.equal(standings[1].playerId, 'p2');
+  assert.equal(standings[1].rank, 2);
+});
+
 test('highlightBands: top 2 and bottom 2 flagged correctly in a group of 6', () => {
   const rows = [1,2,3,4,5,6].map((rank) => ({ teamId: `T${rank}`, rank }));
   const bands = highlightBands(rows, 6);
