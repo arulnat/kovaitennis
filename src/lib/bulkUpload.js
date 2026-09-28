@@ -120,11 +120,14 @@ export function validateBulkUpload(rows) {
   return { ok: true, teams };
 }
 
-/** A small 2-team example matching the expected one-row-per-team format, for downloadSampleTemplate(). */
+/** A 5-team example matching the expected one-row-per-team format, for downloadSampleTemplate(). */
 export function sampleTemplateRows() {
   return [
     ['Aces', 'Priya Kumar', '9876543210', 'City Sports Club'],
     ['Smashers', 'Anita Menon', '9123456780', ''],
+    ['Warriors', 'Rahul Verma', '9988776655', 'Green Park Club'],
+    ['Titans', 'Sneha Pillai', '9871234560', 'City Sports Club'],
+    ['Strikers', 'Vikram Singh', '9765432109', ''],
   ];
 }
 
