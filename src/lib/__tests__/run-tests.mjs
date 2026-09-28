@@ -18,6 +18,7 @@ import {
 } from '../standings.js';
 import { validateBulkUpload, generateLoginId } from '../bulkUpload.js';
 import { seededShuffle, planAutoGroup } from '../grouping.js';
+import { normalizePhone } from '../phone.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -438,6 +439,29 @@ test('bulk upload: a team name that would generate the reserved "admin"/"superad
   assert.ok(!result.errors.some((e) => e.includes('"Super Admin"')));
 });
 
+test('bulk upload: captain phone is normalized — spaces stripped, leading +91/91 stripped', () => {
+  const rows = [
+    ['Aces', 'Ravi', '+91 98765 43210', 3],
+    ['Sunil', 'Meena', 'Kumar'],
+    ['Smashers', 'Anita', '91 91234 56780', 3], // no "+", same 91-prefix rule applies
+    ['Rahul', 'Sneha', 'Vikram'],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, true);
+  assert.equal(result.teams[0].captainPhone, '9876543210');
+  assert.equal(result.teams[1].captainPhone, '9123456780');
+});
+
+test('bulk upload: captain phone that isn\'t exactly 10 digits after normalization is rejected', () => {
+  const rows = [
+    ['Aces', 'Ravi', '98765', 3], // too short
+    ['Sunil', 'Meena', 'Kumar'],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('captain phone') && e.includes('10-digit')));
+});
+
 test('bulk upload: team with fewer than 4 players including the captain is rejected (Req 1.5)', () => {
   const rows = [
     ['Aces', 'Ravi', '9876543210', 2], // 2 others + captain = 3 total, below the minimum of 4
@@ -485,6 +509,35 @@ test('bulk upload: club name defaults to the team name\'s first word when the cl
 
 test('generateLoginId: team name -> lowercase dash-separated slug', () => {
   assert.equal(generateLoginId('Chennai Tennis Club!'), 'chennai-tennis-club');
+});
+
+console.log('\n== phone.js ==');
+
+test('normalizePhone: plain 10 digits pass through unchanged', () => {
+  assert.deepEqual(normalizePhone('9876543210'), { ok: true, value: '9876543210' });
+});
+
+test('normalizePhone: spaces are stripped from anywhere in the number', () => {
+  assert.deepEqual(normalizePhone('98765 43210'), { ok: true, value: '9876543210' });
+  assert.deepEqual(normalizePhone('9 8 7 6 5 4 3 2 1 0'), { ok: true, value: '9876543210' });
+});
+
+test('normalizePhone: a leading +91 or 91 (with or without a space) is stripped', () => {
+  assert.deepEqual(normalizePhone('+919876543210'), { ok: true, value: '9876543210' });
+  assert.deepEqual(normalizePhone('+91 98765 43210'), { ok: true, value: '9876543210' });
+  assert.deepEqual(normalizePhone('919876543210'), { ok: true, value: '9876543210' });
+  assert.deepEqual(normalizePhone('91 9876543210'), { ok: true, value: '9876543210' });
+});
+
+test('normalizePhone: a 10-digit number that happens to start with 91 is left alone, not mistaken for a country code', () => {
+  assert.deepEqual(normalizePhone('9187654321'), { ok: true, value: '9187654321' });
+});
+
+test('normalizePhone: anything other than exactly 10 digits after stripping is rejected', () => {
+  assert.equal(normalizePhone('98765').ok, false); // too short
+  assert.equal(normalizePhone('+1 9876543210').ok, false); // non-91 country code -> 11 digits after stripping "+"
+  assert.equal(normalizePhone('987-654-3210').ok, false); // dashes aren't stripped, only spaces
+  assert.equal(normalizePhone('').ok, false);
 });
 
 console.log('\n== grouping.js ==');

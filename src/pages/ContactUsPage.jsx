@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient.js';
+import { normalizePhone } from '../lib/phone.js';
 
 export default function ContactUsPage() {
   const [name, setName] = useState('');
@@ -26,11 +27,21 @@ export default function ContactUsPage() {
       return;
     }
 
+    let normalizedPhone = null;
+    if (phone.trim()) {
+      const result = normalizePhone(phone);
+      if (!result.ok) {
+        setError('Contact number must be a 10-digit number (spaces are fine; a leading +91 or 91 is fine).');
+        return;
+      }
+      normalizedPhone = result.value;
+    }
+
     setSubmitting(true);
     const { error: insertErr } = await supabase.from('contact_messages').insert({
       name: name.trim(),
       email: email.trim(),
-      phone: phone.trim() || null,
+      phone: normalizedPhone,
       subject: subject.trim() || null,
       details: details.trim(),
     });

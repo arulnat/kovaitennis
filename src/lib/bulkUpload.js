@@ -21,7 +21,10 @@
 // clubs. The club name can be corrected later on the Teams page. A 2-team
 // file is 4 rows total. Captain and player names are normalized to title
 // case ("raVI KUMAR" -> "Ravi Kumar") regardless of how they were typed —
-// team name and club name are left as-is.
+// team name and club name are left as-is. captain_phone is normalized to
+// a plain 10-digit number (see normalizePhone in phone.js) — spaces are
+// stripped, and a leading +91/91 is stripped, but anything left over that
+// isn't exactly 10 digits is rejected.
 //
 // Uses SheetJS (`xlsx`) to parse the CSV — parsing itself is kept separate
 // from validation (and the `xlsx` import is dynamic, inside parseWorkbook and
@@ -29,8 +32,7 @@
 // plain Node, without requiring the `xlsx` package to be installed.
 
 import { downloadCsv } from './csv.js';
-
-const PHONE_RE = /^[0-9+\-\s()]{7,15}$/;
+import { normalizePhone } from './phone.js';
 
 /** Title-case a name: first letter of each word uppercase, rest lowercase (e.g. "raVI kumAR" -> "Ravi Kumar") — applied to captain/player names so inconsistent typing in the CSV doesn't carry through. */
 function toTitleCase(name) {
@@ -71,7 +73,9 @@ export function validateBulkUpload(rows) {
     const infoLineNo = i + 1;
     const teamName = String(infoRow[0] ?? '').trim();
     const captainName = toTitleCase(String(infoRow[1] ?? '').trim());
-    const captainPhone = String(infoRow[2] ?? '').trim();
+    const captainPhoneRaw = String(infoRow[2] ?? '').trim();
+    const captainPhoneResult = captainPhoneRaw ? normalizePhone(captainPhoneRaw) : null;
+    const captainPhone = captainPhoneResult?.ok ? captainPhoneResult.value : captainPhoneRaw;
     const playerCountRaw = infoRow[3];
     const playerCount = Number(playerCountRaw);
     const explicitClubName = String(infoRow[4] ?? '').trim();
@@ -83,8 +87,8 @@ export function validateBulkUpload(rows) {
 
     if (!teamName) errors.push(`Row ${infoLineNo}: team name is required`);
     if (!captainName) errors.push(`Row ${infoLineNo}: captain name is required`);
-    if (!captainPhone) errors.push(`Row ${infoLineNo}: captain phone is required`);
-    else if (!PHONE_RE.test(captainPhone)) errors.push(`Row ${infoLineNo}: captain phone "${captainPhone}" doesn't look like a valid phone number`);
+    if (!captainPhoneRaw) errors.push(`Row ${infoLineNo}: captain phone is required`);
+    else if (!captainPhoneResult.ok) errors.push(`Row ${infoLineNo}: captain phone "${captainPhoneRaw}" must be a 10-digit number (spaces are fine; a leading +91 or 91 is fine)`);
 
     if (!countIsValid) {
       errors.push(`Row ${infoLineNo}: player count "${playerCountRaw}" must be a positive whole number`);
