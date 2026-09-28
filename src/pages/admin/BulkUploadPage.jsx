@@ -147,11 +147,6 @@ export default function BulkUploadPage({ seasonId }) {
             {importResult.created.length} team(s) created.
             {importResult.failures?.length > 0 && ` ${importResult.failures.length} failed.`}
           </p>
-          <ul className="border rounded divide-y">
-            {importResult.created.map((c) => (
-              <li key={c.loginId} className="p-3 text-sm">{c.teamName}</li>
-            ))}
-          </ul>
           {importResult.failures?.length > 0 && (
             <ul className="mt-2 text-sm text-red-700 list-disc pl-5">
               {importResult.failures.map((f, i) => <li key={i}>{f.team}: {f.error}</li>)}
