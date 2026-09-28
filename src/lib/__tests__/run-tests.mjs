@@ -409,6 +409,19 @@ test('bulk upload: duplicate team name across blocks is caught', () => {
   assert.ok(result.errors.some((e) => e.includes('duplicate team name')));
 });
 
+test('bulk upload: club name defaults to the team name\'s first word when the club column is blank', () => {
+  const rows = [
+    ['Aces Warriors', 'Ravi', '9876543210', 3, ''], // no club given
+    ['Sunil', 'Meena', 'Kumar'],
+    ['Smashers', 'Anita', '9123456780', 4, 'City Sports Club'], // club given explicitly
+    ['Rahul', 'Sneha', 'Vikram', 'Lakshmi'],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, true);
+  assert.equal(result.teams[0].clubName, 'Aces'); // first word of "Aces Warriors", no trailing space
+  assert.equal(result.teams[1].clubName, 'City Sports Club'); // explicit value untouched
+});
+
 test('generateLoginId: team name -> lowercase dash-separated slug', () => {
   assert.equal(generateLoginId('Chennai Tennis Club!'), 'chennai-tennis-club');
 });

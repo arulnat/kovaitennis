@@ -13,11 +13,13 @@
 // where N is the player_count given in Row 1 — OTHER players, not counting
 // the captain. The captain is added to the roster automatically (Req 1.5's
 // 4-player minimum includes the captain), so player_count must be at least
-// 3. club_name (5th column) is optional — leave it blank for a team with no
-// club. It's matched case-insensitively against existing clubs server-side
+// 3. club_name (5th column) is optional — if left blank, it defaults to the
+// team name's first word (e.g. "Aces Warriors" -> "Aces"); either way it's
+// matched case-insensitively against existing clubs server-side
 // (bulk-create-teams Edge Function), creating a new club only if no match
 // exists, so "Aces Club" and "aces club" never end up as two different
-// clubs. A 2-team file is 4 rows total.
+// clubs. The club name can be corrected later on the Teams page. A 2-team
+// file is 4 rows total.
 //
 // Uses SheetJS (`xlsx`) to parse the CSV — parsing itself is kept separate
 // from validation (and the `xlsx` import is dynamic, inside parseWorkbook and
@@ -59,7 +61,11 @@ export function validateBulkUpload(rows) {
     const captainPhone = String(infoRow[2] ?? '').trim();
     const playerCountRaw = infoRow[3];
     const playerCount = Number(playerCountRaw);
-    const clubName = String(infoRow[4] ?? '').trim() || null;
+    const explicitClubName = String(infoRow[4] ?? '').trim();
+    // No club given -> default to the team name's first word (e.g. "Aces
+    // Warriors" -> "Aces"), so every team lands in some club by default;
+    // still editable later on the Teams page (ClubCell/updateClub).
+    const clubName = explicitClubName || (teamName ? teamName.split(/\s+/)[0].trim() : null);
     const countIsValid = Number.isInteger(playerCount) && playerCount > 0;
 
     if (!teamName) errors.push(`Row ${infoLineNo}: team name is required`);
