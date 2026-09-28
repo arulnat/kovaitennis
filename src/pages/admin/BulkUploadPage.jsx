@@ -108,14 +108,28 @@ export default function BulkUploadPage({ seasonId }) {
       {status === 'preview' && (
         <div className="mt-4">
           <p className="font-medium mb-2">{teams.length} team(s) ready to import:</p>
-          <ul className="border rounded divide-y">
-            {teams.map((t) => (
-              <li key={t.teamName} className="p-3 flex justify-between text-sm">
-                <span>{t.teamName} — captain {t.captainName}{t.clubName ? ` (${t.clubName.toUpperCase()})` : ''}</span>
-                <span className="text-gray-500">{t.players.length} players</span>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto rounded shadow">
+            <table className="w-full text-sm border">
+              <thead className="bg-teal-900 text-teal-50">
+                <tr>
+                  <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Team Name</th>
+                  <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Club Name</th>
+                  <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Captain Name</th>
+                  <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Mobile Phone Number</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teams.map((t, i) => (
+                  <tr key={t.teamName} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="p-2 border-t font-semibold">{t.teamName}</td>
+                    <td className="p-2 border-t">{t.clubName ? t.clubName.toUpperCase() : '—'}</td>
+                    <td className="p-2 border-t">{t.captainName}</td>
+                    <td className="p-2 border-t">{t.captainPhone}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <button
             onClick={handleImport}
             className="mt-4 px-4 py-2 rounded bg-teal-700 text-white text-sm font-medium hover:bg-teal-800"
