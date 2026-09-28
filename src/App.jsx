@@ -15,6 +15,7 @@ import UpdateScoresPage from './pages/admin/UpdateScoresPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
 import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
+import RosterPage from './pages/team/RosterPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
 import ResultsPage from './pages/public/ResultsPage.jsx';
 import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
@@ -54,6 +55,9 @@ export default function App() {
 
             {/* Score entry — either captain, or an admin doing it on their behalf (Req 5.2) */}
             <Route path="/score/:fixtureId" element={<RequireRole roles={['team', 'tournament_admin', 'super_admin']}><ScoreEntryRouteWrapper /></RequireRole>} />
+
+            {/* Self-service roster editing — captain only, on their own team */}
+            <Route path="/my-roster" element={<RequireRole roles={['team']}><RosterPage /></RequireRole>} />
 
             {/* Admin */}
             <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
@@ -132,6 +136,9 @@ function Nav() {
       <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
       <Link to="/clubs" className={navLinkClass}>Clubs</Link>
+      {role === 'team' && (
+        <Link to="/my-roster" className={navLinkClass}>My Roster</Link>
+      )}
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <SetupMenu />

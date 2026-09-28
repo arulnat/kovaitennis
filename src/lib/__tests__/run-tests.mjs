@@ -369,68 +369,69 @@ test('highlightBands: top 2 and bottom 2 flagged correctly in a group of 6', () 
 
 console.log('\n== bulkUpload.js ==');
 
-test('bulk upload: captain is added to the roster, so player_count of 3 meets the 4-player minimum (Req 1.5)', () => {
+test('bulk upload: one row per team creates the captain plus 3 default placeholder players (Req 1.5)', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 3],
-    ['Sunil', 'Meena', 'Kumar'], // 3 OTHER players, not counting captain Ravi
+    ['Aces', 'Ravi', '9876543210'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
   assert.equal(result.teams.length, 1);
   assert.equal(result.teams[0].teamName, 'Aces');
-  assert.equal(result.teams[0].players.length, 4); // 3 + captain
-  assert.deepEqual(result.teams[0].players[0], { name: 'Ravi', gender: null }); // captain listed first
-  assert.deepEqual(result.teams[0].players.slice(1).map((p) => p.name), ['Sunil', 'Meena', 'Kumar']);
+  assert.equal(result.teams[0].players.length, 4); // captain + 3 placeholders
+  assert.deepEqual(result.teams[0].players[0], { name: 'Ravi', gender: null }); // captain listed first, real name kept
+  assert.deepEqual(result.teams[0].players.slice(1).map((p) => p.name), ['Player 1', 'Player 2', 'Player 3']);
 });
 
-test('bulk upload: multiple team blocks in one file all parse', () => {
+test('bulk upload: multiple team rows in one file all parse', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 3],
-    ['Sunil', 'Meena', 'Kumar'],
-    ['Smashers', 'Anita', '9123456780', 4],
-    ['Rahul', 'Sneha', 'Vikram', 'Lakshmi'],
+    ['Aces', 'Ravi', '9876543210'],
+    ['Smashers', 'Anita', '9123456780'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
   assert.equal(result.teams.length, 2);
-  assert.equal(result.teams[0].players.length, 4); // 3 + captain Ravi
+  assert.equal(result.teams[0].players.length, 4);
   assert.equal(result.teams[1].teamName, 'Smashers');
-  assert.equal(result.teams[1].players.length, 5); // 4 + captain Anita
+  assert.equal(result.teams[1].players.length, 4);
 });
 
-test('bulk upload: whole file rejected if ANY block has an error (all-or-nothing, Req 2.1)', () => {
+test('bulk upload: a trailing blank line is ignored, not treated as an empty team row', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 3],
-    ['Sunil', 'Meena', 'Kumar'],
-    ['Smashers', 'Anita', 'not-a-phone', 3],
-    ['Rahul', 'Sneha', 'Vikram'],
+    ['Aces', 'Ravi', '9876543210'],
+    ['', '', '', ''],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, true);
+  assert.equal(result.teams.length, 1);
+});
+
+test('bulk upload: whole file rejected if ANY row has an error (all-or-nothing, Req 2.1)', () => {
+  const rows = [
+    ['Aces', 'Ravi', '9876543210'],
+    ['Smashers', 'Anita', 'not-a-phone'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((e) => e.includes('captain phone')));
-  // all-or-nothing: even the valid "Aces" block is not returned
+  // all-or-nothing: even the valid "Aces" row is not returned
   assert.equal(result.teams, undefined);
 });
 
-test('bulk upload: captain and player names are normalized to title case regardless of how they were typed', () => {
+test('bulk upload: captain name is normalized to title case regardless of how it was typed', () => {
   const rows = [
-    ['Aces', 'raVI KUMAR', '9876543210', 3],
-    ['SUNIL', 'meena', 'kUMAR'],
+    ['Aces', 'raVI KUMAR', '9876543210'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
   assert.equal(result.teams[0].captainName, 'Ravi Kumar');
-  assert.deepEqual(result.teams[0].players.map((p) => p.name), ['Ravi Kumar', 'Sunil', 'Meena', 'Kumar']);
+  assert.deepEqual(result.teams[0].players.map((p) => p.name), ['Ravi Kumar', 'Player 1', 'Player 2', 'Player 3']);
 });
 
 test('bulk upload: a team name that would generate the reserved "admin"/"superadmin" login ID is rejected', () => {
   const rows = [
-    ['Admin', 'Ravi', '9876543210', 3],
-    ['Sunil', 'Meena', 'Kumar'],
-    ['Super Admin', 'Anita', '9123456780', 3], // -> "super-admin", NOT reserved (has a dash)
-    ['Rahul', 'Sneha', 'Vikram'],
-    ['SuperAdmin', 'Deepak', '9123456781', 3], // -> "superadmin", reserved
-    ['Farah', 'Gita', 'Hari'],
+    ['Admin', 'Ravi', '9876543210'],
+    ['Super Admin', 'Anita', '9123456780'], // -> "super-admin", NOT reserved (has a dash)
+    ['SuperAdmin', 'Deepak', '9123456781'], // -> "superadmin", reserved
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
@@ -441,10 +442,8 @@ test('bulk upload: a team name that would generate the reserved "admin"/"superad
 
 test('bulk upload: captain phone is normalized — spaces stripped, leading +91/91 stripped', () => {
   const rows = [
-    ['Aces', 'Ravi', '+91 98765 43210', 3],
-    ['Sunil', 'Meena', 'Kumar'],
-    ['Smashers', 'Anita', '91 91234 56780', 3], // no "+", same 91-prefix rule applies
-    ['Rahul', 'Sneha', 'Vikram'],
+    ['Aces', 'Ravi', '+91 98765 43210'],
+    ['Smashers', 'Anita', '91 91234 56780'], // no "+", same 91-prefix rule applies
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
@@ -454,40 +453,17 @@ test('bulk upload: captain phone is normalized — spaces stripped, leading +91/
 
 test('bulk upload: captain phone that isn\'t exactly 10 digits after normalization is rejected', () => {
   const rows = [
-    ['Aces', 'Ravi', '98765', 3], // too short
-    ['Sunil', 'Meena', 'Kumar'],
+    ['Aces', 'Ravi', '98765'], // too short
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((e) => e.includes('captain phone') && e.includes('10-digit')));
 });
 
-test('bulk upload: team with fewer than 4 players including the captain is rejected (Req 1.5)', () => {
+test('bulk upload: duplicate team name across rows is caught', () => {
   const rows = [
-    ['Aces', 'Ravi', '9876543210', 2], // 2 others + captain = 3 total, below the minimum of 4
-    ['Sunil', 'Meena'],
-  ];
-  const result = validateBulkUpload(rows);
-  assert.equal(result.ok, false);
-  assert.ok(result.errors.some((e) => e.includes('minimum is 4')));
-});
-
-test('bulk upload: roster row with fewer names than the declared count is caught', () => {
-  const rows = [
-    ['Aces', 'Ravi', '9876543210', 4],
-    ['Sunil', 'Meena'], // only 2 names, but row 1 says 4
-  ];
-  const result = validateBulkUpload(rows);
-  assert.equal(result.ok, false);
-  assert.ok(result.errors.some((e) => e.includes('expected 4 player name(s)') && e.includes('found 2')));
-});
-
-test('bulk upload: duplicate team name across blocks is caught', () => {
-  const rows = [
-    ['Aces', 'Ravi', '9876543210', 3],
-    ['Sunil', 'Meena', 'Kumar'],
-    ['Aces', 'Deepak', '9123456780', 3],
-    ['Farah', 'Gita', 'Hari'],
+    ['Aces', 'Ravi', '9876543210'],
+    ['Aces', 'Deepak', '9123456780'],
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
@@ -496,10 +472,8 @@ test('bulk upload: duplicate team name across blocks is caught', () => {
 
 test('bulk upload: club name defaults to the team name\'s first word when the club column is blank', () => {
   const rows = [
-    ['Aces Warriors', 'Ravi', '9876543210', 3, ''], // no club given
-    ['Sunil', 'Meena', 'Kumar'],
-    ['Smashers', 'Anita', '9123456780', 4, 'City Sports Club'], // club given explicitly
-    ['Rahul', 'Sneha', 'Vikram', 'Lakshmi'],
+    ['Aces Warriors', 'Ravi', '9876543210', ''], // no club given
+    ['Smashers', 'Anita', '9123456780', 'City Sports Club'], // club given explicitly
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, true);
