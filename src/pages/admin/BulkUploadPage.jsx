@@ -106,7 +106,7 @@ export default function BulkUploadPage({ seasonId }) {
           <ul className="border rounded divide-y">
             {teams.map((t) => (
               <li key={t.teamName} className="p-3 flex justify-between text-sm">
-                <span>{t.teamName} — captain {t.captainName}{t.clubName ? ` (${t.clubName})` : ''}</span>
+                <span>{t.teamName} — captain {t.captainName}{t.clubName ? ` (${t.clubName.toUpperCase()})` : ''}</span>
                 <span className="text-gray-500">{t.players.length} players</span>
               </li>
             ))}

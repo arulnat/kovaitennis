@@ -62,7 +62,7 @@ export default function ClubsPage() {
               to={`/club/${c.id}`}
               className="p-4 rounded-lg bg-white shadow border border-slate-100 hover:border-accent-500 transition-colors text-center font-semibold text-teal-900"
             >
-              {c.name}
+              {c.name.toUpperCase()}
             </Link>
           ))}
         </div>

@@ -305,7 +305,7 @@ function ClubCell({ teamId, initialName, onSave }) {
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder="No club"
-        className="border rounded px-1.5 py-0.5 text-xs w-32"
+        className="border rounded px-1.5 py-0.5 text-xs w-32 uppercase"
       />
       {dirty && (
         <button onClick={save} disabled={saving} className="text-xs text-teal-700 underline shrink-0 disabled:opacity-50">

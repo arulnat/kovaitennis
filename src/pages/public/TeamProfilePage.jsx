@@ -210,7 +210,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
   const statRows = [
     ...(team.clubs?.name ? [{
       label: 'Club',
-      value: <Link to={`/club/${team.clubs.id}`} className="hover:underline">{team.clubs.name}</Link>,
+      value: <Link to={`/club/${team.clubs.id}`} className="hover:underline">{team.clubs.name.toUpperCase()}</Link>,
     }] : []),
     { label: 'Captain', value: team.captain_name || '—' },
     ...(team.captain_phone ? [{ label: 'Phone', value: team.captain_phone }] : []),
