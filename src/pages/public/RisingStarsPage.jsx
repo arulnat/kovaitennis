@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeIndividualStandings } from '../../lib/standings.js';
+import { setsAndGamesFromRow } from '../../lib/scoring.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PlayerLink from '../../components/PlayerLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
@@ -46,13 +47,7 @@ function aggregatePlayerStats(fixtures, kind) {
     for (const r of f.rubbers ?? []) {
       if (!rubberTypes.includes(r.rubber_type) || !r.winner_side || !r.confirmed_at) continue;
 
-      let homeSetsWon = 0, homeSetsLost = 0, homeGamesWon = 0, homeGamesLost = 0;
-      for (const n of [1, 2, 3]) {
-        const h = r[`set${n}_home`], a = r[`set${n}_away`];
-        if (h == null) continue;
-        homeGamesWon += h; homeGamesLost += a;
-        if (h > a) homeSetsWon++; else homeSetsLost++;
-      }
+      const { homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost } = setsAndGamesFromRow(r);
       const homeWon = r.winner_side === 'home';
 
       for (const pid of [r.home_player1_id, r.home_player2_id].filter(Boolean)) {

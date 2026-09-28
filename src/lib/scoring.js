@@ -40,6 +40,30 @@ export function winnerFromSets(rubberType, score) {
   return winOf(set3);
 }
 
+/**
+ * Sets/games a rubber contributes to standings (team and individual/Rising
+ * Stars alike): a super-tiebreak win (set3, the doubles decider) always
+ * counts as exactly one set won/lost, same as any other set, but its raw
+ * breaker points are NOT added to games won/lost — a 10-8 breaker and a
+ * 10-2 breaker both just add "1 set" and nothing to games, keeping games
+ * diff a plain games count. E.g. 6-4, 4-6, 10-8 -> sets 2-1, games 10-10.
+ * Singles never has a set3 in normal play (winnerFromSets: singles is
+ * decided by set1 alone, recorded as e.g. "7-6" when there's a 6-6
+ * breaker), so this only actually changes doubles' set3.
+ * @param {{set1_home,set1_away,set2_home?,set2_away?,set3_home?,set3_away?}} row - flat DB row shape (see scoreToRow/rowToScore)
+ * @returns {{homeSetsWon:number, homeSetsLost:number, homeGamesWon:number, homeGamesLost:number}}
+ */
+export function setsAndGamesFromRow(row) {
+  let homeSetsWon = 0, homeSetsLost = 0, homeGamesWon = 0, homeGamesLost = 0;
+  for (const n of [1, 2, 3]) {
+    const h = row[`set${n}_home`], a = row[`set${n}_away`];
+    if (h == null) continue;
+    if (n < 3) { homeGamesWon += h; homeGamesLost += a; }
+    if (h > a) homeSetsWon++; else homeSetsLost++;
+  }
+  return { homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost };
+}
+
 /** Singles set: single set to 6, standard 7-pt tiebreak at 6-6, recorded as "7-6" (Req 5.3). */
 export function isValidSinglesSet(home, away) {
   return isValidSetScore(home, away);

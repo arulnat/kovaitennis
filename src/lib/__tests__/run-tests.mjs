@@ -11,7 +11,7 @@ import {
 import {
   winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
   isValidSuperTiebreakSet, applyWalkover, selectablePlayers,
-  isValidTimePlayed, defaultWalkoverTime,
+  isValidTimePlayed, defaultWalkoverTime, setsAndGamesFromRow,
 } from '../scoring.js';
 import {
   computeTeamStandings, computeIndividualStandings, highlightBands,
@@ -277,6 +277,25 @@ test('time played: cap at 180 minutes, reject negative/non-integer', () => {
 test('walkover time default: 0 for clean walkover, "leave as-is" (null) otherwise', () => {
   assert.equal(defaultWalkoverTime('not_started'), 0);
   assert.equal(defaultWalkoverTime('mid_set1'), null);
+});
+
+test('setsAndGamesFromRow: doubles super-tiebreak counts as one set but adds nothing to games', () => {
+  // 6-4, 4-6, 10-8 -> sets 2-1, games 10-10 (the breaker's own 10-8 is ignored for games)
+  const row = { set1_home: 6, set1_away: 4, set2_home: 4, set2_away: 6, set3_home: 10, set3_away: 8 };
+  const r = setsAndGamesFromRow(row);
+  assert.equal(r.homeSetsWon, 2);
+  assert.equal(r.homeSetsLost, 1);
+  assert.equal(r.homeGamesWon, 10);
+  assert.equal(r.homeGamesLost, 10);
+});
+
+test('setsAndGamesFromRow: singles decided by a 6-6 breaker is recorded as a plain 7-6 set (no set3 involved)', () => {
+  const row = { set1_home: 7, set1_away: 6, set2_home: null, set2_away: null, set3_home: null, set3_away: null };
+  const r = setsAndGamesFromRow(row);
+  assert.equal(r.homeSetsWon, 1);
+  assert.equal(r.homeSetsLost, 0);
+  assert.equal(r.homeGamesWon, 7);
+  assert.equal(r.homeGamesLost, 6);
 });
 
 console.log('\n== standings.js ==');

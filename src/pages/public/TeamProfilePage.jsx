@@ -17,6 +17,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings } from '../../lib/standings.js';
+import { setsAndGamesFromRow } from '../../lib/scoring.js';
 import StatPanel from '../../components/StatPanel.jsx';
 import Avatar from '../../components/Avatar.jsx';
 import PlayerLink from '../../components/PlayerLink.jsx';
@@ -136,12 +137,9 @@ export default function TeamProfilePage({ seasonId, teamId }) {
             const winner = homeWins >= 2 ? 'home' : 'away';
             let homeSetsWon = 0, homeSetsLost = 0, homeGamesWon = 0, homeGamesLost = 0;
             for (const r of f.rubbers) {
-              const sets = [[r.set1_home, r.set1_away], [r.set2_home, r.set2_away], [r.set3_home, r.set3_away]]
-                .filter(([h]) => h != null);
-              for (const [h, a] of sets) {
-                homeGamesWon += h; homeGamesLost += a;
-                if (h > a) homeSetsWon++; else homeSetsLost++;
-              }
+              const s = setsAndGamesFromRow(r);
+              homeSetsWon += s.homeSetsWon; homeSetsLost += s.homeSetsLost;
+              homeGamesWon += s.homeGamesWon; homeGamesLost += s.homeGamesLost;
             }
             return { homeTeamId: f.home_team_id, awayTeamId: f.away_team_id, winner, homeRubbersWon: homeWins, homeSetsWon, homeSetsLost, homeGamesWon, homeGamesLost };
           });

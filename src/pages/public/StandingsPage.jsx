@@ -20,6 +20,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings, highlightBands } from '../../lib/standings.js';
+import { setsAndGamesFromRow } from '../../lib/scoring.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import RubberRow from '../../components/RubberRow.jsx';
@@ -65,12 +66,9 @@ export default function StandingsPage() {
         const winner = homeWins >= 2 ? 'home' : 'away';
         let homeSetsWon = 0, homeSetsLost = 0, homeGamesWon = 0, homeGamesLost = 0;
         for (const r of f.rubbers) {
-          const sets = [[r.set1_home, r.set1_away], [r.set2_home, r.set2_away], [r.set3_home, r.set3_away]]
-            .filter(([h]) => h != null);
-          for (const [h, a] of sets) {
-            homeGamesWon += h; homeGamesLost += a;
-            if (h > a) homeSetsWon++; else homeSetsLost++;
-          }
+          const s = setsAndGamesFromRow(r);
+          homeSetsWon += s.homeSetsWon; homeSetsLost += s.homeSetsLost;
+          homeGamesWon += s.homeGamesWon; homeGamesLost += s.homeGamesLost;
         }
         return {
           homeTeamId: f.home_team_id, awayTeamId: f.away_team_id, winner,
