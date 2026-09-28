@@ -25,7 +25,10 @@ import ClubsPage from './pages/public/ClubsPage.jsx';
 import ClubProfilePage from './pages/public/ClubProfilePage.jsx';
 import AboutPage from './pages/AboutPage.jsx';
 import DatabaseAdminPage from './pages/admin/DatabaseAdminPage.jsx';
+import MessagesPage from './pages/admin/MessagesPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import ContactUsPage from './pages/ContactUsPage.jsx';
+import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 
 export default function App() {
   return (
@@ -36,6 +39,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/standings" replace />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/contact" element={<ContactUsPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
             {/* Public (Req 10.5 — no login required) */}
             <Route path="/standings" element={<StandingsRouteWrapper />} />
@@ -63,6 +68,7 @@ export default function App() {
             <Route path="/admin/seasons" element={<RequireRole roles={['tournament_admin', 'super_admin']}><SeasonsPage /></RequireRole>} />
             <Route path="/about" element={<RequireRole roles={['tournament_admin', 'super_admin']}><AboutPage /></RequireRole>} />
             <Route path="/admin/database" element={<RequireRole roles={['super_admin']}><DatabaseAdminPage /></RequireRole>} />
+            <Route path="/admin/messages" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MessagesPage /></RequireRole>} />
           </Routes>
         </BrowserRouter>
       </SeasonProvider>
@@ -135,6 +141,7 @@ function Nav() {
           <Link to="/admin/update-scores" className={navLinkClass}>Update Scores</Link>
           <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
           <Link to="/admin/content" className={navLinkClass}>Content</Link>
+          <Link to="/admin/messages" className={navLinkClass}>Messages</Link>
           <Link to="/about" className={navLinkClass}>About</Link>
         </>
       )}

@@ -11,20 +11,24 @@ import { supabase } from '../../lib/supabaseClient.js';
 import { downloadCredentialsSheet } from '../../lib/bulkUpload.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import { extractFunctionErrorMessage } from '../../lib/functionsError.js';
 
 export default function LoginCredentialsPage() {
   const [teams, setTeams] = useState([]);
+  const [resetRequests, setResetRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [backfilling, setBackfilling] = useState(false);
+  const [resettingId, setResettingId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('teams')
-      .select('id, name, login_id, captain_name, team_credentials(default_password)')
-      .order('name');
+    const [{ data, error }, { data: requests }] = await Promise.all([
+      supabase.from('teams').select('id, name, login_id, captain_name, team_credentials(default_password)').order('name'),
+      supabase.from('password_reset_requests').select('*, teams(id, name)').eq('resolved', false).order('created_at', { ascending: false }),
+    ]);
     if (error) { alert(error.message); setLoading(false); return; }
     setTeams(data || []);
+    setResetRequests(requests || []);
     setLoading(false);
   }, []);
 
@@ -38,6 +42,18 @@ export default function LoginCredentialsPage() {
     setBackfilling(false);
     if (error) { alert(error.message); return; }
     alert(`Created ${data.updated.length} login(s).${data.failures.length > 0 ? ` ${data.failures.length} failed.` : ''}`);
+    load();
+  }
+
+  /** Generates a fresh default password for the team and forces a change on next login — how a Forgot Password request actually gets resolved (team accounts have no real email to send a reset link to). */
+  async function resetPassword(teamId, teamName, requestId) {
+    if (!confirm(`Reset "${teamName}"'s password? They'll need the new one to log in and will be forced to change it.`)) return;
+    setResettingId(teamId);
+    const { data, error } = await supabase.functions.invoke('reset-team-password', { body: { teamId } });
+    setResettingId(null);
+    if (error) { alert(await extractFunctionErrorMessage(error)); return; }
+    if (requestId) await supabase.from('password_reset_requests').update({ resolved: true, resolved_at: new Date().toISOString() }).eq('id', requestId);
+    alert(`New password for "${teamName}": ${data.newPassword}\n\nShare this with the team directly — it's also saved here on this page.`);
     load();
   }
 
@@ -77,6 +93,38 @@ export default function LoginCredentialsPage() {
         )}
       </div>
 
+      {resetRequests.length > 0 && (
+        <div className="mb-6 border-2 border-amber-300 rounded p-3 bg-amber-50">
+          <h2 className="font-semibold text-amber-800 mb-2">Forgot Password requests ({resetRequests.length})</h2>
+          <ul className="divide-y border rounded bg-white">
+            {resetRequests.map((r) => (
+              <li key={r.id} className="p-2 flex items-center justify-between text-sm">
+                <span>
+                  <span className="font-mono">{r.login_id}</span>
+                  {r.teams ? <> — <TeamLink teamId={r.teams.id}>{r.teams.name}</TeamLink></> : <span className="text-red-600 ml-1">(no matching team found)</span>}
+                </span>
+                {r.teams ? (
+                  <button
+                    onClick={() => resetPassword(r.teams.id, r.teams.name, r.id)}
+                    disabled={resettingId === r.teams.id}
+                    className="text-amber-700 text-xs underline disabled:opacity-50"
+                  >
+                    {resettingId === r.teams.id ? 'Resetting…' : 'Reset password'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => supabase.from('password_reset_requests').update({ resolved: true }).eq('id', r.id).then(load)}
+                    className="text-gray-500 text-xs underline"
+                  >
+                    Dismiss
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-gray-500">Loading…</p>
       ) : teams.length === 0 ? (
@@ -88,6 +136,7 @@ export default function LoginCredentialsPage() {
               <th className="text-left p-2">Team</th>
               <th className="text-left p-2">Login ID</th>
               <th className="text-left p-2">Password</th>
+              <th className="p-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -97,6 +146,17 @@ export default function LoginCredentialsPage() {
                 <td className="p-2 font-mono">{t.login_id}</td>
                 <td className="p-2 font-mono">
                   {t.team_credentials?.default_password ?? <span className="text-gray-400 italic">no login yet</span>}
+                </td>
+                <td className="p-2 text-right">
+                  {t.team_credentials && (
+                    <button
+                      onClick={() => resetPassword(t.id, t.name, null)}
+                      disabled={resettingId === t.id}
+                      className="text-teal-700 text-xs underline disabled:opacity-50"
+                    >
+                      {resettingId === t.id ? 'Resetting…' : 'Reset'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

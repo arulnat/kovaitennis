@@ -5,13 +5,14 @@
 // the recommended approach). Forces a password change on first login.
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient.js';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase, setRememberMe } from '../lib/supabaseClient.js';
 import { useAuth } from '../lib/auth.jsx';
 
 export default function LoginPage() {
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,6 +22,9 @@ export default function LoginPage() {
   async function handleLogin(e) {
     e.preventDefault();
     setError('');
+    // Decide where the session gets written BEFORE signing in — the
+    // client's storage adapter reads this on every call.
+    setRememberMe(remember);
     // login_id -> synthetic email convention: "<login_id>@teams.internal"
     // for team accounts; admin accounts use their real email directly.
     const email = loginId.includes('@') ? loginId : `${loginId}@teams.internal`;
@@ -72,8 +76,16 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="p-6">
           <input placeholder="Login ID (or admin email)" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
+          <label className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            Remember me
+          </label>
           {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
           <button type="submit" className="w-full py-2.5 rounded bg-teal-700 text-white text-sm font-bold uppercase tracking-wide hover:bg-teal-800 shadow">Sign in</button>
+          <div className="flex items-center justify-between mt-3 text-xs">
+            <Link to="/forgot-password" className="text-teal-700 underline">Forgot your password?</Link>
+            <Link to="/contact" className="text-gray-500 underline">Contact Us</Link>
+          </div>
         </form>
       </div>
     </div>
