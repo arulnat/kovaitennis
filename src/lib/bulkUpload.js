@@ -19,7 +19,9 @@
 // (bulk-create-teams Edge Function), creating a new club only if no match
 // exists, so "Aces Club" and "aces club" never end up as two different
 // clubs. The club name can be corrected later on the Teams page. A 2-team
-// file is 4 rows total.
+// file is 4 rows total. Captain and player names are normalized to title
+// case ("raVI KUMAR" -> "Ravi Kumar") regardless of how they were typed —
+// team name and club name are left as-is.
 //
 // Uses SheetJS (`xlsx`) to parse the CSV — parsing itself is kept separate
 // from validation (and the `xlsx` import is dynamic, inside parseWorkbook and
@@ -29,6 +31,14 @@
 import { downloadCsv } from './csv.js';
 
 const PHONE_RE = /^[0-9+\-\s()]{7,15}$/;
+
+/** Title-case a name: first letter of each word uppercase, rest lowercase (e.g. "raVI kumAR" -> "Ravi Kumar") — applied to captain/player names so inconsistent typing in the CSV doesn't carry through. */
+function toTitleCase(name) {
+  return name
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
 
 /** Login IDs reserved for the tournament admin ("admin") and website admin ("superadmin") logins — never available to a team, even if its name would otherwise generate one of these. */
 export const RESERVED_LOGIN_IDS = ['admin', 'superadmin'];
@@ -60,7 +70,7 @@ export function validateBulkUpload(rows) {
     const infoRow = rows[i] || [];
     const infoLineNo = i + 1;
     const teamName = String(infoRow[0] ?? '').trim();
-    const captainName = String(infoRow[1] ?? '').trim();
+    const captainName = toTitleCase(String(infoRow[1] ?? '').trim());
     const captainPhone = String(infoRow[2] ?? '').trim();
     const playerCountRaw = infoRow[3];
     const playerCount = Number(playerCountRaw);
@@ -103,7 +113,7 @@ export function validateBulkUpload(rows) {
       continue;
     }
 
-    const playerNames = rosterRow.map((v) => String(v ?? '').trim()).filter((v) => v !== '');
+    const playerNames = rosterRow.map((v) => toTitleCase(String(v ?? '').trim())).filter((v) => v !== '');
 
     if (countIsValid && playerNames.length !== playerCount) {
       errors.push(`Row ${rosterLineNo}: expected ${playerCount} player name(s) for team "${teamName || '(unnamed)'}", found ${playerNames.length}`);

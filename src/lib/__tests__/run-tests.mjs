@@ -411,6 +411,17 @@ test('bulk upload: whole file rejected if ANY block has an error (all-or-nothing
   assert.equal(result.teams, undefined);
 });
 
+test('bulk upload: captain and player names are normalized to title case regardless of how they were typed', () => {
+  const rows = [
+    ['Aces', 'raVI KUMAR', '9876543210', 3],
+    ['SUNIL', 'meena', 'kUMAR'],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, true);
+  assert.equal(result.teams[0].captainName, 'Ravi Kumar');
+  assert.deepEqual(result.teams[0].players.map((p) => p.name), ['Ravi Kumar', 'Sunil', 'Meena', 'Kumar']);
+});
+
 test('bulk upload: a team name that would generate the reserved "admin"/"superadmin" login ID is rejected', () => {
   const rows = [
     ['Admin', 'Ravi', '9876543210', 3],
