@@ -30,6 +30,9 @@ import { downloadCsv } from './csv.js';
 
 const PHONE_RE = /^[0-9+\-\s()]{7,15}$/;
 
+/** Login IDs reserved for the tournament admin ("admin") and website admin ("superadmin") logins — never available to a team, even if its name would otherwise generate one of these. */
+export const RESERVED_LOGIN_IDS = ['admin', 'superadmin'];
+
 /** Parse a workbook (ArrayBuffer) into raw rows of cell values (no header row in this format). Requires `xlsx` (npm install xlsx). */
 export async function parseWorkbook(arrayBuffer) {
   const XLSX = await import('xlsx');
@@ -84,6 +87,11 @@ export function validateBulkUpload(rows) {
         errors.push(`Row ${infoLineNo}: duplicate team name "${teamName}"`);
       }
       seenTeamNames.add(teamName);
+
+      const loginId = generateLoginId(teamName);
+      if (RESERVED_LOGIN_IDS.includes(loginId)) {
+        errors.push(`Row ${infoLineNo}: team name "${teamName}" would generate the login ID "${loginId}", which is reserved for admin logins — rename the team`);
+      }
     }
 
     const rosterRowIndex = i + 1;

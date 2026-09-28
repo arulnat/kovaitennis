@@ -1,13 +1,18 @@
 // src/pages/LoginPage.jsx
 //
-// Req 10.2/10.6: login by ID/password (team's login_id is not an email,
-// so we map it to a synthetic email for Supabase Auth — see README for
-// the recommended approach). Forces a password change on first login.
+// Req 10.2/10.6: login by ID/password — no one types an email. login_id
+// isn't a real email, so it's mapped to a synthetic one for Supabase Auth
+// under the hood (see README): "admin"/"superadmin" (reserved, never
+// available to a team — see RESERVED_LOGIN_IDS in bulkUpload.js) map to
+// `@admin.internal`, everything else to `@teams.internal`. Forces a
+// password change on first login.
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase, setRememberMe } from '../lib/supabaseClient.js';
 import { useAuth } from '../lib/auth.jsx';
+
+const ADMIN_LOGIN_IDS = ['admin', 'superadmin'];
 
 export default function LoginPage() {
   const [loginId, setLoginId] = useState('');
@@ -25,9 +30,15 @@ export default function LoginPage() {
     // Decide where the session gets written BEFORE signing in — the
     // client's storage adapter reads this on every call.
     setRememberMe(remember);
-    // login_id -> synthetic email convention: "<login_id>@teams.internal"
-    // for team accounts; admin accounts use their real email directly.
-    const email = loginId.includes('@') ? loginId : `${loginId}@teams.internal`;
+    const normalized = loginId.trim().toLowerCase();
+    // login_id -> synthetic email: "admin"/"superadmin" -> @admin.internal,
+    // every other login_id (a team) -> @teams.internal. A raw email (with
+    // "@") is passed through as-is, in case anyone still has one on file.
+    const email = loginId.includes('@')
+      ? loginId
+      : ADMIN_LOGIN_IDS.includes(normalized)
+        ? `${normalized}@admin.internal`
+        : `${loginId}@teams.internal`;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setError(error.message); return; }
     navigate('/standings');
@@ -74,7 +85,7 @@ export default function LoginPage() {
           <h1 className="text-lg font-extrabold uppercase tracking-wide text-white">Login</h1>
         </div>
         <form onSubmit={handleLogin} className="p-6">
-          <input placeholder="Login ID (or admin email)" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
+          <input placeholder="Login ID" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="border rounded px-3 py-2 text-sm w-full mb-2" />
           <label className="flex items-center gap-2 text-sm text-gray-600 mb-3">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />

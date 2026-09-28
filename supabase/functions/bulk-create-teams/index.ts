@@ -17,6 +17,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
+// "admin"/"superadmin" are the tournament admin and website admin login
+// IDs (see LoginPage.jsx) — never let a team take one, even if the
+// client-side check (bulkUpload.js) was somehow bypassed.
+const RESERVED_LOGIN_IDS = ['admin', 'superadmin'];
+
 // The browser calls this cross-origin (app origin -> *.supabase.co), so it
 // needs its own CORS handling — Supabase's gateway doesn't add this for you.
 const CORS_HEADERS = {
@@ -62,6 +67,9 @@ Deno.serve(async (req) => {
     for (const team of teams) {
       try {
         const loginId = generateLoginId(team.teamName);
+        if (RESERVED_LOGIN_IDS.includes(loginId)) {
+          throw new Error(`Team name "${team.teamName}" would generate the login ID "${loginId}", which is reserved for admin logins`);
+        }
         const defaultPassword = generateDefaultPassword();
         const email = `${loginId}@teams.internal`;
 

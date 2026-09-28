@@ -411,6 +411,22 @@ test('bulk upload: whole file rejected if ANY block has an error (all-or-nothing
   assert.equal(result.teams, undefined);
 });
 
+test('bulk upload: a team name that would generate the reserved "admin"/"superadmin" login ID is rejected', () => {
+  const rows = [
+    ['Admin', 'Ravi', '9876543210', 3],
+    ['Sunil', 'Meena', 'Kumar'],
+    ['Super Admin', 'Anita', '9123456780', 3], // -> "super-admin", NOT reserved (has a dash)
+    ['Rahul', 'Sneha', 'Vikram'],
+    ['SuperAdmin', 'Deepak', '9123456781', 3], // -> "superadmin", reserved
+    ['Farah', 'Gita', 'Hari'],
+  ];
+  const result = validateBulkUpload(rows);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((e) => e.includes('"Admin"') && e.includes('reserved')));
+  assert.ok(result.errors.some((e) => e.includes('"SuperAdmin"') && e.includes('reserved')));
+  assert.ok(!result.errors.some((e) => e.includes('"Super Admin"')));
+});
+
 test('bulk upload: team with fewer than 4 players including the captain is rejected (Req 1.5)', () => {
   const rows = [
     ['Aces', 'Ravi', '9876543210', 2], // 2 others + captain = 3 total, below the minimum of 4

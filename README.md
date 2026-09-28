@@ -51,9 +51,13 @@ a schema rewrite.
    the Supabase CLI (`supabase db push`) or by pasting it into the SQL Editor in the dashboard.
 3. **Copy `.env.example` to `.env`** and fill in your project's URL and anon key (Project
    Settings → API).
-4. **Bootstrap the admin accounts** (Req 10.6): create a Tournament Admin and Super Admin user
-   in Supabase Auth (dashboard → Authentication → Users → Add User), then insert matching rows
-   into `app_users` with the right `role`.
+4. **Bootstrap the admin accounts** (Req 10.6): in Supabase Auth (dashboard → Authentication →
+   Users → Add User), create `admin@admin.internal` (Tournament Admin) and
+   `superadmin@admin.internal` (Super Admin / website admin) — with "Auto Confirm User" checked,
+   same as a team login — then insert matching rows into `app_users` with the right `role`. These
+   are the actual login IDs typed on the Login page: "admin" and "superadmin" (see the note
+   below); they're reserved and a team can never be assigned either one (`RESERVED_LOGIN_IDS` in
+   `bulkUpload.js`).
 5. `npm install`
 6. `npm run dev` — starts the local dev server.
 7. `npm test` — runs the pure-logic test suite (no Supabase connection needed).
@@ -69,11 +73,15 @@ a schema rewrite.
 
 ## A note on login IDs vs. Supabase Auth
 
-Supabase Auth's `signInWithPassword` expects an email. Since team logins use a generated
-`login_id` (Req 2.2), not an email, this scaffold uses the convention
-`<login_id>@teams.internal` as a synthetic email under the hood (see `LoginPage.jsx`). This is a
-reasonable, common pattern — but double-check it against your Supabase project's email
-validation settings, since some configurations reject non-standard domains.
+Supabase Auth's `signInWithPassword` expects an email. Since no login here — team or admin — is
+a real email, this scaffold maps every `login_id` to a synthetic one under the hood (see
+`LoginPage.jsx`): a team's generated `login_id` (Req 2.2) becomes `<login_id>@teams.internal`,
+and the two admin logins, "admin" and "superadmin", become `admin@admin.internal` and
+`superadmin@admin.internal` — a separate domain so a team's login_id can never collide with an
+admin login even in principle (on top of `RESERVED_LOGIN_IDS` blocking the words outright at
+team-creation time). This is a reasonable, common pattern — but double-check it against your
+Supabase project's email validation settings, since some configurations reject non-standard
+domains.
 
 ## What to build next
 
