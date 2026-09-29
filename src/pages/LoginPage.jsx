@@ -39,9 +39,19 @@ export default function LoginPage() {
       : ADMIN_LOGIN_IDS.includes(normalized)
         ? `${normalized}@admin.internal`
         : `${loginId}@teams.internal`;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setError(error.message); return; }
-    navigate('/standings');
+
+    // Check must_change_password directly here, rather than relying on
+    // AuthProvider's own (separately async) profile fetch — that one
+    // races with this function: navigating immediately after sign-in
+    // could reach /standings before mustChangePassword flips to true,
+    // silently skipping the forced reset (Req 2.3). Not navigating at
+    // all when a reset is required lets this same component re-render
+    // into the "Set a new password" view below once that context state
+    // does catch up, right here in the window that actually signed in.
+    const { data: profile } = await supabase.from('app_users').select('must_change_password').eq('id', data.user.id).single();
+    if (!profile?.must_change_password) navigate('/standings');
   }
 
   async function handlePasswordChange(e) {
