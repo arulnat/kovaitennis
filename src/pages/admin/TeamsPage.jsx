@@ -1,14 +1,26 @@
 // src/pages/admin/TeamsPage.jsx
 //
 // Req 3.5.5: lists every team registered for the currently selected
-// season (created via Bulk Upload) — read-only with respect to grouping;
-// assigning/ranking teams within a division now lives entirely on the
-// Grouping page. This page mirrors whatever Grouping currently shows:
-// unassigned teams first, then each division highest-to-lowest
-// (divisions.order_index — see DivisionsPage), and within a division,
-// highest rank to lowest (team_seasons.order_index) — so a change made
-// in Grouping (move a team, reorder it, reorder divisions) is reflected
-// here automatically, since both pages read the same underlying order.
+// season (created via Bulk Upload, or the "+ Add Team" form here) —
+// read-only with respect to GROUPING; assigning/ranking teams within a
+// division still lives entirely on the Grouping page. This page mirrors
+// whatever Grouping currently shows: unassigned teams first, then each
+// division highest-to-lowest (divisions.order_index — see DivisionsPage),
+// and within a division, highest rank to lowest (team_seasons.order_index)
+// — so a change made in Grouping (move a team, reorder it, reorder
+// divisions) is reflected here automatically, since both pages read the
+// same underlying order.
+//
+// Team name, captain name, phone, and club are all editable in place
+// (EditableCell) — Save only appears once a field actually changes.
+// Team/captain name and phone are required (blank never saves); club
+// blank clears it. Renaming the team here does NOT touch its login_id
+// (fixed at creation) or its Auth email, so an existing login keeps
+// working after a rename.
+//
+// "+ Add Team" (AddTeamForm) creates a single team directly, without a
+// CSV — same validation and creation path as Bulk Upload (captain plus 3
+// placeholder players).
 //
 // Delete (single, via the per-row button, or several at once via the
 // checkboxes + "Delete selected") is only offered for a team unassigned
@@ -23,6 +35,8 @@ import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
+import { validateBulkUpload } from '../../lib/bulkUpload.js';
+import { normalizePhone } from '../../lib/phone.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import { extractFunctionErrorMessage } from '../../lib/functionsError.js';
@@ -136,6 +150,31 @@ export default function TeamsPage({ seasonId }) {
     load();
   }
 
+  async function updateTeamField(teamId, field, value) {
+    const { error } = await supabase.from('teams').update({ [field]: value }).eq('id', teamId);
+    if (error) { alert(error.message); return; }
+    load();
+  }
+
+  async function updateTeamName(teamId, name) {
+    if (!name) { alert('Team name is required.'); return; }
+    await updateTeamField(teamId, 'name', name);
+  }
+
+  async function updateCaptainName(teamId, name) {
+    if (!name) { alert('Captain name is required.'); return; }
+    await updateTeamField(teamId, 'captain_name', name);
+  }
+
+  async function updateCaptainPhone(teamId, phone) {
+    const result = normalizePhone(phone);
+    if (!result.ok) {
+      alert('Phone number must be a 10-digit number (spaces are fine; a leading +91 or 91 is fine).');
+      return;
+    }
+    await updateTeamField(teamId, 'captain_phone', result.value);
+  }
+
   async function deleteTeams(targets) {
     if (targets.length === 0) return;
     const names = targets.map((r) => r.teams?.name).join(', ');
@@ -160,8 +199,10 @@ export default function TeamsPage({ seasonId }) {
     <div className="max-w-4xl mx-auto p-6">
       <PageHeader
         title="Teams"
-        subtitle={'Teams registered for the currently selected season (via Bulk Upload). Grouping into divisions and ranking happens on the Grouping page — this list mirrors it: unassigned first, then each division highest to lowest, ranked within it. Only an unassigned team can be deleted.'}
+        subtitle={'Teams registered for the currently selected season (via Bulk Upload, or added directly below). Grouping into divisions and ranking happens on the Grouping page — this list mirrors it: unassigned first, then each division highest to lowest, ranked within it. Only an unassigned team can be deleted.'}
       />
+
+      {seasonId && <AddTeamForm seasonId={seasonId} onCreated={load} />}
 
       {loading ? (
         <p className="text-gray-500">Loading…</p>
@@ -247,11 +288,20 @@ export default function TeamsPage({ seasonId }) {
                           title={r.division_id ? 'Unassign from its division first (Grouping)' : undefined}
                         />
                       </td>
-                      <td className="p-2 font-medium"><TeamLink teamId={r.team_id}>{r.teams?.name}</TeamLink></td>
-                      <td className="p-2">{r.teams?.captain_name}</td>
-                      <td className="p-2">{r.teams?.captain_phone}</td>
+                      <td className="p-2 font-medium">
+                        <div className="flex items-center gap-2">
+                          <EditableCell teamId={r.team_id} initialValue={r.teams?.name ?? ''} onSave={updateTeamName} placeholder="Team name" />
+                          <TeamLink teamId={r.team_id} className="text-xs text-gray-400 underline shrink-0">View</TeamLink>
+                        </div>
+                      </td>
                       <td className="p-2">
-                        <ClubCell teamId={r.team_id} initialName={r.teams?.clubs?.name ?? ''} onSave={updateClub} />
+                        <EditableCell teamId={r.team_id} initialValue={r.teams?.captain_name ?? ''} onSave={updateCaptainName} placeholder="Captain name" />
+                      </td>
+                      <td className="p-2">
+                        <EditableCell teamId={r.team_id} initialValue={r.teams?.captain_phone ?? ''} onSave={updateCaptainPhone} placeholder="Phone" />
+                      </td>
+                      <td className="p-2">
+                        <EditableCell teamId={r.team_id} initialValue={r.teams?.clubs?.name ?? ''} onSave={updateClub} placeholder="No club" className="border rounded px-1.5 py-0.5 text-xs w-32 uppercase" allowBlank />
                       </td>
                       <td className="p-2 text-center">{r.playerCount}</td>
                       {isAdmin && (
@@ -287,15 +337,99 @@ export default function TeamsPage({ seasonId }) {
   );
 }
 
-/** Inline club-name editor for one team row — Save only appears once the text actually changes, so nothing writes on every keystroke. */
-function ClubCell({ teamId, initialName, onSave }) {
-  const [draft, setDraft] = useState(initialName);
+/**
+ * Add a single team directly from this page, without a CSV — reuses the
+ * exact same validation (validateBulkUpload, wrapped around a one-row
+ * "file") and creation path (bulk-create-teams Edge Function) as Bulk
+ * Upload, so a directly-added team gets the same captain + 3 placeholder
+ * players ("Player 1"/"Player 2"/"Player 3") and is just as deletable/
+ * editable afterward.
+ */
+function AddTeamForm({ seasonId, onCreated }) {
+  const [open, setOpen] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [captainName, setCaptainName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [clubName, setClubName] = useState('');
+  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const dirty = draft.trim() !== initialName;
+
+  function reset() {
+    setTeamName(''); setCaptainName(''); setPhone(''); setClubName(''); setError('');
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    setError('');
+    const result = validateBulkUpload([[teamName, captainName, phone, clubName]]);
+    if (!result.ok) { setError(result.errors.join(' ')); return; }
+
+    setSaving(true);
+    const { data, error: invokeErr } = await supabase.functions.invoke('bulk-create-teams', {
+      body: { seasonId, teams: result.teams },
+    });
+    setSaving(false);
+    if (invokeErr) { setError(await extractFunctionErrorMessage(invokeErr)); return; }
+    if (data.failures?.length > 0) { setError(data.failures[0].error); return; }
+
+    reset();
+    setOpen(false);
+    onCreated();
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mb-4 px-3 py-1.5 rounded bg-teal-700 text-white text-sm font-medium hover:bg-teal-800">
+        + Add Team
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="mb-4 p-3 border rounded bg-teal-50 flex flex-wrap items-end gap-2">
+      <div>
+        <label className="block text-xs text-gray-600 mb-0.5">Team name</label>
+        <input value={teamName} onChange={(e) => setTeamName(e.target.value)} className="border rounded px-2 py-1 text-sm w-36" />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-600 mb-0.5">Captain name</label>
+        <input value={captainName} onChange={(e) => setCaptainName(e.target.value)} className="border rounded px-2 py-1 text-sm w-36" />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-600 mb-0.5">Phone</label>
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} className="border rounded px-2 py-1 text-sm w-32" />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-600 mb-0.5">Club (optional)</label>
+        <input value={clubName} onChange={(e) => setClubName(e.target.value)} className="border rounded px-2 py-1 text-sm w-36" />
+      </div>
+      <button type="submit" disabled={saving} className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50">
+        {saving ? 'Adding…' : 'Add'}
+      </button>
+      <button type="button" onClick={() => { reset(); setOpen(false); }} className="px-3 py-1.5 rounded border text-sm text-gray-600 hover:bg-gray-50">
+        Cancel
+      </button>
+      {error && <p className="w-full text-red-600 text-xs mt-1">{error}</p>}
+    </form>
+  );
+}
+
+/**
+ * Generic inline text editor for one team-row field (team name, captain
+ * name, phone, club) — Save only appears once the text actually changes,
+ * so nothing writes on every keystroke. Blank counts as "changed" only
+ * when allowBlank is set (club: blank clears it; team/captain name and
+ * phone are required, so blank is never saveable there).
+ */
+function EditableCell({ teamId, initialValue, onSave, placeholder, className, allowBlank = false }) {
+  const [draft, setDraft] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
+  const trimmed = draft.trim();
+  const dirty = trimmed !== initialValue && (allowBlank || trimmed !== '');
 
   async function save() {
     setSaving(true);
-    await onSave(teamId, draft);
+    await onSave(teamId, trimmed);
     setSaving(false);
   }
 
@@ -304,8 +438,8 @@ function ClubCell({ teamId, initialName, onSave }) {
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder="No club"
-        className="border rounded px-1.5 py-0.5 text-xs w-32 uppercase"
+        placeholder={placeholder}
+        className={className ?? 'border rounded px-1.5 py-0.5 text-xs w-32'}
       />
       {dirty && (
         <button onClick={save} disabled={saving} className="text-xs text-teal-700 underline shrink-0 disabled:opacity-50">
