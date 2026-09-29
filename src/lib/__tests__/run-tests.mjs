@@ -430,14 +430,14 @@ test('bulk upload: captain name is normalized to title case regardless of how it
 test('bulk upload: a team name that would generate the reserved "admin"/"superadmin" login ID is rejected', () => {
   const rows = [
     ['Admin', 'Ravi', '9876543210'],
-    ['Super Admin', 'Anita', '9123456780'], // -> "super-admin", NOT reserved (has a dash)
-    ['SuperAdmin', 'Deepak', '9123456781'], // -> "superadmin", reserved
+    ['Super Admin', 'Anita', '9123456780'], // spaces are dropped -> "superadmin", reserved too
+    ['Administrator', 'Deepak', '9123456781'], // -> "administrator", NOT reserved
   ];
   const result = validateBulkUpload(rows);
   assert.equal(result.ok, false);
   assert.ok(result.errors.some((e) => e.includes('"Admin"') && e.includes('reserved')));
-  assert.ok(result.errors.some((e) => e.includes('"SuperAdmin"') && e.includes('reserved')));
-  assert.ok(!result.errors.some((e) => e.includes('"Super Admin"')));
+  assert.ok(result.errors.some((e) => e.includes('"Super Admin"') && e.includes('reserved')));
+  assert.ok(!result.errors.some((e) => e.includes('"Administrator"')));
 });
 
 test('bulk upload: captain phone is normalized — spaces stripped, leading +91/91 stripped', () => {
@@ -481,8 +481,11 @@ test('bulk upload: club name defaults to the team name\'s first word when the cl
   assert.equal(result.teams[1].clubName, 'City Sports Club'); // explicit value untouched
 });
 
-test('generateLoginId: team name -> lowercase dash-separated slug', () => {
-  assert.equal(generateLoginId('Chennai Tennis Club!'), 'chennai-tennis-club');
+test('generateLoginId: keeps only letters, concatenated with nothing between them, lowercased', () => {
+  assert.equal(generateLoginId('Chennai Tennis Club!'), 'chennaitennisclub');
+  assert.equal(generateLoginId('CMTA-A'), 'cmtaa');
+  assert.equal(generateLoginId('KGR Sky Riders'), 'kgrskyriders');
+  assert.equal(generateLoginId('Team 7 Aces'), 'teamaces'); // digits dropped too, not just spaces/hyphens
 });
 
 console.log('\n== phone.js ==');

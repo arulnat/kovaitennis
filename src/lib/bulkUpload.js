@@ -151,13 +151,15 @@ export async function downloadCredentialsSheet(created) {
   await downloadCsv(rows, 'team-login-credentials.csv');
 }
 
-/** Generate a login ID from a team name (Req 2.2): lowercase, alnum + dashes, deduped by caller if needed. */
+/**
+ * Generate a login ID from a team name (Req 2.2): every letter,
+ * concatenated with nothing between them, lowercased — spaces, hyphens,
+ * digits, and everything else are simply dropped. "CMTA-A" -> "cmtaa",
+ * "KGR Sky Riders" -> "kgrskyriders". Deduped by caller if needed (the
+ * DB's login_id unique constraint is the final backstop).
+ */
 export function generateLoginId(teamName) {
-  return teamName
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return teamName.replace(/[^a-zA-Z]/g, '').toLowerCase();
 }
 
 /** Generate a default password (Req 2.2) — simple, human-typeable, forced to change on first login anyway. */

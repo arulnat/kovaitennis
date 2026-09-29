@@ -6,6 +6,12 @@
 // team_credentials, a table with no public RLS policy at all (unlike
 // `teams`, which is publicly selectable for Req 10.5), so this page is
 // the only place they're ever read back.
+//
+// "Normalize login IDs" (normalize-team-login-ids Edge Function)
+// recomputes every login_id with the current letters-only rule
+// (generateLoginId in bulkUpload.js) and updates the matching Auth
+// email to match — safe to click repeatedly, since an already-correct
+// team is left untouched.
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { downloadCredentialsSheet } from '../../lib/bulkUpload.js';
@@ -18,6 +24,7 @@ export default function LoginCredentialsPage() {
   const [resetRequests, setResetRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [backfilling, setBackfilling] = useState(false);
+  const [normalizing, setNormalizing] = useState(false);
   const [resettingId, setResettingId] = useState(null);
 
   const load = useCallback(async () => {
@@ -42,6 +49,20 @@ export default function LoginCredentialsPage() {
     setBackfilling(false);
     if (error) { alert(error.message); return; }
     alert(`Created ${data.updated.length} login(s).${data.failures.length > 0 ? ` ${data.failures.length} failed.` : ''}`);
+    load();
+  }
+
+  /** Recomputes every team's login ID as letters-only (see generateLoginId), updating the Auth email to match — safe to run repeatedly, a team already correct is left alone. */
+  async function normalizeLoginIds() {
+    if (!confirm("Recompute every team's login ID as letters only (spaces, hyphens, and digits dropped), updating their login email to match? Passwords are unaffected — teams just sign in with the new ID next time.")) return;
+    setNormalizing(true);
+    const { data, error } = await supabase.functions.invoke('normalize-team-login-ids');
+    setNormalizing(false);
+    if (error) { alert(await extractFunctionErrorMessage(error)); return; }
+    let msg = `${data.updated.length} login ID(s) updated.`;
+    if (data.skippedCollisions?.length > 0) msg += `\n${data.skippedCollisions.length} skipped — these teams' names collide on the same login ID, rename one of each pair first: ${data.skippedCollisions.join(', ')}`;
+    if (data.failures?.length > 0) msg += `\n${data.failures.length} failed: ${data.failures.map((f) => `${f.team} (${f.error})`).join('; ')}`;
+    alert(msg);
     load();
   }
 
@@ -91,6 +112,13 @@ export default function LoginCredentialsPage() {
             {backfilling ? 'Generating…' : `Generate missing logins (${missingLogin.length})`}
           </button>
         )}
+        <button
+          onClick={normalizeLoginIds}
+          disabled={normalizing}
+          className="text-sm text-teal-700 underline disabled:opacity-50"
+        >
+          {normalizing ? 'Normalizing…' : 'Normalize login IDs (letters only)'}
+        </button>
       </div>
 
       {resetRequests.length > 0 && (

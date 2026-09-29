@@ -173,7 +173,7 @@ function json(body, status = 200) {
 }
 
 function generateLoginId(teamName) {
-  return teamName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return teamName.replace(/[^a-zA-Z]/g, '').toLowerCase();
 }
 
 function generateDefaultPassword() {
