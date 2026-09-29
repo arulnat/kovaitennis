@@ -107,8 +107,8 @@ export function validateBulkUpload(rows) {
       teams.push({
         teamName, captainName, captainPhone, clubName,
         players: [
-          { name: captainName, gender: null },
-          ...DEFAULT_PLACEHOLDER_PLAYERS.map((name) => ({ name, gender: null })),
+          { name: captainName, gender: null, isCaptain: true },
+          ...DEFAULT_PLACEHOLDER_PLAYERS.map((name) => ({ name, gender: null, isCaptain: false })),
         ],
       });
     }

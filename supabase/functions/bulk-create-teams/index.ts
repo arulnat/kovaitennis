@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
         // 2. Create the players + season roster membership
         const { data: playerRows, error: playersErr } = await admin
           .from('players')
-          .insert(team.players.map((p) => ({ team_id: teamRow.id, name: p.name, gender: p.gender })))
+          .insert(team.players.map((p) => ({ team_id: teamRow.id, name: p.name, gender: p.gender, is_captain: p.isCaptain ?? false })))
           .select();
         if (playersErr) throw playersErr;
 

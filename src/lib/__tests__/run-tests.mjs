@@ -378,7 +378,8 @@ test('bulk upload: one row per team creates the captain plus 3 default placehold
   assert.equal(result.teams.length, 1);
   assert.equal(result.teams[0].teamName, 'Aces');
   assert.equal(result.teams[0].players.length, 4); // captain + 3 placeholders
-  assert.deepEqual(result.teams[0].players[0], { name: 'Ravi', gender: null }); // captain listed first, real name kept
+  assert.deepEqual(result.teams[0].players[0], { name: 'Ravi', gender: null, isCaptain: true }); // captain listed first, real name kept
+  assert.equal(result.teams[0].players[1].isCaptain, false);
   assert.deepEqual(result.teams[0].players.slice(1).map((p) => p.name), ['Player 1', 'Player 2', 'Player 3']);
 });
 
