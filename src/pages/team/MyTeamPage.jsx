@@ -1,24 +1,35 @@
-// src/pages/team/RosterPage.jsx
+// src/pages/team/MyTeamPage.jsx
 //
-// Self-service roster page for a team login. Bulk upload / Add Team
+// "My Team" — a team login's own roster management (formerly "My
+// Roster"), also reused, unchanged, for admin's per-team roster editor
+// (Teams admin page links to /admin/teams/:teamId/roster, which renders
+// this with an explicit teamId + isAdminView). Bulk upload / Add Team
 // create every team with its real captain plus 3 placeholder players —
 // "Player 1"/"Player 2"/"Player 3" — meeting the 4-player minimum (Req
-// 1.5). This is where the captain fills those placeholders in with real
-// people (name, gender, date of birth, coach or not, an optional photo)
-// and manages the roster from there, via the manage-team-roster Edge
-// Function — players/team_players are admin-only tables under RLS, so
-// the team login can't write to them directly (see 0001_init.sql).
+// 1.5). This is where the captain (or an admin) fills those placeholders
+// in with real people (name, gender, date of birth, coach or not, a
+// photo) and manages the roster, via the manage-team-roster Edge
+// Function — players/team_players/team_seasons are admin-only tables
+// under RLS, so a team login can't write to them directly (0001_init.sql).
 //
 // The captain is always shown first, and — along with the first 4
-// players overall (the ones present since the team was created) — can
-// never be deleted from here, only edited; anyone added after that can
-// be deleted. Only one player on the team can be marked coach at a time
+// players overall (the ones present since the team was created) — can't
+// be deleted by the CAPTAIN, only edited; anyone added after that can be
+// deleted. An admin can remove any of those first 4 too (but never the
+// captain themselves, either way — see the Edge Function). Only one
+// player on the team can be marked coach at a time
 // (players_one_coach_per_team, migration 0024) — marking a new one
 // automatically un-marks the previous one, handled server-side.
 //
 // Editing the captain's own row also offers the team's phone number
 // (teams.captain_phone), since that's the one piece of "player" contact
 // info that doesn't actually live on the players table.
+//
+// Submit (migration 0026's team_seasons.roster_submitted) requires every
+// player to have name/gender/date of birth/photo filled in — re-checked
+// server-side, since this flag is what gates the public Teams directory
+// (TeamsDirectoryPage.jsx). Editing continues to work after submitting;
+// nothing here re-locks or un-submits automatically.
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth.jsx';
@@ -45,29 +56,47 @@ function readFileAsDataUrl(file) {
   });
 }
 
-export default function RosterPage() {
-  const { teamId } = useAuth();
+function isPlayerComplete(p) {
+  return !!(p?.name?.trim() && p?.gender && p?.date_of_birth && p?.photo_url);
+}
+
+export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) {
+  const { teamId: ownTeamId } = useAuth();
   const { seasonId } = useSeason();
+  const teamId = teamIdProp ?? ownTeamId;
   const [players, setPlayers] = useState(null); // null = loading
+  const [teamSeason, setTeamSeason] = useState(null); // { roster_submitted, roster_submitted_at } | null
   const [adding, setAdding] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     if (!teamId || !seasonId) { setPlayers([]); return; }
     setPlayers(null);
-    const { data } = await supabase
-      .from('team_players')
-      .select('player_id, players(id, name, gender, date_of_birth, is_coach, is_captain, photo_url, created_at)')
-      .eq('season_id', seasonId)
-      .eq('team_id', teamId);
+    const [{ data }, { data: tsRow }] = await Promise.all([
+      supabase
+        .from('team_players')
+        .select('player_id, players(id, name, gender, date_of_birth, is_coach, is_captain, photo_url, created_at)')
+        .eq('season_id', seasonId)
+        .eq('team_id', teamId),
+      supabase
+        .from('team_seasons')
+        .select('roster_submitted, roster_submitted_at')
+        .eq('season_id', seasonId)
+        .eq('team_id', teamId)
+        .maybeSingle(),
+    ]);
     setPlayers((data || []).map((r) => r.players).filter(Boolean));
+    setTeamSeason(tsRow || null);
   }, [teamId, seasonId]);
 
   useEffect(() => { load(); }, [load]);
 
   async function callRoster(body) {
     setError('');
-    const { error: err } = await supabase.functions.invoke('manage-team-roster', { body });
+    const { error: err } = await supabase.functions.invoke('manage-team-roster', {
+      body: isAdminView ? { ...body, teamId } : body,
+    });
     if (err) { setError(await extractFunctionErrorMessage(err)); return false; }
     await load();
     return true;
@@ -78,11 +107,18 @@ export default function RosterPage() {
     await callRoster({ action: 'delete', playerId: player.id });
   }
 
+  async function submitRoster() {
+    setSubmitting(true);
+    const ok = await callRoster({ action: 'submit', seasonId });
+    setSubmitting(false);
+    if (ok) alert('Roster submitted — it now appears in the public Teams list.');
+  }
+
   if (!seasonId) return <p className="p-6 text-gray-500">No season selected.</p>;
 
-  // Delete-eligibility is decided by CREATION order (matching the Edge
-  // Function's own check exactly) — the first 4 players ever added are
-  // protected, regardless of display order below.
+  // Delete-eligibility (for a non-admin caller) is decided by CREATION
+  // order (matching the Edge Function's own check exactly) — the first 4
+  // players ever added are protected, regardless of display order below.
   const byCreated = players
     ? [...players].sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id.localeCompare(b.id))
     : [];
@@ -96,12 +132,22 @@ export default function RosterPage() {
       })
     : [];
 
+  const allComplete = players !== null && players.length > 0 && players.every(isPlayerComplete);
+
   return (
     <div className="max-w-2xl mx-auto p-6">
       <PageHeader
-        title="My Roster"
-        subtitle="Fill in real details for every placeholder player, and manage your team's roster here."
+        title={isAdminView ? 'Team Roster' : 'My Team'}
+        subtitle={isAdminView
+          ? 'Edit, add, or remove any player on this team\'s roster.'
+          : 'Fill in real details for every placeholder player, and manage your team\'s roster here.'}
       />
+
+      {teamSeason?.roster_submitted && (
+        <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-2 mb-3">
+          ✓ Submitted{teamSeason.roster_submitted_at ? ` on ${new Date(teamSeason.roster_submitted_at).toLocaleDateString()}` : ''} — listed in the public Teams directory. You can keep editing below.
+        </p>
+      )}
 
       {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
 
@@ -115,7 +161,7 @@ export default function RosterPage() {
             <PlayerCard
               key={p.id}
               player={p}
-              deletable={!p.is_captain && !protectedIds.has(p.id)}
+              deletable={!p.is_captain && (isAdminView || !protectedIds.has(p.id))}
               onSave={(fields) => callRoster({ action: 'edit', playerId: p.id, ...fields })}
               onDelete={() => deletePlayer(p)}
             />
@@ -134,12 +180,22 @@ export default function RosterPage() {
           onCancel={() => setAdding(false)}
         />
       ) : (
-        <button
-          onClick={() => setAdding(true)}
-          className="px-4 py-2 rounded bg-teal-700 text-white text-sm font-semibold hover:bg-teal-800"
-        >
-          + Add Player
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setAdding(true)}
+            className="px-4 py-2 rounded bg-teal-700 text-white text-sm font-semibold hover:bg-teal-800"
+          >
+            + Add Player
+          </button>
+          <button
+            onClick={submitRoster}
+            disabled={submitting || !allComplete}
+            title={!allComplete ? 'Every player needs a name, gender, date of birth, and photo first' : undefined}
+            className="px-4 py-2 rounded bg-accent-500 text-teal-950 text-sm font-bold uppercase tracking-wide hover:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Submitting…' : 'Submit'}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -148,8 +204,8 @@ export default function RosterPage() {
 /**
  * One roster entry. Either a normal view/edit card for an existing
  * player, or (isNew) the "Add Player" form — same fields either way, so
- * a captain fills in a placeholder exactly the same way they add a
- * brand new one.
+ * filling in a placeholder works exactly the same as adding a brand new
+ * player.
  */
 function PlayerCard({ player, isNew, deletable, onSave, onDelete, onCancel }) {
   const [editing, setEditing] = useState(!!isNew);
@@ -219,6 +275,7 @@ function PlayerCard({ player, isNew, deletable, onSave, onDelete, onCancel }) {
   }
 
   if (!editing) {
+    const complete = isPlayerComplete(player);
     return (
       <div className="border rounded bg-white shadow p-3">
         <div className="flex items-center justify-between gap-3">
@@ -226,6 +283,7 @@ function PlayerCard({ player, isNew, deletable, onSave, onDelete, onCancel }) {
             <span className="font-semibold">{player.name}</span>
             {player.is_captain && <span className="ml-2 text-xs font-bold uppercase text-teal-700">Captain</span>}
             {player.is_coach && <span className="ml-2 text-xs font-bold uppercase text-accent-600">Coach</span>}
+            {!complete && <span className="ml-2 text-xs font-bold uppercase text-amber-600">Incomplete</span>}
             <div className="text-xs text-gray-500 mt-0.5">
               {genderLabel(player.gender)}
               {' · '}
@@ -289,7 +347,7 @@ function PlayerCard({ player, isNew, deletable, onSave, onDelete, onCancel }) {
           </div>
         </div>
         <div>
-          <label className="block text-xs text-gray-600 mb-0.5">Photo (under 100KB, optional)</label>
+          <label className="block text-xs text-gray-600 mb-0.5">Photo (under 100KB{isNew ? ', optional for now — required to submit' : ''})</label>
           <input type="file" accept="image/*" onChange={handlePhotoChange} className="text-xs w-full" />
           {player?.photo_url && !photoFile && (
             <label className="flex items-center gap-1 text-xs text-gray-600 mt-1">

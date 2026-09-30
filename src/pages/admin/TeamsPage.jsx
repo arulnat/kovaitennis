@@ -22,6 +22,11 @@
 // CSV — same validation and creation path as Bulk Upload (captain plus 3
 // placeholder players).
 //
+// The Roster column's player count links to /admin/teams/:teamId/roster
+// (MyTeamPage.jsx in admin mode) — the same roster editor a captain uses
+// on their own team, letting an admin edit/add/remove any player on any
+// team's roster too.
+//
 // Delete (single, via the per-row button, or several at once via the
 // checkboxes + "Delete selected") is only offered for a team unassigned
 // in this season (matching what's visible right here) — the checkbox
@@ -32,6 +37,7 @@
 // auth account needs the service_role key.
 
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
+import { Link } from 'react-router-dom';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -264,7 +270,7 @@ export default function TeamsPage({ seasonId }) {
                 <th className="text-left p-2">Captain</th>
                 <th className="text-left p-2">Phone</th>
                 <th className="text-left p-2">Club</th>
-                <th className="p-2">Players</th>
+                <th className="p-2">Roster</th>
                 {isAdmin && <th className="text-left p-2">Status</th>}
                 <th className="p-2">Delete</th>
               </tr>
@@ -303,7 +309,11 @@ export default function TeamsPage({ seasonId }) {
                       <td className="p-2">
                         <EditableCell teamId={r.team_id} initialValue={r.teams?.clubs?.name ?? ''} onSave={updateClub} placeholder="No club" className="border rounded px-1.5 py-0.5 text-xs w-32 uppercase" allowBlank />
                       </td>
-                      <td className="p-2 text-center">{r.playerCount}</td>
+                      <td className="p-2 text-center">
+                        <Link to={`/admin/teams/${r.team_id}/roster`} className="text-teal-700 underline">
+                          {r.playerCount}
+                        </Link>
+                      </td>
                       {isAdmin && (
                         <td className="p-2">
                           {r.division_id ? (

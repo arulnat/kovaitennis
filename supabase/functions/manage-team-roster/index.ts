@@ -1,34 +1,50 @@
 // supabase/functions/manage-team-roster/index.ts
 //
-// Self-service roster management for a team captain: add a player (full
-// details required — name, gender, date of birth, coach yes/no, and an
-// optional photo), edit any existing player the same way (including the
-// captain's own row, which can also update the team's captain phone),
-// or delete a player that isn't one of the team's first 4 (the captain
-// plus the minimum roster) or the captain themselves.
+// Roster management for My Team (a team login, own roster only) and for
+// admins (any team, via an explicit teamId — the Teams admin page links
+// to the same UI with a teamId override): add a player (full details
+// required — name, gender, date of birth, coach yes/no, and an optional
+// photo), edit any existing player the same way (including the captain's
+// own row, which can also update the team's captain phone), delete a
+// player, or submit the roster as complete for a season.
 //
-// players/team_players are admin-only tables under RLS (see
+// A team caller's team_id always comes from their own app_users row,
+// never from the request body, so a team can only ever act on its own
+// players. An admin caller must pass teamId explicitly (any admin-owned
+// action without it is rejected) — admins can also remove the first 4
+// players (a team captain can't, see PROTECTED_COUNT below), but even an
+// admin can never delete the captain outright, since teams.captain_name/
+// captain_phone still refer to that identity.
+//
+// players/team_players/team_seasons are admin-only tables under RLS (see
 // 0001_init.sql's players_admin_write / players_admin_update /
-// team_players_admin_all), so this Edge Function — using the
-// service_role key — is the one sanctioned way a team login can touch
-// its own roster. The caller's team_id always comes from their own
-// app_users row, never from the request body, so a team can only ever
-// act on its own players.
+// team_players_admin_all / team_seasons_admin_all), so this Edge
+// Function — using the service_role key — is the one sanctioned way a
+// team login can touch its own roster.
 //
 // "Only one coach per team" is enforced twice: proactively here (setting
-// a new coach clears the previous one first, so a captain never has to
-// manually un-mark someone) and at the DB level via a partial unique
-// index (players_one_coach_per_team, migration 0024) as a backstop.
+// a new coach clears the previous one first, so nobody has to manually
+// un-mark someone) and at the DB level via a partial unique index
+// (players_one_coach_per_team, migration 0024) as a backstop.
 //
 // Photos go straight to the "player-photos" Storage bucket (migration
 // 0025, public) using the service_role key, which bypasses Storage RLS
 // entirely — the client sends the file as a data: URL, capped at 100KB.
 //
+// "submit" (My Team's Submit button, migration 0026's
+// team_seasons.roster_submitted) requires every player currently on the
+// season's roster to have name/gender/date_of_birth/photo_url all set —
+// re-validated here even though the client checks first, since this is
+// what actually gates the public Teams directory.
+//
 // Deploy: supabase functions deploy manage-team-roster
 // Call from the client with:
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, isCoach, photoBase64? } })
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'edit', playerId, name, gender, dateOfBirth, isCoach, photoBase64?, removePhoto?, captainPhone? } })
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'delete', playerId } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, isCoach, photoBase64?, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'edit', playerId, name, gender, dateOfBirth, isCoach, photoBase64?, removePhoto?, captainPhone?, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'delete', playerId, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'submit', seasonId, teamId? } })
+// teamId is only honored for an admin caller; a team login's own
+// app_users.team_id is used regardless of what (if anything) it sends.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -110,12 +126,20 @@ Deno.serve(async (req) => {
       return json({ error: 'Not authenticated' }, 401);
     }
     const { data: profile } = await callerClient.from('app_users').select('role, team_id').eq('id', user.id).single();
-    if (!profile || profile.role !== 'team' || !profile.team_id) {
-      return json({ error: 'Team login required' }, 403);
-    }
-    const teamId = profile.team_id;
 
     const body = await req.json();
+    const isAdminCaller = !!profile && ['tournament_admin', 'super_admin'].includes(profile.role);
+
+    let teamId;
+    if (profile?.role === 'team' && profile.team_id) {
+      teamId = profile.team_id;
+    } else if (isAdminCaller) {
+      if (!body.teamId) return json({ error: 'teamId is required for an admin call' }, 400);
+      teamId = body.teamId;
+    } else {
+      return json({ error: 'Team login or admin role required' }, 403);
+    }
+
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     if (body.action === 'add') {
@@ -216,17 +240,19 @@ Deno.serve(async (req) => {
         return json({ error: "The captain can't be deleted" }, 400);
       }
 
-      const { data: teamPlayers, error: listErr } = await admin
-        .from('players')
-        .select('id')
-        .eq('team_id', teamId)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true });
-      if (listErr) throw listErr;
+      if (!isAdminCaller) {
+        const { data: teamPlayers, error: listErr } = await admin
+          .from('players')
+          .select('id')
+          .eq('team_id', teamId)
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true });
+        if (listErr) throw listErr;
 
-      const index = (teamPlayers ?? []).findIndex((p) => p.id === playerId);
-      if (index >= 0 && index < PROTECTED_COUNT) {
-        return json({ error: `One of the first ${PROTECTED_COUNT} players on the roster can't be deleted` }, 400);
+        const index = (teamPlayers ?? []).findIndex((p) => p.id === playerId);
+        if (index >= 0 && index < PROTECTED_COUNT) {
+          return json({ error: `One of the first ${PROTECTED_COUNT} players on the roster can't be deleted` }, 400);
+        }
       }
 
       const { error: deleteErr } = await admin.from('players').delete().eq('id', playerId);
@@ -236,6 +262,45 @@ Deno.serve(async (req) => {
         }
         throw deleteErr;
       }
+
+      return json({ ok: true });
+    }
+
+    if (body.action === 'submit') {
+      const { seasonId } = body;
+      if (!seasonId) return json({ error: 'seasonId is required' }, 400);
+
+      const { data: teamSeason } = await admin
+        .from('team_seasons')
+        .select('id')
+        .eq('season_id', seasonId)
+        .eq('team_id', teamId)
+        .maybeSingle();
+      if (!teamSeason) return json({ error: 'This team is not registered for this season' }, 404);
+
+      const { data: roster, error: rosterErr } = await admin
+        .from('team_players')
+        .select('players(name, gender, date_of_birth, photo_url)')
+        .eq('season_id', seasonId)
+        .eq('team_id', teamId);
+      if (rosterErr) throw rosterErr;
+
+      const incomplete = (roster ?? [])
+        .map((r) => r.players)
+        .filter((p) => p && (!p.name?.trim() || !p.gender || !p.date_of_birth || !p.photo_url))
+        .map((p) => p.name || '(unnamed)');
+      if (incomplete.length > 0) {
+        return json({ error: `Complete every player's details (name, gender, date of birth, photo) first — missing for: ${incomplete.join(', ')}` }, 400);
+      }
+      if ((roster ?? []).length === 0) {
+        return json({ error: 'The roster is empty' }, 400);
+      }
+
+      const { error: submitErr } = await admin
+        .from('team_seasons')
+        .update({ roster_submitted: true, roster_submitted_at: new Date().toISOString() })
+        .eq('id', teamSeason.id);
+      if (submitErr) throw submitErr;
 
       return json({ ok: true });
     }

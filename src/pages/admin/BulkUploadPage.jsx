@@ -6,7 +6,7 @@
 // team is created with its real captain plus 3 default placeholder
 // players ("Player 1"/"Player 2"/"Player 3"), meeting the 4-player
 // minimum immediately; the captain renames/extends the roster later
-// from their own Roster page after logging in (see RosterPage.jsx and
+// from their own My Team page after logging in (see MyTeamPage.jsx and
 // the manage-team-roster Edge Function).
 //
 // The actual team/player/login creation happens server-side in the
@@ -76,7 +76,7 @@ export default function BulkUploadPage({ seasonId }) {
       <p className="text-sm text-gray-600 mb-4">
         No roster is collected here — each team is created with its captain plus 3 placeholder players,
         "Player 1"/"Player 2"/"Player 3", meeting the 4-player minimum immediately. Once the captain signs in
-        (see Team Logins), they rename those placeholders and add any further players from their own Roster
+        (see Team Logins), they rename those placeholders and add any further players from their own My Team
         page. A club name is matched case-insensitively against clubs already on file, so "City Club" and "city
         club" become the same club rather than two — a new one is only created if nothing matches. Club can
         also be added or corrected later from the Teams page. Gender, photos, ID proof, and date of birth are

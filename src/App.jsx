@@ -15,11 +15,12 @@ import UpdateScoresPage from './pages/admin/UpdateScoresPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
 import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
-import RosterPage from './pages/team/RosterPage.jsx';
+import MyTeamPage from './pages/team/MyTeamPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
 import ResultsPage from './pages/public/ResultsPage.jsx';
 import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
 import TeamProfilePage from './pages/public/TeamProfilePage.jsx';
+import TeamsDirectoryPage from './pages/public/TeamsDirectoryPage.jsx';
 import PlayerProfilePage from './pages/public/PlayerProfilePage.jsx';
 import RisingStarsPage from './pages/public/RisingStarsPage.jsx';
 import ClubsPage from './pages/public/ClubsPage.jsx';
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/fixtures-calendar" element={<FixturesCalendarRouteWrapper />} />
             <Route path="/rising-stars" element={<RisingStarsRouteWrapper />} />
             <Route path="/team/:teamId" element={<TeamProfileRouteWrapper />} />
+            <Route path="/teams" element={<TeamsDirectoryRouteWrapper />} />
             <Route path="/player/:playerId" element={<PlayerProfileRouteWrapper />} />
             <Route path="/clubs" element={<ClubsRouteWrapper />} />
             <Route path="/club/:clubId" element={<ClubProfileRouteWrapper />} />
@@ -56,13 +58,14 @@ export default function App() {
             {/* Score entry — either captain, or an admin doing it on their behalf (Req 5.2) */}
             <Route path="/score/:fixtureId" element={<RequireRole roles={['team', 'tournament_admin', 'super_admin']}><ScoreEntryRouteWrapper /></RequireRole>} />
 
-            {/* Self-service roster editing — captain only, on their own team */}
-            <Route path="/my-roster" element={<RequireRole roles={['team']}><RosterPage /></RequireRole>} />
+            {/* Self-service team roster editing — captain only, on their own team */}
+            <Route path="/my-team" element={<RequireRole roles={['team']}><MyTeamPage /></RequireRole>} />
 
             {/* Admin */}
             <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
             <Route path="/admin/login-credentials" element={<RequireRole roles={['tournament_admin', 'super_admin']}><LoginCredentialsPage /></RequireRole>} />
             <Route path="/admin/teams" element={<RequireRole roles={['tournament_admin', 'super_admin']}><TeamsRouteWrapper /></RequireRole>} />
+            <Route path="/admin/teams/:teamId/roster" element={<RequireRole roles={['tournament_admin', 'super_admin']}><AdminTeamRosterRouteWrapper /></RequireRole>} />
             <Route path="/admin/divisions" element={<RequireRole roles={['tournament_admin', 'super_admin']}><DivisionsPage /></RequireRole>} />
             <Route path="/admin/grouping" element={<RequireRole roles={['tournament_admin', 'super_admin']}><GroupingRouteWrapper /></RequireRole>} />
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
@@ -136,8 +139,9 @@ function Nav() {
       <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
       <Link to="/clubs" className={navLinkClass}>Clubs</Link>
+      <Link to="/teams" className={navLinkClass}>Teams</Link>
       {role === 'team' && (
-        <Link to="/my-roster" className={navLinkClass}>My Roster</Link>
+        <Link to="/my-team" className={navLinkClass}>My Team</Link>
       )}
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
@@ -222,6 +226,18 @@ function PlayerProfileRouteWrapper() {
   const { seasonId } = useSeason();
   const { playerId } = useParams();
   return <PlayerProfilePage seasonId={seasonId} playerId={playerId} />;
+}
+function TeamsDirectoryRouteWrapper() {
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <TeamsDirectoryPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
+}
+function AdminTeamRosterRouteWrapper() {
+  const { teamId } = useParams();
+  return <MyTeamPage teamId={teamId} isAdminView />;
 }
 function ClubsRouteWrapper() {
   return <ClubsPage />;

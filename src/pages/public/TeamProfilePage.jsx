@@ -2,11 +2,14 @@
 //
 // A single team's profile: captain/contact info, current-season division
 // and standing (reusing standings.js exactly as StandingsPage does, then
-// picking this team's own row out of the computed table), season roster,
-// and this season's fixtures split into Completed/Upcoming tabs. Public —
-// no login required, same as Standings/Fixtures Calendar (Req 10.5) —
-// since this is the page every team-name hyperlink across the app (public
-// or logged-in) points to, for any login.
+// picking this team's own row out of the computed table), season roster
+// (each player's real photo when set via My Team, falling back to the
+// initials Avatar otherwise), and this season's fixtures split into
+// Completed/Upcoming tabs. Public — no login required, same as
+// Standings/Fixtures Calendar (Req 10.5) — since this is the page every
+// team-name hyperlink across the app (public or logged-in) points to,
+// for any login, and what the public Teams directory
+// (TeamsDirectoryPage.jsx) links every submitted team to.
 //
 // Bold hero + stat panel + roster grid, in the spirit of league.cdta.co.in's
 // bold, high-contrast team page (not a copy of its layout) — see
@@ -100,7 +103,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
 
       const { data: rosterRows } = await supabase
         .from('team_players')
-        .select('player_id, players(id, name, gender)')
+        .select('player_id, players(id, name, gender, photo_url, is_captain, is_coach)')
         .eq('season_id', seasonId)
         .eq('team_id', teamId);
       if (cancelled) return;
@@ -267,8 +270,14 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                 {roster.map((r) => (
                   <PlayerLink key={r.player_id} playerId={r.player_id} className="block">
                     <div className="flex flex-col items-center text-center gap-1.5 p-2 rounded-lg bg-white shadow border border-slate-100 hover:border-accent-500 transition-colors">
-                      <Avatar name={r.players?.name} />
+                      {r.players?.photo_url ? (
+                        <img src={r.players.photo_url} alt={r.players.name} className="w-12 h-12 rounded-full object-cover shadow" />
+                      ) : (
+                        <Avatar name={r.players?.name} />
+                      )}
                       <span className="text-xs font-semibold text-slate-800 leading-tight">{r.players?.name}</span>
+                      {r.players?.is_captain && <span className="text-[9px] font-bold uppercase text-teal-700">Captain</span>}
+                      {r.players?.is_coach && <span className="text-[9px] font-bold uppercase text-accent-600">Coach</span>}
                       {r.players?.gender && <span className="text-[10px] text-slate-400 uppercase">{r.players.gender}</span>}
                       {ratingsByPlayer[r.player_id] && (
                         <span className="text-[9px] text-slate-500 leading-tight" title={`Average of ${ratingsByPlayer[r.player_id].count} rating(s) this season`}>

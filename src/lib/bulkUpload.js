@@ -16,7 +16,7 @@
 // 1"/"Player 2"/"Player 3", for every team. Once the login exists, the
 // captain signs in and renames those placeholders (and can add more
 // real players) from the Roster page — see manage-team-roster Edge
-// Function and RosterPage.jsx. Gender, photos, ID proof, and date of
+// Function and MyTeamPage.jsx. Gender, photos, ID proof, and date of
 // birth are still not collected anywhere in this flow.
 //
 // Captain name is normalized to title case ("raVI KUMAR" -> "Ravi

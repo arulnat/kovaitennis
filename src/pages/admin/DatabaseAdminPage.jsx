@@ -112,6 +112,8 @@ const TABLE_SCHEMAS = {
     'approved / fee_paid / payment_proof_url: deferred fields',
     'created_at: timestamptz, NOT NULL, default now()',
     "order_index: integer, NOT NULL, default 0 — team's rank within its division",
+    'roster_submitted: boolean, NOT NULL, default false — set via My Team\'s Submit button (manage-team-roster Edge Function); gates the public Teams directory',
+    'roster_submitted_at: timestamptz — when roster_submitted was last set true',
     'UNIQUE (season_id, team_id)',
   ],
   team_players: [
