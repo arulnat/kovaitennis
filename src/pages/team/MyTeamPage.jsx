@@ -28,8 +28,10 @@
 // Submit (migration 0026's team_seasons.roster_submitted) requires every
 // player to have name/gender/date of birth/photo filled in — re-checked
 // server-side, since this flag is what gates the public Teams directory
-// (TeamsDirectoryPage.jsx). Editing continues to work after submitting;
-// nothing here re-locks or un-submits automatically.
+// (TeamsDirectoryPage.jsx). Once submitted, the CAPTAIN can no longer
+// add/edit/delete (Edit/Delete/+Add Player/Submit all disappear here,
+// and the Edge Function rejects it too if somehow called anyway) — only
+// an admin, via isAdminView, can make further changes from that point.
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth.jsx';
@@ -104,7 +106,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
 
   async function deletePlayer(player) {
     if (!confirm(`Remove ${player.name} from the roster? This cannot be undone.`)) return;
-    await callRoster({ action: 'delete', playerId: player.id });
+    await callRoster({ action: 'delete', playerId: player.id, seasonId });
   }
 
   async function submitRoster() {
@@ -133,6 +135,9 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
     : [];
 
   const allComplete = players !== null && players.length > 0 && players.every(isPlayerComplete);
+  // Once the captain has submitted, they can no longer add/edit/delete —
+  // only an admin (isAdminView) can, from here on (enforced server-side too).
+  const locked = !isAdminView && !!teamSeason?.roster_submitted;
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -145,7 +150,8 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
 
       {teamSeason?.roster_submitted && (
         <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-2 mb-3">
-          ✓ Submitted{teamSeason.roster_submitted_at ? ` on ${new Date(teamSeason.roster_submitted_at).toLocaleDateString()}` : ''} — listed in the public Teams directory. You can keep editing below.
+          ✓ Submitted{teamSeason.roster_submitted_at ? ` on ${new Date(teamSeason.roster_submitted_at).toLocaleDateString()}` : ''} — listed in the public Teams directory.
+          {locked && ' The roster is now locked; contact an admin for any further changes.'}
         </p>
       )}
 
@@ -161,15 +167,16 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
             <PlayerCard
               key={p.id}
               player={p}
+              readOnly={locked}
               deletable={!p.is_captain && (isAdminView || !protectedIds.has(p.id))}
-              onSave={(fields) => callRoster({ action: 'edit', playerId: p.id, ...fields })}
+              onSave={(fields) => callRoster({ action: 'edit', playerId: p.id, seasonId, ...fields })}
               onDelete={() => deletePlayer(p)}
             />
           ))}
         </div>
       )}
 
-      {adding ? (
+      {locked ? null : adding ? (
         <PlayerCard
           isNew
           onSave={async (fields) => {
@@ -207,7 +214,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
  * filling in a placeholder works exactly the same as adding a brand new
  * player.
  */
-function PlayerCard({ player, isNew, deletable, onSave, onDelete, onCancel }) {
+function PlayerCard({ player, isNew, deletable, readOnly, onSave, onDelete, onCancel }) {
   const [editing, setEditing] = useState(!!isNew);
   const [showPhoto, setShowPhoto] = useState(false);
   const [name, setName] = useState(player?.name ?? '');
@@ -296,10 +303,12 @@ function PlayerCard({ player, isNew, deletable, onSave, onDelete, onCancel }) {
                 {showPhoto ? 'Hide' : 'View'}
               </button>
             )}
-            <button onClick={() => { resetToPlayer(); setEditing(true); }} className="text-teal-700 underline text-xs">
-              Edit
-            </button>
-            {deletable && (
+            {!readOnly && (
+              <button onClick={() => { resetToPlayer(); setEditing(true); }} className="text-teal-700 underline text-xs">
+                Edit
+              </button>
+            )}
+            {!readOnly && deletable && (
               <button onClick={onDelete} className="text-red-600 underline text-xs">
                 Delete
               </button>

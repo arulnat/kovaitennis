@@ -37,11 +37,16 @@
 // re-validated here even though the client checks first, since this is
 // what actually gates the public Teams directory.
 //
+// Once a season's roster_submitted is true, the CAPTAIN can no longer
+// add/edit/delete (rosterIsSubmitted below) — only an admin can, from
+// then on. add/edit/delete all take a seasonId for exactly this check
+// (edit/delete don't otherwise need one).
+//
 // Deploy: supabase functions deploy manage-team-roster
 // Call from the client with:
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, isCoach, photoBase64?, teamId? } })
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'edit', playerId, name, gender, dateOfBirth, isCoach, photoBase64?, removePhoto?, captainPhone?, teamId? } })
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'delete', playerId, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'edit', playerId, seasonId, name, gender, dateOfBirth, isCoach, photoBase64?, removePhoto?, captainPhone?, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'delete', playerId, seasonId, teamId? } })
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'submit', seasonId, teamId? } })
 // teamId is only honored for an admin caller; a team login's own
 // app_users.team_id is used regardless of what (if anything) it sends.
@@ -111,6 +116,13 @@ async function ensureSingleCoach(admin, teamId, isCoach, excludeId) {
   if (error) throw error;
 }
 
+/** Once a team has submitted its roster for a season, the CAPTAIN can no longer add/edit/delete — only an admin can, from here on (isAdminCaller bypasses this entirely). */
+async function rosterIsSubmitted(admin, teamId, seasonId) {
+  if (!seasonId) return false;
+  const { data } = await admin.from('team_seasons').select('roster_submitted').eq('team_id', teamId).eq('season_id', seasonId).maybeSingle();
+  return !!data?.roster_submitted;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -146,6 +158,9 @@ Deno.serve(async (req) => {
       const fields = validatePlayerFields(body);
       const { seasonId } = body;
       if (!seasonId) return json({ error: 'seasonId is required' }, 400);
+      if (!isAdminCaller && await rosterIsSubmitted(admin, teamId, seasonId)) {
+        return json({ error: 'Roster already submitted — ask an admin to make further changes' }, 403);
+      }
 
       const { data: teamSeason } = await admin
         .from('team_seasons')
@@ -185,8 +200,11 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === 'edit') {
-      const { playerId } = body;
+      const { playerId, seasonId } = body;
       if (!playerId) return json({ error: 'playerId is required' }, 400);
+      if (!isAdminCaller && await rosterIsSubmitted(admin, teamId, seasonId)) {
+        return json({ error: 'Roster already submitted — ask an admin to make further changes' }, 403);
+      }
 
       const { data: player } = await admin.from('players').select('id, team_id, is_captain').eq('id', playerId).maybeSingle();
       if (!player || player.team_id !== teamId) {
@@ -229,8 +247,11 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === 'delete') {
-      const { playerId } = body;
+      const { playerId, seasonId } = body;
       if (!playerId) return json({ error: 'playerId is required' }, 400);
+      if (!isAdminCaller && await rosterIsSubmitted(admin, teamId, seasonId)) {
+        return json({ error: 'Roster already submitted — ask an admin to make further changes' }, 403);
+      }
 
       const { data: player } = await admin.from('players').select('id, team_id, is_captain').eq('id', playerId).maybeSingle();
       if (!player || player.team_id !== teamId) {
