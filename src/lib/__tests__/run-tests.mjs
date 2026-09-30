@@ -10,7 +10,7 @@ import {
 } from '../scheduler.js';
 import {
   winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
-  isValidSuperTiebreakSet, applyWalkover, selectablePlayers,
+  isValidSuperTiebreakSet, isValidStandardTiebreakSet, applyWalkover, selectablePlayers,
   isValidTimePlayed, defaultWalkoverTime, setsAndGamesFromRow,
 } from '../scoring.js';
 import {
@@ -205,12 +205,22 @@ test('singles set validation accepts 6-4, 7-5, 7-6; rejects 8-6, 6-5', () => {
   assert.equal(isValidSinglesSet(6, 5), false);
 });
 
-test('super-tiebreak validation: 10-8 valid, 10-9 invalid (must win by 2 past 10), 12-10 valid', () => {
+test('super-tiebreak validation (doubles set3): 10-8 valid, 10-9 invalid (must win by 2 past 10), 12-10 valid', () => {
   assert.equal(isValidSuperTiebreakSet(10, 8), true);
   assert.equal(isValidSuperTiebreakSet(10, 9), false);
   assert.equal(isValidSuperTiebreakSet(11, 9), true);
   assert.equal(isValidSuperTiebreakSet(12, 10), true);
   assert.equal(isValidSuperTiebreakSet(12, 9), false);
+});
+
+test('standard tiebreak validation (singles 6-6 breaker): 7-3 and 7-5 valid, 7-6 invalid (must win by 2), 9-7 valid', () => {
+  assert.equal(isValidStandardTiebreakSet(7, 3), true); // a low-scoring breaker, rejected under the old (wrong) 10-point rule
+  assert.equal(isValidStandardTiebreakSet(7, 5), true);
+  assert.equal(isValidStandardTiebreakSet(7, 6), false); // not a 2-point margin, breaker would continue
+  assert.equal(isValidStandardTiebreakSet(8, 6), true);
+  assert.equal(isValidStandardTiebreakSet(9, 7), true);
+  assert.equal(isValidStandardTiebreakSet(9, 8), false);
+  assert.equal(isValidStandardTiebreakSet(6, 4), false); // below 7, breaker isn't over yet
 });
 
 test('winnerFromSets: singles is decided by set1 alone', () => {

@@ -75,8 +75,9 @@ export function isValidDoublesRegularSet(home, away) {
 }
 
 /**
- * A doubles super-tiebreak "set" (Req 5.4, and singles' 6-6 breaker under
- * 5.3): minimum winning score 10, must win by 2 beyond 10-10.
+ * A doubles super-tiebreak "set" (Req 5.4, the deciding "3rd set" when a
+ * doubles rubber is 1-1): minimum winning score 10, must win by 2
+ * beyond 10-10. NOT used for singles — see isValidStandardTiebreakSet.
  */
 export function isValidSuperTiebreakSet(home, away) {
   if (home < 0 || away < 0) return false;
@@ -85,6 +86,21 @@ export function isValidSuperTiebreakSet(home, away) {
   if (max < 10) return false;
   if (max === 10) return min <= 8;
   return max - min === 2; // past 10, must win by exactly 2 (11-9, 12-10, ...)
+}
+
+/**
+ * Singles' 6-6 breaker (Req 5.3): a standard tennis tiebreak, race to 7
+ * points, win by 2 — NOT the doubles 10-point super-tiebreak. Valid:
+ * 7-0..7-5, then 8-6, 9-7, 10-8, 11-9, ... (points, not the set score,
+ * which is always recorded as a plain "7-6").
+ */
+export function isValidStandardTiebreakSet(home, away) {
+  if (home < 0 || away < 0) return false;
+  const max = Math.max(home, away);
+  const min = Math.min(home, away);
+  if (max < 7) return false;
+  if (max === 7) return min <= 5;
+  return max - min === 2; // past 7, must win by exactly 2 (8-6, 9-7, ...)
 }
 
 function isValidSetScore(home, away) {

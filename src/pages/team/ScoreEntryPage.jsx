@@ -39,7 +39,7 @@ import PageHeader from '../../components/PageHeader.jsx';
 import Dropdown from '../../components/Dropdown.jsx';
 import {
   RUBBER_TYPES, winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
-  isValidSuperTiebreakSet, applyWalkover, selectablePlayers, isValidTimePlayed,
+  isValidSuperTiebreakSet, isValidStandardTiebreakSet, applyWalkover, selectablePlayers, isValidTimePlayed,
   defaultWalkoverTime, scoreToRow, rowToScore,
 } from '../../lib/scoring.js';
 
@@ -597,8 +597,8 @@ function RubberEditor({
     // an error. Only a genuine 7-6/6-7 finish requires and validates it.
     if (showTiebreakColumn && isTiebreakSet) {
       const tbHome = Number(tiebreak.home), tbAway = Number(tiebreak.away);
-      if (tiebreak.home === '' || tiebreak.away === '' || !isValidSuperTiebreakSet(tbHome, tbAway)) {
-        alert('Set 1 went to 7-6 — enter a valid tiebreak point score (min 10, win by 2 past 10-10).'); return;
+      if (tiebreak.home === '' || tiebreak.away === '' || !isValidStandardTiebreakSet(tbHome, tbAway)) {
+        alert('Set 1 went to 7-6 — enter a valid tiebreak point score (min 7, win by 2 past 6-6).'); return;
       }
       score.set1.tiebreakHome = tbHome;
       score.set1.tiebreakAway = tbAway;
