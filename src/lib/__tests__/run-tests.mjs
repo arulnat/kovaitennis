@@ -337,7 +337,51 @@ test('team standings: clear winner ranks above a tied pair correctly, tied pair 
   const standings = computeTeamStandings(teams, ties);
   assert.equal(standings[0].teamId, 'A');
   assert.equal(standings[0].rank, 1);
-  // B and C both have 1 win, 1 loss, identical sets/games diff by construction below
+  // A sweeps both ties (6 pts) and B/C end up on different points (2 vs 1)
+  // here, so no tiebreak is even needed between them in this fixture.
+});
+
+test('team standings tiebreak (Step 2): 3+ tied on points -> mini-league among just them decides, then Step 3 head-to-head breaks a remaining pair', () => {
+  // X, Y, Z all finish on 5 points; W is untied at 3. The mini-league
+  // (only the X-Y, X-Z, Y-Z matches) gives X=5, Y=2, Z=2 — X is clear,
+  // but Y and Z are left level in the mini-league, so their own direct
+  // head-to-head (Y beat Z) breaks that remaining pair per Step 3.
+  const teams = ['X', 'Y', 'Z', 'W'];
+  const ties = [
+    { homeTeamId: 'X', awayTeamId: 'Y', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+    { homeTeamId: 'X', awayTeamId: 'Z', winner: 'home', homeRubbersWon: 2, homeSetsWon: 2, homeSetsLost: 1, homeGamesWon: 12, homeGamesLost: 10 },
+    { homeTeamId: 'Y', awayTeamId: 'Z', winner: 'home', homeRubbersWon: 2, homeSetsWon: 2, homeSetsLost: 1, homeGamesWon: 12, homeGamesLost: 10 },
+    { homeTeamId: 'W', awayTeamId: 'X', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+    { homeTeamId: 'Y', awayTeamId: 'W', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+    { homeTeamId: 'Z', awayTeamId: 'W', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+  ];
+  const standings = computeTeamStandings(teams, ties);
+  const rankOf = (id) => standings.find((r) => r.teamId === id).rank;
+  assert.equal(rankOf('X'), 1);
+  assert.equal(rankOf('Y'), 2); // beat Z head-to-head
+  assert.equal(rankOf('Z'), 3);
+  assert.equal(rankOf('W'), 4); // never tied with X/Y/Z on points at all
+});
+
+test('team standings tiebreak (Step 4): mini-league ties exactly -> games diff separates what it can, residual pair shares rank (draw/lot)', () => {
+  // Same 3-team cyclic sweep as the "all equal" test above, but with
+  // different game margins this time: the mini-league (identical to the
+  // whole 3-team league here) still can't separate anyone, and sets diff
+  // is symmetric too (every tie a clean 2-0 sweep) - but games diff
+  // separates A from the rest, while B and C remain genuinely tied even
+  // on games diff, so they share rank 2 (an actual draw/lot would decide
+  // the real order between just the two of them).
+  const teams = ['A', 'B', 'C'];
+  const ties = [
+    { homeTeamId: 'A', awayTeamId: 'B', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 4 },
+    { homeTeamId: 'B', awayTeamId: 'C', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 6 },
+    { homeTeamId: 'C', awayTeamId: 'A', winner: 'home', homeRubbersWon: 3, homeSetsWon: 2, homeSetsLost: 0, homeGamesWon: 12, homeGamesLost: 8 },
+  ];
+  const standings = computeTeamStandings(teams, ties);
+  assert.equal(standings[0].teamId, 'A');
+  assert.equal(standings[0].rank, 1);
+  assert.equal(standings[1].rank, 2);
+  assert.equal(standings[2].rank, 2); // B and C: still tied even after games diff -> shared rank
 });
 
 test('individual standings: residual tie after wins/sets/games all equal -> shared rank (Req 6.6)', () => {
