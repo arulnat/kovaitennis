@@ -14,6 +14,7 @@ import MissingScoresReportPage from './pages/admin/MissingScoresReportPage.jsx';
 import UpdateScoresPage from './pages/admin/UpdateScoresPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
 import SeasonsPage from './pages/admin/SeasonsPage.jsx';
+import FinalResultsAdminPage from './pages/admin/FinalResultsAdminPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
 import MyTeamPage from './pages/team/MyTeamPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
             <Route path="/admin/update-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><UpdateScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
+            <Route path="/admin/final-results" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FinalResultsAdminPage /></RequireRole>} />
             <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
             <Route path="/admin/seasons" element={<RequireRole roles={['tournament_admin', 'super_admin']}><SeasonsPage /></RequireRole>} />
             <Route path="/about" element={<RequireRole roles={['tournament_admin', 'super_admin']}><AboutPage /></RequireRole>} />
@@ -151,6 +153,7 @@ function Nav() {
           <Link to="/admin/fixtures" className={navLinkClass}>Fixtures</Link>
           <Link to="/admin/update-scores" className={navLinkClass}>Update Scores</Link>
           <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
+          <Link to="/admin/final-results" className={navLinkClass}>Final Results</Link>
           <Link to="/admin/content" className={navLinkClass}>Content</Link>
           <Link to="/admin/messages" className={navLinkClass}>Messages</Link>
           <Link to="/about" className={navLinkClass}>About</Link>
@@ -195,10 +198,13 @@ function StandingsRouteWrapper() {
   );
 }
 function ResultsRouteWrapper() {
+  // NeedsSeason only, not NeedsDivision — ResultsPage's own Final
+  // Results tab is season-wide (no division), so it must still be
+  // reachable with no division selected/created.
   return (
-    <NeedsDivision>
+    <NeedsSeason>
       <ResultsPage />
-    </NeedsDivision>
+    </NeedsSeason>
   );
 }
 function FixturesCalendarRouteWrapper() {

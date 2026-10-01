@@ -12,6 +12,12 @@
 // player's doubles1 and doubles2 rubbers are combined into one figure,
 // not shown separately, since the toggle here is singles vs. doubles as
 // a whole, not per doubles slot.
+//
+// On the combined "every division" view only, the top QUALIFY_COUNT
+// players (4 singles / 8 doubles) are highlighted — they're the ones
+// who qualify for the final week's single-set knockout (semifinals +
+// final), set up from the Final Results admin page and shown on the
+// public Results page's Final Results tab once posted.
 
 import { useEffect, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
@@ -26,8 +32,11 @@ import Dropdown from '../../components/Dropdown.jsx';
 const ALL_DIVISIONS = '__all__';
 const ALL_TEAMS = '__all__';
 
+/** How many top-ranked (all-divisions) players qualify for the final week's single-set knockout (semifinals + final) — see FinalResultsAdminPage.jsx. */
+export const QUALIFY_COUNT = { singles: 4, doubles: 8 };
+
 /** One row per player, aggregated from every scored rubber of the given kind — doubles combines doubles1 + doubles2 rubbers into one figure per player (Req 6.6). */
-function aggregatePlayerStats(fixtures, kind) {
+export function aggregatePlayerStats(fixtures, kind) {
   const rubberTypes = kind === 'singles' ? ['singles'] : ['doubles1', 'doubles2'];
   const byPlayer = new Map();
 
@@ -142,9 +151,19 @@ export default function RisingStarsPage({ seasonId }) {
   const search = nameSearch.trim().toLowerCase();
   const shownRows = search ? (teamFiltered ?? []).filter((r) => r.playerName?.toLowerCase().includes(search)) : teamFiltered;
 
+  // Only meaningful on the combined, every-division leaderboard — a
+  // division-scoped view isn't what decides who qualifies for the final
+  // week's knockout (Req: top 4 singles / top 8 doubles, by rank here).
+  const qualifyCount = divisionId === ALL_DIVISIONS ? QUALIFY_COUNT[kind] : null;
+
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <PageHeader title="Rising Stars" subtitle="Individual leaderboard — most wins first, tied on wins broken by sets +/-, then games +/-, then matches played." />
+      <PageHeader
+        title="Rising Stars"
+        subtitle={`Individual leaderboard — most wins first, tied on wins broken by sets +/-, then games +/-, then matches played.${
+          divisionId === ALL_DIVISIONS ? ` Top ${QUALIFY_COUNT[kind]} ${kind} players (highlighted) qualify for the final week's semifinals and final.` : ''
+        }`}
+      />
 
       <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="flex border-2 border-accent-500 rounded overflow-hidden">
@@ -202,9 +221,14 @@ export default function RisingStarsPage({ seasonId }) {
             </tr>
           </thead>
           <tbody>
-            {shownRows.map((r, i) => (
-              <tr key={r.playerId} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                <td className="p-2 font-bold border-t"><PlayerLink playerId={r.playerId}>{r.playerName ?? '—'}</PlayerLink></td>
+            {shownRows.map((r, i) => {
+              const qualifies = qualifyCount != null && r.rank <= qualifyCount;
+              return (
+              <tr key={r.playerId} className={qualifies ? 'bg-accent-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                <td className="p-2 font-bold border-t">
+                  <PlayerLink playerId={r.playerId}>{r.playerName ?? '—'}</PlayerLink>
+                  {qualifies && <span className="ml-2 text-[10px] font-extrabold uppercase text-accent-600" title="Qualifies for the final week's semifinals/final">Qualified</span>}
+                </td>
                 <td className="p-2 border-t"><TeamLink teamId={r.teamId}>{r.teamName}</TeamLink></td>
                 <td className="p-2 border-t text-gray-600">{r.divisionName}</td>
                 <td className="p-2 text-center border-t font-extrabold">{r.wins}</td>
@@ -214,7 +238,8 @@ export default function RisingStarsPage({ seasonId }) {
                 <td className="p-2 text-center border-t">{r.gamesWon}</td>
                 <td className="p-2 text-center border-t">{r.gamesLost}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       )}
