@@ -146,7 +146,7 @@ function Nav() {
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
           <SetupMenu />
-          <Link to="/admin/teams" className={navLinkClass}>Teams</Link>
+          <Link to="/admin/teams" className={navLinkClass}>Manage Teams</Link>
           <Link to="/admin/grouping" className={navLinkClass}>Grouping</Link>
           <Link to="/admin/fixtures" className={navLinkClass}>Fixtures</Link>
           <Link to="/admin/update-scores" className={navLinkClass}>Update Scores</Link>
