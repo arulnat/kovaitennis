@@ -19,6 +19,7 @@ import {
 import { validateBulkUpload, generateLoginId } from '../bulkUpload.js';
 import { seededShuffle, planAutoGroup } from '../grouping.js';
 import { normalizePhone } from '../phone.js';
+import { calculateAge, isAgeEligible, MIN_AGE } from '../age.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -526,6 +527,27 @@ test('normalizePhone: anything other than exactly 10 digits after stripping is r
   assert.equal(normalizePhone('+1 9876543210').ok, false); // non-91 country code -> 11 digits after stripping "+"
   assert.equal(normalizePhone('987-654-3210').ok, false); // dashes aren't stripped, only spaces
   assert.equal(normalizePhone('').ok, false);
+});
+
+console.log('\n== age.js ==');
+
+test('calculateAge: exact birthday on the cutoff date counts as having turned that age', () => {
+  assert.equal(calculateAge('1986-10-01', '2026-10-01'), 40);
+});
+
+test('calculateAge: birthday is one day after the cutoff -> one year younger', () => {
+  assert.equal(calculateAge('1986-10-02', '2026-10-01'), 39);
+});
+
+test('calculateAge: birthday already passed earlier in the cutoff year', () => {
+  assert.equal(calculateAge('1986-01-15', '2026-10-01'), 40);
+});
+
+test('isAgeEligible: 40+ as of the season cutoff passes, under 40 fails', () => {
+  assert.equal(MIN_AGE, 40);
+  assert.equal(isAgeEligible('1986-10-01', '2026-10-01'), true); // exactly 40
+  assert.equal(isAgeEligible('1986-10-02', '2026-10-01'), false); // turns 40 one day too late -> still 39
+  assert.equal(isAgeEligible('1980-05-20', '2026-10-01'), true); // well over 40
 });
 
 console.log('\n== grouping.js ==');

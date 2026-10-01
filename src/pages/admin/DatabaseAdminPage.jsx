@@ -45,6 +45,7 @@ const TABLE_SCHEMAS = {
     'name: text, NOT NULL',
     "is_test: boolean, NOT NULL, default false — retired concept, always false now",
     'start_weekend: date, NOT NULL — Saturday date of week 1',
+    'age_cutoff_date: date, NOT NULL — players must be 40+ as of this date to be on a roster this season (My Team / manage-team-roster, src/lib/age.js)',
     'registration_fee: numeric, NOT NULL, default 1000 — deferred feature',
     'player_fee: numeric, NOT NULL, default 500 — deferred feature',
     'final_results_approved: boolean, NOT NULL, default false',

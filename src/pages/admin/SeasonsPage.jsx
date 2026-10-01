@@ -7,6 +7,12 @@
 // divisions' order lock) — an admin must deliberately unlock a season
 // before Purge Data will run, so a mis-click can't nuke real fixtures,
 // scores, or team placements.
+//
+// Age Cutoff is the fixed date My Team / manage-team-roster uses to
+// decide whether a player is old enough (40+) to be on a team's roster
+// this season — a per-season reference date, not "today", so a player's
+// eligibility never silently shifts mid-season (src/lib/age.js). Next
+// season just gets its own cutoff when it's created.
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -18,6 +24,7 @@ export default function SeasonsPage() {
   const [seasons, setSeasons] = useState([]);
   const [name, setName] = useState('');
   const [startWeekend, setStartWeekend] = useState('');
+  const [ageCutoffDate, setAgeCutoffDate] = useState('');
 
   useEffect(() => { refresh(); }, []);
 
@@ -28,13 +35,22 @@ export default function SeasonsPage() {
   }
 
   async function createSeason() {
-    if (!name.trim() || !startWeekend) { alert('Enter a name and start date.'); return; }
+    if (!name.trim() || !startWeekend || !ageCutoffDate) { alert('Enter a name, start date, and age-eligibility cutoff date.'); return; }
     const { error } = await supabase.from('seasons').insert({
-      name: name.trim(), start_weekend: startWeekend, is_test: false,
+      name: name.trim(), start_weekend: startWeekend, age_cutoff_date: ageCutoffDate, is_test: false,
     });
     if (error) { alert(error.message); return; }
     setName('');
     setStartWeekend('');
+    setAgeCutoffDate('');
+    refresh();
+  }
+
+  /** Players must be 40+ as of this date to be added/kept on a team's roster this season (My Team / manage-team-roster). */
+  async function updateAgeCutoff(season, date) {
+    if (!date) return;
+    const { error } = await supabase.from('seasons').update({ age_cutoff_date: date }).eq('id', season.id);
+    if (error) { alert(error.message); return; }
     refresh();
   }
 
@@ -95,7 +111,14 @@ export default function SeasonsPage() {
             placeholder="2026 Summer League"
             className="border rounded px-2 py-1 text-sm flex-1"
           />
-          <input type="date" value={startWeekend} onChange={(e) => setStartWeekend(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+          <div>
+            <label className="block text-[10px] text-gray-500">Start weekend</label>
+            <input type="date" value={startWeekend} onChange={(e) => setStartWeekend(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500">Age cutoff (40+ as of)</label>
+            <input type="date" value={ageCutoffDate} onChange={(e) => setAgeCutoffDate(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+          </div>
         </div>
         <button onClick={createSeason} className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm">Create</button>
       </div>
@@ -105,6 +128,7 @@ export default function SeasonsPage() {
           <tr>
             <th className="text-left p-2">Name</th>
             <th className="text-left p-2">Start Weekend</th>
+            <th className="text-left p-2">Age Cutoff (40+ as of)</th>
             <th className="p-2">Purge Lock</th>
             <th className="p-2"></th>
           </tr>
@@ -114,6 +138,14 @@ export default function SeasonsPage() {
             <tr key={s.id} className="border-t">
               <td className="p-2">{s.name}{s.is_test ? ' (test)' : ''}</td>
               <td className="p-2">{s.start_weekend}</td>
+              <td className="p-2">
+                <input
+                  type="date"
+                  defaultValue={s.age_cutoff_date ?? ''}
+                  onBlur={(e) => { if (e.target.value !== s.age_cutoff_date) updateAgeCutoff(s, e.target.value); }}
+                  className="border rounded px-1.5 py-0.5 text-xs"
+                />
+              </td>
               <td className="p-2 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <span className={`text-xs font-medium px-2 py-1 rounded ${s.purge_locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>

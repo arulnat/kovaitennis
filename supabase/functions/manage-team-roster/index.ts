@@ -42,6 +42,12 @@
 // then on. add/edit/delete all take a seasonId for exactly this check
 // (edit/delete don't otherwise need one).
 //
+// Age eligibility (Req): every player must be MIN_AGE (40) or older as
+// of their season's fixed age_cutoff_date (seasons.age_cutoff_date,
+// migration 0027, set per season on the Seasons admin page — "today"
+// is deliberately never used, so eligibility can't silently shift
+// mid-season). Enforced in validatePlayerFields for both add and edit.
+//
 // Deploy: supabase functions deploy manage-team-roster
 // Call from the client with:
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, isCoach, photoBase64?, teamId? } })
@@ -63,6 +69,7 @@ const CORS_HEADERS = {
 
 const MAX_PHOTO_BYTES = 100 * 1024;
 const PROTECTED_COUNT = 4; // the captain + the minimum 3 others can never be deleted from here
+const MIN_AGE = 40; // Req: every player must be MIN_AGE+ as of the season's age_cutoff_date — see src/lib/age.js (duplicated here, same logic)
 
 function normalizePhone(raw) {
   let digits = String(raw ?? '').replace(/\s+/g, '').replace(/^\+/, '');
@@ -70,8 +77,20 @@ function normalizePhone(raw) {
   return /^\d{10}$/.test(digits) ? { ok: true, value: digits } : { ok: false };
 }
 
-/** Validates the shared required fields (name/gender/dateOfBirth/isCoach) for both add and edit. Returns a trimmed/normalized copy, or throws with a user-facing message. */
-function validatePlayerFields(body) {
+/** Age in whole years as of asOfDate — same logic as src/lib/age.js's calculateAge (duplicated; Deno can't import across the function boundary). */
+function calculateAge(dateOfBirth, asOfDate) {
+  const dob = new Date(dateOfBirth);
+  const asOf = new Date(asOfDate);
+  let age = asOf.getUTCFullYear() - dob.getUTCFullYear();
+  const birthdayPassed =
+    asOf.getUTCMonth() > dob.getUTCMonth() ||
+    (asOf.getUTCMonth() === dob.getUTCMonth() && asOf.getUTCDate() >= dob.getUTCDate());
+  if (!birthdayPassed) age -= 1;
+  return age;
+}
+
+/** Validates the shared required fields (name/gender/dateOfBirth/isCoach) for both add and edit, plus age eligibility when ageCutoffDate is known. Returns a trimmed/normalized copy, or throws with a user-facing message. */
+function validatePlayerFields(body, ageCutoffDate) {
   const name = String(body.name ?? '').trim();
   if (!name) throw new Error('Name is required');
 
@@ -82,6 +101,13 @@ function validatePlayerFields(body) {
   if (!dateOfBirth || Number.isNaN(Date.parse(dateOfBirth))) throw new Error('Date of birth is required');
 
   if (typeof body.isCoach !== 'boolean') throw new Error('Coach status is required');
+
+  if (ageCutoffDate) {
+    const age = calculateAge(dateOfBirth, ageCutoffDate);
+    if (age < MIN_AGE) {
+      throw new Error(`Player must be ${MIN_AGE} or older as of ${ageCutoffDate} for this season — this date of birth is ${age}`);
+    }
+  }
 
   return { name, gender, dateOfBirth, isCoach: body.isCoach };
 }
@@ -123,6 +149,12 @@ async function rosterIsSubmitted(admin, teamId, seasonId) {
   return !!data?.roster_submitted;
 }
 
+async function getAgeCutoffDate(admin, seasonId) {
+  if (!seasonId) return null;
+  const { data } = await admin.from('seasons').select('age_cutoff_date').eq('id', seasonId).maybeSingle();
+  return data?.age_cutoff_date ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -155,12 +187,12 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     if (body.action === 'add') {
-      const fields = validatePlayerFields(body);
       const { seasonId } = body;
       if (!seasonId) return json({ error: 'seasonId is required' }, 400);
       if (!isAdminCaller && await rosterIsSubmitted(admin, teamId, seasonId)) {
         return json({ error: 'Roster already submitted — ask an admin to make further changes' }, 403);
       }
+      const fields = validatePlayerFields(body, await getAgeCutoffDate(admin, seasonId));
 
       const { data: teamSeason } = await admin
         .from('team_seasons')
@@ -211,7 +243,7 @@ Deno.serve(async (req) => {
         return json({ error: 'Player not found on your team' }, 404);
       }
 
-      const fields = validatePlayerFields(body);
+      const fields = validatePlayerFields(body, await getAgeCutoffDate(admin, seasonId));
       await ensureSingleCoach(admin, teamId, fields.isCoach, playerId);
 
       const { error: updateErr } = await admin

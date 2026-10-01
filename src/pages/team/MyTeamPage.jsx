@@ -32,12 +32,19 @@
 // add/edit/delete (Edit/Delete/+Add Player/Submit all disappear here,
 // and the Edge Function rejects it too if somehow called anyway) — only
 // an admin, via isAdminView, can make further changes from that point.
+//
+// Age eligibility (src/lib/age.js): every player must be MIN_AGE (40) or
+// older as of the season's age_cutoff_date (seasons.age_cutoff_date, set
+// on the Seasons admin page) — shown live as soon as a date of birth is
+// picked, in both the view and edit states, and re-checked server-side
+// (the real enforcement; this client check is just immediate feedback).
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { extractFunctionErrorMessage } from '../../lib/functionsError.js';
+import { calculateAge, isAgeEligible, MIN_AGE } from '../../lib/age.js';
 import PageHeader from '../../components/PageHeader.jsx';
 
 const MAX_PHOTO_BYTES = 100 * 1024;
@@ -68,6 +75,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
   const teamId = teamIdProp ?? ownTeamId;
   const [players, setPlayers] = useState(null); // null = loading
   const [teamSeason, setTeamSeason] = useState(null); // { roster_submitted, roster_submitted_at } | null
+  const [ageCutoffDate, setAgeCutoffDate] = useState(null);
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -75,7 +83,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
   const load = useCallback(async () => {
     if (!teamId || !seasonId) { setPlayers([]); return; }
     setPlayers(null);
-    const [{ data }, { data: tsRow }] = await Promise.all([
+    const [{ data }, { data: tsRow }, { data: seasonRow }] = await Promise.all([
       supabase
         .from('team_players')
         .select('player_id, players(id, name, gender, date_of_birth, is_coach, is_captain, photo_url, created_at)')
@@ -87,9 +95,11 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
         .eq('season_id', seasonId)
         .eq('team_id', teamId)
         .maybeSingle(),
+      supabase.from('seasons').select('age_cutoff_date').eq('id', seasonId).maybeSingle(),
     ]);
     setPlayers((data || []).map((r) => r.players).filter(Boolean));
     setTeamSeason(tsRow || null);
+    setAgeCutoffDate(seasonRow?.age_cutoff_date ?? null);
   }, [teamId, seasonId]);
 
   useEffect(() => { load(); }, [load]);
@@ -143,9 +153,12 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
     <div className="max-w-2xl mx-auto p-6">
       <PageHeader
         title={isAdminView ? 'Team Roster' : 'My Team'}
-        subtitle={isAdminView
-          ? 'Edit, add, or remove any player on this team\'s roster.'
-          : 'Fill in real details for every placeholder player, and manage your team\'s roster here.'}
+        subtitle={
+          (isAdminView
+            ? 'Edit, add, or remove any player on this team\'s roster.'
+            : 'Fill in real details for every placeholder player, and manage your team\'s roster here.')
+          + (ageCutoffDate ? ` Every player must be ${MIN_AGE}+ as of ${ageCutoffDate}.` : '')
+        }
       />
 
       {teamSeason?.roster_submitted && (
@@ -167,6 +180,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
             <PlayerCard
               key={p.id}
               player={p}
+              ageCutoffDate={ageCutoffDate}
               readOnly={locked}
               deletable={!p.is_captain && (isAdminView || !protectedIds.has(p.id))}
               onSave={(fields) => callRoster({ action: 'edit', playerId: p.id, seasonId, ...fields })}
@@ -179,6 +193,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
       {locked ? null : adding ? (
         <PlayerCard
           isNew
+          ageCutoffDate={ageCutoffDate}
           onSave={async (fields) => {
             const ok = await callRoster({ action: 'add', seasonId, ...fields });
             if (ok) setAdding(false);
@@ -214,7 +229,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
  * filling in a placeholder works exactly the same as adding a brand new
  * player.
  */
-function PlayerCard({ player, isNew, deletable, readOnly, onSave, onDelete, onCancel }) {
+function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave, onDelete, onCancel }) {
   const [editing, setEditing] = useState(!!isNew);
   const [showPhoto, setShowPhoto] = useState(false);
   const [name, setName] = useState(player?.name ?? '');
@@ -256,6 +271,10 @@ function PlayerCard({ player, isNew, deletable, readOnly, onSave, onDelete, onCa
     if (!name.trim()) { setFieldError('Name is required.'); return; }
     if (gender !== 'male' && gender !== 'female') { setFieldError('Select a gender.'); return; }
     if (!dateOfBirth) { setFieldError('Date of birth is required.'); return; }
+    if (ageCutoffDate && !isAgeEligible(dateOfBirth, ageCutoffDate)) {
+      setFieldError(`Must be ${MIN_AGE} or older as of ${ageCutoffDate} — this date of birth is ${calculateAge(dateOfBirth, ageCutoffDate)}.`);
+      return;
+    }
 
     setSaving(true);
     let photoBase64;
@@ -294,7 +313,9 @@ function PlayerCard({ player, isNew, deletable, readOnly, onSave, onDelete, onCa
             <div className="text-xs text-gray-500 mt-0.5">
               {genderLabel(player.gender)}
               {' · '}
-              {player.date_of_birth || 'DOB not set'}
+              {player.date_of_birth
+                ? `${player.date_of_birth}${ageCutoffDate ? ` (age ${calculateAge(player.date_of_birth, ageCutoffDate)})` : ''}`
+                : 'DOB not set'}
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
@@ -343,6 +364,12 @@ function PlayerCard({ player, isNew, deletable, readOnly, onSave, onDelete, onCa
         <div>
           <label className="block text-xs text-gray-600 mb-0.5">Date of birth</label>
           <input type="date" value={dateOfBirth ?? ''} onChange={(e) => setDateOfBirth(e.target.value)} className="border rounded px-2 py-1 text-sm w-full" />
+          {dateOfBirth && ageCutoffDate && (
+            <p className={`text-[11px] mt-0.5 ${isAgeEligible(dateOfBirth, ageCutoffDate) ? 'text-gray-500' : 'text-red-600 font-semibold'}`}>
+              Age {calculateAge(dateOfBirth, ageCutoffDate)} as of {ageCutoffDate}
+              {!isAgeEligible(dateOfBirth, ageCutoffDate) && ` — must be ${MIN_AGE}+`}
+            </p>
+          )}
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-0.5">Role</label>
