@@ -175,7 +175,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
         <p className="text-sm text-teal-900 bg-teal-50 border border-teal-200 rounded p-2 mb-3">
           Entry fee: ₹{seasonFees.registrationFee.toLocaleString('en-IN')} + ₹{seasonFees.playerFee.toLocaleString('en-IN')} per player
           {players.length > 0 && (
-            <> — {players.length} player{players.length === 1 ? '' : 's'} so far = <strong>₹{(seasonFees.registrationFee + players.length * seasonFees.playerFee).toLocaleString('en-IN')}</strong> total</>
+            <> — {players.length} player{players.length === 1 ? '' : 's'} so far. Total = <strong>Rs. {(seasonFees.registrationFee + players.length * seasonFees.playerFee).toLocaleString('en-IN')}</strong></>
           )}
         </p>
       )}
