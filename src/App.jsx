@@ -88,17 +88,14 @@ export default function App() {
 const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
 const dropdownLinkClass = 'block px-4 py-2 text-teal-100 hover:text-white hover:bg-teal-800 font-semibold uppercase text-xs tracking-wide transition-colors whitespace-nowrap';
 
-// Seasons -> Divisions -> Bulk Upload -> Manage Teams -> Team Logins is
-// the order an admin actually sets a season up in (teams exist only
-// once uploaded, and logins are only worth circulating once team
-// details are confirmed), so grouping them under one "Setup" dropdown,
-// in that order, keeps the one-time setup steps together and out of
-// the way of the day-to-day admin links, instead of each sitting as
-// its own top-level nav item. Grouping+Fixtures (scheduling) and
-// Update Scores+Final Results (score entry) are the same idea applied
-// to two more pairs of closely related pages — see their AdminDropdown
-// calls in Nav() below.
-function AdminDropdown({ label, items }) {
+// A reusable "label ▾" nav dropdown — used for groups of closely
+// related pages that would otherwise each be their own top-level nav
+// item: public Teams/Fixtures Calendar/Clubs, and, admin-only, Setup
+// (Seasons -> Divisions -> Bulk Upload -> Manage Teams -> Team Logins,
+// the order an admin actually sets a season up in), Grouping+Fixtures
+// (scheduling), Update Scores+Final Results (score entry), and
+// Content+Messages+About. See the NavDropdown calls in Nav() below.
+function NavDropdown({ label, items }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -141,16 +138,21 @@ function Nav() {
         Tennis League
       </Link>
       <Link to="/results" className={navLinkClass}>Results</Link>
-      <Link to="/fixtures-calendar" className={navLinkClass}>Fixtures Calendar</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
-      <Link to="/clubs" className={navLinkClass}>Clubs</Link>
-      <Link to="/teams" className={navLinkClass}>Teams</Link>
+      <NavDropdown
+        label="Teams"
+        items={[
+          { to: '/teams', label: 'Teams' },
+          { to: '/fixtures-calendar', label: 'Fixtures Calendar' },
+          { to: '/clubs', label: 'Clubs' },
+        ]}
+      />
       {role === 'team' && (
         <Link to="/my-team" className={navLinkClass}>My Team</Link>
       )}
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
-          <AdminDropdown
+          <NavDropdown
             label="Setup"
             items={[
               { to: '/admin/seasons', label: 'Seasons' },
@@ -160,14 +162,14 @@ function Nav() {
               { to: '/admin/login-credentials', label: 'Team Logins' },
             ]}
           />
-          <AdminDropdown
+          <NavDropdown
             label="Grouping"
             items={[
               { to: '/admin/grouping', label: 'Grouping' },
               { to: '/admin/fixtures', label: 'Fixtures' },
             ]}
           />
-          <AdminDropdown
+          <NavDropdown
             label="Scores"
             items={[
               { to: '/admin/update-scores', label: 'Update Scores' },
@@ -175,7 +177,7 @@ function Nav() {
             ]}
           />
           <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
-          <AdminDropdown
+          <NavDropdown
             label="About"
             items={[
               { to: '/admin/content', label: 'Content' },
