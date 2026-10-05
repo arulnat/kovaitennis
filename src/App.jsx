@@ -107,6 +107,22 @@ const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400
       <stop offset="0" stop-color="#eaff7a"/>
       <stop offset="1" stop-color="#9ad028"/>
     </radialGradient>
+    <!-- Vivid multi-hue blends (head to feet), not a single flat colour —
+         userSpaceOnUse so the colour flows smoothly across each figure's
+         separate limb strokes instead of each one computing its own
+         gradient independently. -->
+    <linearGradient id="navfig-gradA" x1="0" y1="-115" x2="0" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b5fe0"/>
+      <stop offset="0.35" stop-color="#9345d6"/>
+      <stop offset="0.65" stop-color="#e94f9c"/>
+      <stop offset="1" stop-color="#ffb23e"/>
+    </linearGradient>
+    <linearGradient id="navfig-gradB" x1="0" y1="-115" x2="0" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7c3fe0"/>
+      <stop offset="0.4" stop-color="#e94f6a"/>
+      <stop offset="0.7" stop-color="#ff8a3d"/>
+      <stop offset="1" stop-color="#ffd54a"/>
+    </linearGradient>
     <g id="navfig-ball-icon">
       <circle cx="0" cy="0" r="11" fill="url(#navfig-ball)"/>
       <path d="M 0 -11 C -8 -8, -8 8, 0 11" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.85"/>
@@ -158,13 +174,13 @@ const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400
   </defs>
   <g stroke-linecap="round">
     <use href="#navfig-ball-icon" transform="translate(60,70)"/>
-    <g transform="translate(190,134)" fill="#f2b84b" stroke="#f2b84b"><use href="#navfig-serve"/></g>
+    <g transform="translate(190,134)" fill="url(#navfig-gradA)" stroke="url(#navfig-gradA)"><use href="#navfig-serve"/></g>
     <use href="#navfig-ball-icon" transform="translate(360,140)"/>
-    <g transform="translate(500,134)" fill="#ff8a5c" stroke="#ff8a5c"><use href="#navfig-forehand-high"/></g>
+    <g transform="translate(500,134)" fill="url(#navfig-gradB)" stroke="url(#navfig-gradB)"><use href="#navfig-forehand-high"/></g>
     <use href="#navfig-ball-icon" transform="translate(680,50)"/>
-    <g transform="translate(820,134) scale(-1,1)" fill="#7fd9b6" stroke="#7fd9b6"><use href="#navfig-forehand-low"/></g>
+    <g transform="translate(820,134) scale(-1,1)" fill="url(#navfig-gradA)" stroke="url(#navfig-gradA)"><use href="#navfig-forehand-low"/></g>
     <use href="#navfig-ball-icon" transform="translate(1000,160)"/>
-    <g transform="translate(1140,118)" fill="#b9a3e3" stroke="#b9a3e3"><use href="#navfig-jump-smash"/></g>
+    <g transform="translate(1140,118)" fill="url(#navfig-gradB)" stroke="url(#navfig-gradB)"><use href="#navfig-jump-smash"/></g>
     <use href="#navfig-ball-icon" transform="translate(1320,90)"/>
   </g>
 </svg>`;
@@ -174,7 +190,7 @@ const navStripStyle = {
   backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(NAV_STRIP_SVG)}")`,
   backgroundRepeat: 'repeat-x',
   backgroundPosition: 'left bottom',
-  backgroundSize: 'auto 100px',
+  backgroundSize: 'auto 64px',
 };
 
 const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
@@ -291,7 +307,7 @@ function Nav() {
         )}
       </div>
       </div>
-      <div className="h-[100px]" style={navStripStyle} aria-hidden="true" />
+      <div className="h-[64px]" style={navStripStyle} aria-hidden="true" />
     </nav>
   );
 }
