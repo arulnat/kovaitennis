@@ -33,6 +33,7 @@ export default function BulkUploadPage({ seasonId }) {
   function handleFileChosen(e) {
     setFile(e.target.files?.[0] ?? null);
     setErrors([]);
+    setStatus('idle'); // clear any previous error state — nothing is shown again until Upload is pressed
   }
 
   async function handleUpload() {
