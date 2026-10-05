@@ -175,9 +175,14 @@ function Nav() {
             ]}
           />
           <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
-          <Link to="/admin/content" className={navLinkClass}>Content</Link>
-          <Link to="/admin/messages" className={navLinkClass}>Messages</Link>
-          <Link to="/about" className={navLinkClass}>About</Link>
+          <AdminDropdown
+            label="About"
+            items={[
+              { to: '/admin/content', label: 'Content' },
+              { to: '/admin/messages', label: 'Messages' },
+              { to: '/about', label: 'About' },
+            ]}
+          />
         </>
       )}
       <SeasonSelector />
