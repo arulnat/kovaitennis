@@ -3,14 +3,17 @@
 // "My Team" — a team login's own roster management (formerly "My
 // Roster"), also reused, unchanged, for admin's per-team roster editor
 // (Teams admin page links to /admin/teams/:teamId/roster, which renders
-// this with an explicit teamId + isAdminView). Bulk upload / Add Team
-// create every team with its real captain plus 3 placeholder players —
-// "Player 1"/"Player 2"/"Player 3" — meeting the 4-player minimum (Req
-// 1.5). This is where the captain (or an admin) fills those placeholders
-// in with real people (name, gender, date of birth, coach or not, a
-// photo) and manages the roster, via the manage-team-roster Edge
-// Function — players/team_players/team_seasons are admin-only tables
-// under RLS, so a team login can't write to them directly (0001_init.sql).
+// this with an explicit teamId + isAdminView). Bulk upload collects a
+// real roster up front (captain + however many other players, Req
+// 1.5's 4-player minimum enforced there); the admin's quick "+ Add
+// Team" form instead fills the roster with 3 placeholder players —
+// "Player 1"/"Player 2"/"Player 3" — meeting the same minimum until
+// they're renamed. Either way, this is where the captain (or an admin)
+// fills in real details (name, gender, date of birth, coach or not, a
+// photo) and manages the roster from here on, via the
+// manage-team-roster Edge Function — players/team_players/team_seasons
+// are admin-only tables under RLS, so a team login can't write to them
+// directly (0001_init.sql).
 //
 // The captain is always shown first, and — along with the first 4
 // players overall (the ones present since the team was created) — can't

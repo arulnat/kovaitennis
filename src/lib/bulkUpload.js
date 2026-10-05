@@ -1,30 +1,27 @@
 // src/lib/bulkUpload.js
 //
-// Admin bulk CSV upload (Req 2.1), MVP-scoped, one row per team, no
-// header row, repeated: team_name | captain_name | captain_phone |
-// club_name?. club_name is optional — if left blank, it defaults to the
-// team name's first word (e.g. "Aces Warriors" -> "Aces"); either way
-// it's matched case-insensitively against existing clubs server-side
-// (bulk-create-teams Edge Function), creating a new club only if no
-// match exists, so "Aces Club" and "aces club" never end up as two
-// different clubs. The club name can be corrected later on the Teams
-// page. All-or-nothing validation (v6 decision): any row's error
-// rejects the whole file.
+// Admin bulk CSV upload (Req 2.1), MVP-scoped — NO header row, two rows
+// per team, repeated:
+//   Row 1 (team info): team_name | captain_name | captain_phone | player_count | club_name?
+//   Row 2 (roster):    player_name_1 | player_name_2 | ... | player_name_N
+// player_count is the TEAM'S TOTAL size, captain included — so N (the
+// number of names on row 2, the OTHER players) is player_count - 1.
+// player_count must be at least 4 (Req 1.5's minimum), so row 2 always
+// has at least 3 names. club_name (5th column on row 1) is optional —
+// if left blank, it defaults to the full team name (not just part of
+// it); either way it's matched case-insensitively against existing
+// clubs server-side (bulk-create-teams Edge Function), creating a new
+// club only if no match exists, so "Aces Club" and "aces club" never
+// end up as two different clubs. The club name can be corrected later
+// on the Teams page. All-or-nothing validation (v6 decision): any
+// row's error rejects the whole file.
 //
-// No roster is collected here — Req 1.5's 4-player minimum is met by
-// creating the captain (real name) plus 3 placeholder players, "Player
-// 1"/"Player 2"/"Player 3", for every team. Once the login exists, the
-// captain signs in and renames those placeholders (and can add more
-// real players) from the Roster page — see manage-team-roster Edge
-// Function and MyTeamPage.jsx. Gender, photos, ID proof, and date of
-// birth are still not collected anywhere in this flow.
-//
-// Captain name is normalized to title case ("raVI KUMAR" -> "Ravi
-// Kumar") regardless of how it was typed — team name and club name are
-// left as-is. captain_phone is normalized to a plain 10-digit number
-// (see normalizePhone in phone.js) — spaces are stripped, and a leading
-// +91/91 is stripped, but anything left over that isn't exactly 10
-// digits is rejected.
+// Captain and player names are normalized to title case ("raVI KUMAR"
+// -> "Ravi Kumar") regardless of how they were typed — team name and
+// club name are left as-is. captain_phone is normalized to a plain
+// 10-digit number (see normalizePhone in phone.js) — spaces are
+// stripped, and a leading +91/91 is stripped, but anything left over
+// that isn't exactly 10 digits is rejected.
 //
 // Uses SheetJS (`xlsx`) to parse the CSV — parsing itself is kept separate
 // from validation (and the `xlsx` import is dynamic, inside parseWorkbook and
@@ -53,15 +50,13 @@ export async function parseWorkbook(arrayBuffer) {
   return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 }
 
-/** The 3 placeholder players every bulk-uploaded team gets alongside its real captain, meeting the Req 1.5 4-player minimum until the captain renames them from the Roster page. */
-const DEFAULT_PLACEHOLDER_PLAYERS = ['Player 1', 'Player 2', 'Player 3'];
-
 /**
- * Validate raw rows (array of arrays), one row per team. Returns either
- * {ok:true, teams:[...]} — each team's `players` is the captain plus the
- * 3 default placeholders — or {ok:false, errors:[...]}, in which case
- * NONE of the file should be imported (all-or-nothing, Req 2.1). Every
- * problem found is reported, not just the first one.
+ * Validate raw rows (array of arrays) in the 2-row-per-team block format.
+ * Returns either {ok:true, teams:[...]} — each team's `players` is the
+ * captain (first, tagged isCaptain) plus the roster row's names — or
+ * {ok:false, errors:[...]}, in which case NONE of the file should be
+ * imported (all-or-nothing, Req 2.1). Every problem found is reported,
+ * not just the first one.
  *
  * @param {any[][]} rows
  */
@@ -70,49 +65,75 @@ export function validateBulkUpload(rows) {
   const teams = [];
   const seenTeamNames = new Set();
 
-  rows.forEach((row, i) => {
-    const lineNo = i + 1;
-    const isBlank = (row || []).every((v) => String(v ?? '').trim() === '');
-    if (isBlank) return; // e.g. a trailing blank line from the CSV
+  for (let i = 0; i < rows.length; i += 2) {
+    const infoRow = rows[i] || [];
+    const infoLineNo = i + 1;
+    const isBlankInfoRow = infoRow.every((v) => String(v ?? '').trim() === '');
+    if (isBlankInfoRow) continue; // e.g. a trailing blank line from the CSV
 
-    const teamName = String(row[0] ?? '').trim();
-    const captainName = toTitleCase(String(row[1] ?? '').trim());
-    const captainPhoneRaw = String(row[2] ?? '').trim();
+    const teamName = String(infoRow[0] ?? '').trim();
+    const captainName = toTitleCase(String(infoRow[1] ?? '').trim());
+    const captainPhoneRaw = String(infoRow[2] ?? '').trim();
     const captainPhoneResult = captainPhoneRaw ? normalizePhone(captainPhoneRaw) : null;
     const captainPhone = captainPhoneResult?.ok ? captainPhoneResult.value : captainPhoneRaw;
-    const explicitClubName = String(row[3] ?? '').trim();
-    // No club given -> default to the team name's first word (e.g. "Aces
-    // Warriors" -> "Aces"), so every team lands in some club by default;
-    // still editable later on the Teams page (ClubCell/updateClub).
-    const clubName = explicitClubName || (teamName ? teamName.split(/\s+/)[0].trim() : null);
+    const playerCountRaw = infoRow[3];
+    const playerCount = Number(playerCountRaw); // total team size, captain included
+    const explicitClubName = String(infoRow[4] ?? '').trim();
+    // No club given -> default to the full team name, so every team
+    // lands in some club by default; still editable later on the Teams
+    // page (ClubCell/updateClub).
+    const clubName = explicitClubName || teamName || null;
+    const countIsValid = Number.isInteger(playerCount) && playerCount > 0;
 
-    if (!teamName) errors.push(`Row ${lineNo}: team name is required`);
-    if (!captainName) errors.push(`Row ${lineNo}: captain name is required`);
-    if (!captainPhoneRaw) errors.push(`Row ${lineNo}: captain phone is required`);
-    else if (!captainPhoneResult.ok) errors.push(`Row ${lineNo}: captain phone "${captainPhoneRaw}" must be a 10-digit number (spaces are fine; a leading +91 or 91 is fine)`);
+    if (!teamName) errors.push(`Row ${infoLineNo}: team name is required`);
+    if (!captainName) errors.push(`Row ${infoLineNo}: captain name is required`);
+    if (!captainPhoneRaw) errors.push(`Row ${infoLineNo}: captain phone is required`);
+    else if (!captainPhoneResult.ok) errors.push(`Row ${infoLineNo}: captain phone "${captainPhoneRaw}" must be a 10-digit number (spaces are fine; a leading +91 or 91 is fine)`);
+
+    if (!countIsValid) {
+      errors.push(`Row ${infoLineNo}: player count "${playerCountRaw}" must be a positive whole number`);
+    } else if (playerCount < 4) {
+      errors.push(`Row ${infoLineNo}: team "${teamName || '(unnamed)'}" has ${playerCount} player(s) including the captain — minimum is 4`);
+    }
 
     if (teamName) {
       if (seenTeamNames.has(teamName)) {
-        errors.push(`Row ${lineNo}: duplicate team name "${teamName}"`);
+        errors.push(`Row ${infoLineNo}: duplicate team name "${teamName}"`);
       }
       seenTeamNames.add(teamName);
 
       const loginId = generateLoginId(teamName);
       if (RESERVED_LOGIN_IDS.includes(loginId)) {
-        errors.push(`Row ${lineNo}: team name "${teamName}" would generate the login ID "${loginId}", which is reserved for admin logins — rename the team`);
+        errors.push(`Row ${infoLineNo}: team name "${teamName}" would generate the login ID "${loginId}", which is reserved for admin logins — rename the team`);
       }
     }
 
-    if (teamName && captainName && captainPhoneResult?.ok) {
+    const rosterRowIndex = i + 1;
+    const rosterLineNo = rosterRowIndex + 1;
+    const rosterRow = rows[rosterRowIndex];
+    const otherPlayerCount = countIsValid ? playerCount - 1 : null; // row 2 excludes the captain
+
+    if (!rosterRow) {
+      errors.push(`Row ${rosterLineNo}: expected a player-names row after row ${infoLineNo}, but the file ends there`);
+      continue;
+    }
+
+    const playerNames = rosterRow.map((v) => toTitleCase(String(v ?? '').trim())).filter((v) => v !== '');
+
+    if (countIsValid && playerNames.length !== otherPlayerCount) {
+      errors.push(`Row ${rosterLineNo}: expected ${otherPlayerCount} player name(s) (player count ${playerCount} minus the captain) for team "${teamName || '(unnamed)'}", found ${playerNames.length}`);
+    }
+
+    if (teamName && captainName && captainPhoneResult?.ok && countIsValid && playerNames.length === otherPlayerCount) {
       teams.push({
         teamName, captainName, captainPhone, clubName,
         players: [
           { name: captainName, gender: null, isCaptain: true },
-          ...DEFAULT_PLACEHOLDER_PLAYERS.map((name) => ({ name, gender: null, isCaptain: false })),
+          ...playerNames.map((name) => ({ name, gender: null, isCaptain: false })),
         ],
       });
     }
-  });
+  }
 
   if (errors.length > 0) {
     return { ok: false, errors };
@@ -120,14 +141,19 @@ export function validateBulkUpload(rows) {
   return { ok: true, teams };
 }
 
-/** A 5-team example matching the expected one-row-per-team format, for downloadSampleTemplate(). */
+/**
+ * A small 2-team example matching the expected block format, for
+ * downloadSampleTemplate(). The roster row lists OTHER players only —
+ * the captain (named in the info row, also counted in player_count) is
+ * added automatically, so "Aces" here shows the minimum allowed: a
+ * player_count of 4 (captain + 3 others listed on the roster row).
+ */
 export function sampleTemplateRows() {
   return [
-    ['Aces', 'Priya Kumar', '9876543210', 'City Sports Club'],
-    ['Smashers', 'Anita Menon', '9123456780', ''],
-    ['Warriors', 'Rahul Verma', '9988776655', 'Green Park Club'],
-    ['Titans', 'Sneha Pillai', '9871234560', 'City Sports Club'],
-    ['Strikers', 'Vikram Singh', '9765432109', ''],
+    ['Aces', 'Priya Kumar', '9876543210', 4, 'City Sports Club'],
+    ['Arjun Rao', 'Divya Shah', 'Karthik Iyer'],
+    ['Smashers', 'Anita Menon', '9123456780', 5, ''],
+    ['Rahul Verma', 'Sneha Pillai', 'Vikram Singh', 'Lakshmi Narayan'],
   ];
 }
 

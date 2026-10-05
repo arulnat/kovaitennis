@@ -1,13 +1,14 @@
 // src/pages/admin/BulkUploadPage.jsx
 //
-// Req 2.1 (MVP-extended): admin uploads one CSV file, one row per team.
-// All-or-nothing validation — any bad row rejects the whole file,
-// nothing is imported (v6 decision). No roster is collected here — each
-// team is created with its real captain plus 3 default placeholder
-// players ("Player 1"/"Player 2"/"Player 3"), meeting the 4-player
-// minimum immediately; the captain renames/extends the roster later
-// from their own My Team page after logging in (see MyTeamPage.jsx and
-// the manage-team-roster Edge Function).
+// Req 2.1 (MVP-extended): admin uploads one CSV file, two rows per team
+// (team info, then roster). All-or-nothing validation — any bad block
+// rejects the whole file, nothing is imported (v6 decision). The
+// roster row lists every player EXCEPT the captain — the info row's
+// player count is the team's total size (captain included), so that
+// count minus 1 is how many names the roster row must have. The
+// captain can still add more players later from their own My Team page
+// after logging in (see MyTeamPage.jsx and the manage-team-roster Edge
+// Function).
 //
 // The actual team/player/login creation happens server-side in the
 // bulk-create-teams Edge Function (service_role key required to create
@@ -68,19 +69,19 @@ export default function BulkUploadPage({ seasonId }) {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader title="Bulk Team Upload" />
       <p className="text-sm text-gray-600 mb-2">
-        CSV file, no header row — one row per team:
+        CSV file, no header row — two rows per team, one block after another:
       </p>
       <ul className="text-sm text-gray-600 mb-4 list-disc pl-5 space-y-1">
-        <li>team name, captain name, captain phone, club name (optional — leave blank if none)</li>
+        <li><strong>Row 1</strong> (team info): team name, captain name, captain phone, number of players (total team size, including the captain — minimum 4), club name (optional — leave blank if none)</li>
+        <li><strong>Row 2</strong> (roster): that many names <em>minus the captain</em>, one per column — e.g. a player count of 4 means 3 names on this row</li>
       </ul>
       <p className="text-sm text-gray-600 mb-4">
-        No roster is collected here — each team is created with its captain plus 3 placeholder players,
-        "Player 1"/"Player 2"/"Player 3", meeting the 4-player minimum immediately. Once the captain signs in
-        (see Team Logins), they rename those placeholders and add any further players from their own My Team
-        page. A club name is matched case-insensitively against clubs already on file, so "City Club" and "city
-        club" become the same club rather than two — a new one is only created if nothing matches. Club can
-        also be added or corrected later from the Teams page. Gender, photos, ID proof, and date of birth are
-        not collected here. If any row has a problem, nothing is imported — fix the file and re-upload.
+        Repeat for each additional team — a 2-team file is 4 rows total. If a club name is left blank, it
+        defaults to the full team name; either way it's matched case-insensitively against clubs already on
+        file, so "City Club" and "city club" become the same club rather than two — a new one is only created
+        if nothing matches. Club can also be added or corrected later from the Teams page. The captain can add
+        further players later from their own My Team page. Gender, photos, ID proof, and date of birth are not
+        collected here. If any block has a problem, nothing is imported — fix the file and re-upload.
       </p>
 
       <button

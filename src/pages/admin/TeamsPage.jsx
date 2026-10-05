@@ -19,8 +19,9 @@
 // working after a rename.
 //
 // "+ Add Team" (AddTeamForm) creates a single team directly, without a
-// CSV — same validation and creation path as Bulk Upload (captain plus 3
-// placeholder players).
+// CSV — same validation and creation path as Bulk Upload, but fills the
+// roster with 3 placeholder players ("Player 1"/"Player 2"/"Player 3")
+// rather than collecting real names right here.
 //
 // The Roster column's player count links to /admin/teams/:teamId/roster
 // (MyTeamPage.jsx in admin mode) — the same roster editor a captain uses
@@ -349,11 +350,13 @@ export default function TeamsPage({ seasonId }) {
 
 /**
  * Add a single team directly from this page, without a CSV — reuses the
- * exact same validation (validateBulkUpload, wrapped around a one-row
- * "file") and creation path (bulk-create-teams Edge Function) as Bulk
- * Upload, so a directly-added team gets the same captain + 3 placeholder
- * players ("Player 1"/"Player 2"/"Player 3") and is just as deletable/
- * editable afterward.
+ * exact same validation (validateBulkUpload, wrapped around a 2-row
+ * "file" the way a real upload would look) and creation path
+ * (bulk-create-teams Edge Function) as Bulk Upload, but fills the
+ * roster row with 3 placeholder players ("Player 1"/"Player 2"/
+ * "Player 3") rather than collecting real names here — the captain
+ * renames/extends it from their own My Team page afterward. Still just
+ * as deletable/editable afterward as any other team.
  */
 function AddTeamForm({ seasonId, onCreated }) {
   const [open, setOpen] = useState(false);
@@ -371,7 +374,10 @@ function AddTeamForm({ seasonId, onCreated }) {
   async function submit(e) {
     e.preventDefault();
     setError('');
-    const result = validateBulkUpload([[teamName, captainName, phone, clubName]]);
+    const result = validateBulkUpload([
+      [teamName, captainName, phone, 4, clubName],
+      ['Player 1', 'Player 2', 'Player 3'],
+    ]);
     if (!result.ok) { setError(result.errors.join(' ')); return; }
 
     setSaving(true);
