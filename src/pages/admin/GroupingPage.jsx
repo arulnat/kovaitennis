@@ -66,6 +66,7 @@ export default function GroupingPage({ seasonId }) {
   const [loading, setLoading] = useState(true);
   const [groupSize, setGroupSize] = useState(4);
   const [seed, setSeed] = useState(randomSeed);
+  const [avoidSameClub, setAvoidSameClub] = useState(false);
   const [startDateDraft, setStartDateDraft] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set()); // team_season ids, from any one column
   const [moveTarget, setMoveTarget] = useState('');
@@ -75,7 +76,7 @@ export default function GroupingPage({ seasonId }) {
     const [{ data: teamSeasonRows, error }, { data: fixtureRows }, { data: holidayRows }] = await Promise.all([
       supabase
         .from('team_seasons')
-        .select('id, division_id, order_index, teams(id, name)')
+        .select('id, division_id, order_index, teams(id, name, club_id)')
         .eq('season_id', seasonId)
         .order('order_index', { ascending: true }),
       supabase.from('fixtures').select('division_id').eq('season_id', seasonId),
@@ -216,24 +217,32 @@ export default function GroupingPage({ seasonId }) {
     // divisions is already ordered highest-first (order_index) — fill it
     // top-down before creating anything new (Req: "always start from
     // higher division to allocate"). Locked divisions are frozen, so
-    // they're excluded entirely rather than topped up.
+    // they're excluded entirely rather than topped up. existingClubIds
+    // lets avoidSameClub steer around a club already seated in a division
+    // (not just clubs it adds during this same draw).
     const divisionsWithCounts = divisions
       .filter((d) => !d.grouping_locked)
       .map((d) => ({
         id: d.id,
         currentCount: teamSeasons.filter((ts) => ts.division_id === d.id).length,
+        existingClubIds: teamSeasons.filter((ts) => ts.division_id === d.id).map((ts) => ts.teams?.club_id).filter(Boolean),
       }));
+
+    const clubIdByTeamId = Object.fromEntries(pool.map((ts) => [ts.id, ts.teams?.club_id ?? null]));
 
     const plan = planAutoGroup({
       poolIds: pool.map((ts) => ts.id),
       divisions: divisionsWithCounts,
       groupSize: size,
       seed: seedValue,
+      avoidSameClub,
+      clubIdByTeamId,
     });
 
     if (!confirm(
       `Randomly draw ${pool.length} unassigned team(s) into groups of ${size} (seed ${seedValue}), filling the ` +
-      `highest unlocked division down first${plan.newGroups.length > 0 ? `, creating ${plan.newGroups.length} new division(s) for the rest` : ''}?`
+      `highest unlocked division down first${plan.newGroups.length > 0 ? `, creating ${plan.newGroups.length} new division(s) for the rest` : ''}` +
+      `${avoidSameClub ? ', avoiding same-club teams in one division where possible' : ''}?`
     )) return;
 
     for (const { divisionId, teamIds } of plan.assignments) {
@@ -426,7 +435,10 @@ export default function GroupingPage({ seasonId }) {
         <p className="text-sm text-gray-600 mb-2">
           Randomly draws the {unassigned.length} unassigned team(s) into groups of this size, filling the
           highest unlocked division's remaining spots first and working down, before creating any new
-          (lower-ranked) division for what's left — the last group may have fewer.
+          (lower-ranked) division for what's left — the last group may have fewer. With "avoid same club"
+          on, each division is steered away from seating two teams from the same club together — but if a
+          club has more teams than there are divisions to spread them across, it's fine for some to share
+          a division anyway.
         </p>
         <div className="flex gap-2 items-center flex-wrap">
           <label className="text-xs text-gray-600">
@@ -455,6 +467,11 @@ export default function GroupingPage({ seasonId }) {
           >
             New seed
           </button>
+          <ToggleSwitch
+            checked={avoidSameClub}
+            onChange={setAvoidSameClub}
+            label="Avoid same club in a division"
+          />
           <button
             onClick={autoGenerate}
             disabled={unassigned.length === 0}
@@ -553,6 +570,26 @@ export default function GroupingPage({ seasonId }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// A small dot-on-a-track switch — the "enable button" for optional
+// auto-generate settings like avoidSameClub, styled to match the app's
+// teal/gray palette rather than a plain checkbox.
+function ToggleSwitch({ checked, onChange, label }) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors ${checked ? 'bg-teal-700' : 'bg-gray-300'}`}
+      >
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+      </button>
+      {label}
+    </label>
   );
 }
 

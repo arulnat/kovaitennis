@@ -704,5 +704,63 @@ test('planAutoGroup: no existing divisions -> everything becomes new groups, las
   assert.equal(plan.newGroups[2].length, 1); // the last group is smaller
 });
 
+test('planAutoGroup: avoidSameClub spreads teams from the same club across divisions', () => {
+  // t1/t2 are clubX, t3/t4 are clubY — 2 divisions of size 2, so a
+  // clash-free split exists (one clubX + one clubY in each).
+  const clubIdByTeamId = { t1: 'clubX', t2: 'clubX', t3: 'clubY', t4: 'clubY' };
+  const plan = planAutoGroup({
+    poolIds: ['t1', 't2', 't3', 't4'],
+    divisions: [{ id: 'divA', currentCount: 0 }, { id: 'divB', currentCount: 0 }],
+    groupSize: 2,
+    seed: 42,
+    avoidSameClub: true,
+    clubIdByTeamId,
+  });
+  for (const { teamIds } of plan.assignments) {
+    const clubs = teamIds.map((id) => clubIdByTeamId[id]);
+    assert.equal(new Set(clubs).size, clubs.length, 'no division should get two teams from the same club here');
+  }
+  // every pool id still accounted for exactly once
+  const allAssigned = plan.assignments.flatMap((a) => a.teamIds);
+  assert.deepEqual([...allAssigned].sort(), ['t1', 't2', 't3', 't4'].sort());
+});
+
+test('planAutoGroup: avoidSameClub falls back to doubling up when there is no clash-free option', () => {
+  // 4 teams all from the same club, only 1 division available — avoidance
+  // is impossible, so every team must still end up assigned (Req: ok to
+  // assign anyway when there are more same-club teams than divisions).
+  const clubIdByTeamId = { t1: 'clubX', t2: 'clubX', t3: 'clubX', t4: 'clubX' };
+  const plan = planAutoGroup({
+    poolIds: ['t1', 't2', 't3', 't4'],
+    divisions: [{ id: 'divA', currentCount: 0 }],
+    groupSize: 4,
+    seed: 1,
+    avoidSameClub: true,
+    clubIdByTeamId,
+  });
+  assert.equal(plan.assignments.length, 1);
+  assert.equal(plan.assignments[0].teamIds.length, 4);
+  assert.deepEqual([...plan.assignments[0].teamIds].sort(), ['t1', 't2', 't3', 't4']);
+});
+
+test('planAutoGroup: avoidSameClub respects a division\'s pre-existing clubs too', () => {
+  // divA already has a clubX team seated; the pool's other clubX team
+  // should be steered to divB instead, even though divA has room.
+  const clubIdByTeamId = { t1: 'clubX', t2: 'clubY' };
+  const plan = planAutoGroup({
+    poolIds: ['t1', 't2'],
+    divisions: [
+      { id: 'divA', currentCount: 1, existingClubIds: ['clubX'] },
+      { id: 'divB', currentCount: 0, existingClubIds: [] },
+    ],
+    groupSize: 2,
+    seed: 7,
+    avoidSameClub: true,
+    clubIdByTeamId,
+  });
+  const divAIds = plan.assignments.find((a) => a.divisionId === 'divA')?.teamIds ?? [];
+  assert.ok(!divAIds.includes('t1'), 't1 (clubX) should avoid divA, which already has a clubX team');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

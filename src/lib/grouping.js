@@ -36,31 +36,65 @@ export function seededShuffle(items, seed) {
  * full is chunked into brand-new groups of groupSize (the last one may be
  * smaller).
  *
+ * When avoidSameClub is set, each slot prefers the first still-queued team
+ * whose club isn't already present in that division/group — but if every
+ * remaining team's club is already represented there (e.g. more teams from
+ * one club than there are divisions to spread them across), it falls back
+ * to just taking the next one in the shuffle; the constraint is a
+ * best-effort preference, never a reason to leave a team unassigned.
+ *
  * @param {object} opts
  * @param {string[]} opts.poolIds - unassigned team_season ids
- * @param {{id: string, currentCount: number}[]} opts.divisions - existing divisions, highest first
+ * @param {{id: string, currentCount: number, existingClubIds?: (string|null)[]}[]} opts.divisions - existing divisions, highest first
  * @param {number} opts.groupSize - target team count per division
  * @param {number} opts.seed - random seed for the shuffle
+ * @param {boolean} [opts.avoidSameClub] - prefer spreading same-club teams across divisions
+ * @param {Record<string, string|null>} [opts.clubIdByTeamId] - each pool team's club, for avoidSameClub
  * @returns {{
  *   assignments: {divisionId: string, teamIds: string[]}[],
  *   newGroups: string[][],
  * }}
  */
-export function planAutoGroup({ poolIds, divisions, groupSize, seed }) {
+export function planAutoGroup({ poolIds, divisions, groupSize, seed, avoidSameClub = false, clubIdByTeamId = {} }) {
   const queue = seededShuffle(poolIds, seed);
-  const assignments = [];
 
+  // Pulls one team out of the queue for a group that already contains
+  // usedClubs. Prefers a team whose club isn't in usedClubs yet; falls
+  // back to the front of the queue if no such team is left.
+  function takeOne(usedClubs) {
+    if (avoidSameClub) {
+      for (let i = 0; i < queue.length; i++) {
+        const clubId = clubIdByTeamId[queue[i]] ?? null;
+        if (clubId == null || !usedClubs.has(clubId)) {
+          const [teamId] = queue.splice(i, 1);
+          if (clubId != null) usedClubs.add(clubId);
+          return teamId;
+        }
+      }
+    }
+    const teamId = queue.shift();
+    const clubId = clubIdByTeamId[teamId] ?? null;
+    if (clubId != null) usedClubs.add(clubId);
+    return teamId;
+  }
+
+  const assignments = [];
   for (const division of divisions) {
     if (queue.length === 0) break;
     const capacity = Math.max(0, groupSize - division.currentCount);
     if (capacity === 0) continue;
-    const teamIds = queue.splice(0, capacity);
+    const usedClubs = new Set(division.existingClubIds ?? []);
+    const teamIds = [];
+    for (let n = 0; n < capacity && queue.length > 0; n++) teamIds.push(takeOne(usedClubs));
     if (teamIds.length > 0) assignments.push({ divisionId: division.id, teamIds });
   }
 
   const newGroups = [];
   while (queue.length > 0) {
-    newGroups.push(queue.splice(0, groupSize));
+    const usedClubs = new Set();
+    const chunk = [];
+    for (let n = 0; n < groupSize && queue.length > 0; n++) chunk.push(takeOne(usedClubs));
+    newGroups.push(chunk);
   }
 
   return { assignments, newGroups };
