@@ -65,6 +65,7 @@ export default function GroupingPage({ seasonId }) {
   const [newHolidayDate, setNewHolidayDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [groupSize, setGroupSize] = useState(4);
+  const [groupSizeTouched, setGroupSizeTouched] = useState(false); // stops the auto-suggested default once the admin types their own value
   const [seed, setSeed] = useState(randomSeed);
   const [avoidSameClub, setAvoidSameClub] = useState(false);
   const [startDateDraft, setStartDateDraft] = useState('');
@@ -91,6 +92,28 @@ export default function GroupingPage({ seasonId }) {
   }, [seasonId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Suggests "teams per group" from the current data instead of a fixed
+  // 4: unassigned teams plus whatever's already seated in unlocked
+  // divisions, spread evenly across however many unlocked divisions
+  // there are — so by default there's exactly enough room for everyone
+  // (matching auto-generate's all-or-nothing requirement) without the
+  // admin having to guess and retry. Keeps recomputing as teams move
+  // around, but stops the moment the admin types their own value.
+  useEffect(() => {
+    if (loading || groupSizeTouched) return;
+    const unlockedDivisions = divisions.filter((d) => !d.grouping_locked);
+    const poolCount = teamSeasons.filter((ts) => !ts.division_id).length;
+    if (poolCount === 0) return;
+    const seatedInUnlocked = unlockedDivisions.reduce(
+      (n, d) => n + teamSeasons.filter((ts) => ts.division_id === d.id).length, 0
+    );
+    const suggested = unlockedDivisions.length > 0
+      ? Math.ceil((poolCount + seatedInUnlocked) / unlockedDivisions.length)
+      : poolCount;
+    setGroupSize(Math.max(1, suggested));
+  }, [loading, groupSizeTouched, teamSeasons, divisions]);
+
   useEffect(() => { setStartDateDraft(activeSeason?.start_weekend || ''); }, [activeSeason?.start_weekend]);
 
   const findDivision = (id) => divisions.find((d) => d.id === id) ?? null;
@@ -430,10 +453,15 @@ export default function GroupingPage({ seasonId }) {
               type="number"
               min="1"
               value={groupSize}
-              onChange={(e) => setGroupSize(e.target.value)}
+              onChange={(e) => { setGroupSize(e.target.value); setGroupSizeTouched(true); }}
               className="border rounded px-2 py-1 text-sm w-20 ml-1"
             />
           </label>
+          {!groupSizeTouched && unassigned.length > 0 && (
+            <span className="text-[11px] text-gray-500" title="Unassigned teams plus whatever's already seated, spread evenly across the unlocked divisions">
+              (suggested, based on {unassigned.length} unassigned across {divisions.filter((d) => !d.grouping_locked).length || 0} unlocked division(s))
+            </span>
+          )}
           <label className="text-xs text-gray-600">
             Random seed
             <input
