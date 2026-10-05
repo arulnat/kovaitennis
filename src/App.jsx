@@ -38,7 +38,6 @@ export default function App() {
     <AuthProvider>
       <SeasonProvider>
         <BrowserRouter>
-          <SiteHeader />
           <Nav />
           <Routes>
             <Route path="/" element={<Navigate to="/standings" replace />} />
@@ -86,23 +85,82 @@ export default function App() {
   );
 }
 
-// Letterhead-style branding, shown above the nav on every page — the
-// trust name, the league's actual name, and its motto, matching the
-// org's own branded header exactly (not just "Tennis League" in the
-// nav bar, which stays as a short link label).
-function SiteHeader() {
+// Colorful tennis-player silhouettes (serve/ready/smash poses, mixed
+// men and women — a ponytail + flared skirt distinguishes the women)
+// as a decorative background band across the nav bar, instead of a
+// stock photo. Pure SVG shapes, no image asset. Absolutely positioned
+// behind the nav content (see Nav()), at partial opacity so the colors
+// stay vivid without fighting the white/gold text on top of it.
+function PlayerSilhouettes({ className }) {
+  // Start well clear of x=0 — that zone sits behind the brand text on
+  // the left, where a figure (especially a gold one) muddies contrast.
+  const figures = [
+    { id: 'female-ready', x: 480, scale: -0.8, color: '#ffffff' },
+    { id: 'female-serve', x: 590, scale: 0.75, color: '#5fcf9e' },
+    { id: 'male-smash', x: 700, scale: -0.85, color: '#f5c344' },
+    { id: 'male-ready', x: 810, scale: 0.8, color: '#ffffff' },
+    { id: 'female-serve', x: 920, scale: -0.75, color: '#f5c344' },
+    { id: 'female-ready', x: 1030, scale: 0.8, color: '#5fcf9e' },
+    { id: 'male-serve', x: 1140, scale: -0.85, color: '#ffffff' },
+    { id: 'male-smash', x: 1250, scale: 0.75, color: '#5fcf9e' },
+    { id: 'female-serve', x: 1360, scale: -0.8, color: '#f5c344' },
+  ];
   return (
-    <div className="no-print bg-white text-center px-4 py-4 border-b border-slate-100">
-      <p className="text-teal-700 font-bold uppercase tracking-wide text-xs sm:text-sm">
-        Kovai Tennis League Association Trust
-      </p>
-      <h1 className="text-teal-950 font-extrabold uppercase text-2xl sm:text-4xl tracking-tight leading-tight mt-1">
-        Kovai Legends 40+ League
-      </h1>
-      <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px] sm:text-xs mt-1.5">
-        Fun . Friendship . Fitness
-      </p>
-    </div>
+    <svg className={className} viewBox="0 0 1400 160" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        {/* Male, serving: legs in a lunge, one arm up with racket */}
+        <g id="male-serve">
+          <circle cx="0" cy="-92" r="10" />
+          <path d="M -9 -78 Q 0 -86 9 -78 L 13 -40 Q 14 -30 6 -28 L 6 -4 L 16 38 L 8 40 L -1 -2 L -8 40 L -16 38 L -8 -4 L -8 -28 Q -16 -30 -13 -40 Z" />
+          <path d="M 9 -78 L 30 -100 L 36 -96 L 20 -70 Z" />
+          <ellipse cx="38" cy="-104" rx="4" ry="16" transform="rotate(35 38 -104)" />
+          <path d="M -9 -78 L -26 -64 L -22 -58 L -4 -70 Z" />
+        </g>
+        {/* Female, serving: ponytail + flared skirt */}
+        <g id="female-serve">
+          <circle cx="0" cy="-92" r="10" />
+          <path d="M -6 -103 Q 8 -108 7 -95 Q 12 -92 7 -87 L 1 -89 Z" />
+          <path d="M -9 -78 Q 0 -86 9 -78 L 12 -44 Q 20 -39 13 -35 L -13 -35 Q -20 -39 -12 -44 Z" />
+          <path d="M -8 -35 L -14 36 L -7 38 L 0 -6 L 7 38 L 14 36 L 8 -35 Z" />
+          <path d="M 9 -78 L 30 -100 L 36 -96 L 20 -70 Z" />
+          <ellipse cx="38" cy="-104" rx="4" ry="16" transform="rotate(35 38 -104)" />
+          <path d="M -9 -78 L -26 -64 L -22 -58 L -4 -70 Z" />
+        </g>
+        {/* Male, ready stance: wide base, racket out front */}
+        <g id="male-ready">
+          <circle cx="0" cy="-88" r="10" />
+          <path d="M -9 -74 Q 0 -80 9 -74 L 12 -36 L -12 -36 Z" />
+          <path d="M -8 -36 L -20 36 L -12 38 L -2 -4 L 2 -4 L 12 38 L 20 36 L 8 -36 Z" />
+          <path d="M -9 -70 L -28 -52 L -22 -46 L -2 -62 Z" />
+          <path d="M 9 -70 L 24 -48 L 18 -42 L 2 -62 Z" />
+          <ellipse cx="30" cy="-44" rx="3.5" ry="13" transform="rotate(-60 30 -44)" />
+        </g>
+        {/* Female, ready stance */}
+        <g id="female-ready">
+          <circle cx="0" cy="-88" r="10" />
+          <path d="M -6 -99 Q 8 -104 7 -91 Q 12 -88 7 -83 L 1 -85 Z" />
+          <path d="M -9 -74 Q 0 -80 9 -74 L 11 -42 Q 18 -38 12 -34 L -12 -34 Q -18 -38 -11 -42 Z" />
+          <path d="M -8 -34 L -16 36 L -9 38 L 0 -4 L 9 38 L 16 36 L 8 -34 Z" />
+          <path d="M -9 -70 L -28 -52 L -22 -46 L -2 -62 Z" />
+          <path d="M 9 -70 L 24 -48 L 18 -42 L 2 -62 Z" />
+          <ellipse cx="30" cy="-44" rx="3.5" ry="13" transform="rotate(-60 30 -44)" />
+        </g>
+        {/* Male, overhead smash: legs together, arm fully extended up */}
+        <g id="male-smash">
+          <circle cx="0" cy="-96" r="10" />
+          <path d="M -8 -82 Q 0 -90 8 -82 L 10 -38 L -10 -38 Z" />
+          <path d="M -7 -38 L -12 36 L -4 38 L 0 -2 L 4 38 L 12 36 L 7 -38 Z" />
+          <path d="M -8 -82 L -22 -70 L -18 -64 L -4 -74 Z" />
+          <path d="M 8 -82 L 14 -112 L 20 -110 L 16 -78 Z" />
+          <ellipse cx="24" cy="-120" rx="4" ry="15" transform="rotate(15 24 -120)" />
+        </g>
+      </defs>
+      {figures.map((f, i) => (
+        <g key={i} transform={`translate(${f.x},120) scale(${f.scale})`}>
+          <use href={`#${f.id}`} fill={f.color} />
+        </g>
+      ))}
+    </svg>
   );
 }
 
@@ -154,9 +212,13 @@ function NavDropdown({ label, items }) {
 function Nav() {
   const { role, signOut } = useAuth();
   return (
-    <nav className="no-print bg-teal-900 border-b-4 border-accent-500 px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm items-center shadow-md">
-      <Link to="/standings" className="font-extrabold uppercase text-white text-lg tracking-wide mr-1">
-        Kovai Legends 40+
+    <nav className="no-print relative overflow-hidden bg-teal-900 border-b-4 border-accent-500 shadow-md">
+      <PlayerSilhouettes className="absolute inset-0 w-full h-full opacity-50 pointer-events-none" />
+      <div className="relative px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 items-center text-sm">
+      <Link to="/standings" className="flex flex-col leading-none mr-1">
+        <span className="hidden sm:block text-accent-400 text-[9px] font-bold uppercase tracking-wide">Kovai Tennis League Association Trust</span>
+        <span className="font-extrabold uppercase text-white text-lg tracking-wide">Kovai Legends 40+</span>
+        <span className="text-teal-200 text-[9px] font-bold uppercase tracking-[0.2em]">Fun . Friendship . Fitness</span>
       </Link>
       <Link to="/results" className={navLinkClass}>Results</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
@@ -215,6 +277,7 @@ function Nav() {
         ) : (
           <Link to="/login" className="text-white font-bold uppercase text-xs tracking-wide hover:text-accent-400 transition-colors">Login</Link>
         )}
+      </div>
       </div>
     </nav>
   );
