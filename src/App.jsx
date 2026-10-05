@@ -256,10 +256,10 @@ function Nav() {
             label="Scores"
             items={[
               { to: '/admin/update-scores', label: 'Update Scores' },
+              { to: '/admin/missing-scores', label: 'Missing Scores' },
               { to: '/admin/final-results', label: 'Final Results' },
             ]}
           />
-          <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
           <NavDropdown
             label="About"
             items={[
