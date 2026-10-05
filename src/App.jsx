@@ -101,72 +101,72 @@ export default function App() {
 // Figure gradients use userSpaceOnUse with coordinates matching each
 // path's own geometry, so colour flows smoothly across the whole
 // silhouette instead of being computed per separate shape.
-const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 160">
+const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 200">
   <defs>
-    <linearGradient id="navfig-g1" x1="0" y1="-120" x2="0" y2="40" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ffd54a"/>
-      <stop offset="0.55" stop-color="#ff7a59"/>
-      <stop offset="1" stop-color="#0d9488"/>
-    </linearGradient>
-    <linearGradient id="navfig-g2" x1="0" y1="-120" x2="0" y2="40" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#5fcf9e"/>
-    </linearGradient>
-    <linearGradient id="navfig-g3" x1="0" y1="-120" x2="0" y2="40" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f5c344"/>
-      <stop offset="1" stop-color="#ffffff"/>
-    </linearGradient>
     <radialGradient id="navfig-ball" cx="0.35" cy="0.3" r="0.8">
       <stop offset="0" stop-color="#eaff7a"/>
       <stop offset="1" stop-color="#9ad028"/>
     </radialGradient>
-    <!-- Racket: a ring (outer disc with a background-colour hole punched
-         out of it) plus white cross-strings and a handle, so it reads as
-         an actual racket rather than a stray stick. Colour comes from
-         whichever figure's <use> instances it — only the hole and
-         strings set an explicit colour, everything else inherits. -->
-    <g id="navfig-racket">
-      <circle cx="0" cy="-18" r="11"/>
-      <circle cx="0" cy="-18" r="7" fill="#0d2a26"/>
-      <line x1="0" y1="-25" x2="0" y2="-11" stroke="#ffffff" stroke-width="1.6" opacity="0.9"/>
-      <line x1="-7" y1="-18" x2="7" y2="-18" stroke="#ffffff" stroke-width="1.6" opacity="0.9"/>
-      <rect x="-2" y="-7" width="4" height="22" rx="2"/>
-    </g>
-    <g id="navfig-male-serve">
-      <circle cx="0" cy="-92" r="10"/>
-      <path d="M -9 -78 Q 0 -86 9 -78 L 13 -40 Q 14 -30 6 -28 L 6 -4 L 16 38 L 8 40 L -1 -2 L -8 40 L -16 38 L -8 -4 L -8 -28 Q -16 -30 -13 -40 Z"/>
-      <path d="M 9 -78 L 30 -100 L 36 -96 L 20 -70 Z"/>
-      <use href="#navfig-racket" transform="translate(38,-104) rotate(35)"/>
-      <path d="M -9 -78 L -26 -64 L -22 -58 L -4 -70 Z"/>
-    </g>
-    <g id="navfig-female-serve">
-      <circle cx="0" cy="-92" r="10"/>
-      <path d="M -6 -103 Q 8 -108 7 -95 Q 12 -92 7 -87 L 1 -89 Z"/>
-      <path d="M -9 -78 Q 0 -86 9 -78 L 12 -44 Q 20 -39 13 -35 L -13 -35 Q -20 -39 -12 -44 Z"/>
-      <path d="M -8 -35 L -14 36 L -7 38 L 0 -6 L 7 38 L 14 36 L 8 -35 Z"/>
-      <path d="M 9 -78 L 30 -100 L 36 -96 L 20 -70 Z"/>
-      <use href="#navfig-racket" transform="translate(38,-104) rotate(35)"/>
-      <path d="M -9 -78 L -26 -64 L -22 -58 L -4 -70 Z"/>
-    </g>
-    <g id="navfig-male-smash">
-      <circle cx="0" cy="-96" r="10"/>
-      <path d="M -8 -82 Q 0 -90 8 -82 L 10 -38 L -10 -38 Z"/>
-      <path d="M -7 -38 L -12 36 L -4 38 L 0 -2 L 4 38 L 12 36 L 7 -38 Z"/>
-      <path d="M -8 -82 L -22 -70 L -18 -64 L -4 -74 Z"/>
-      <use href="#navfig-racket" transform="translate(22,-116) rotate(12)"/>
-    </g>
     <g id="navfig-ball-icon">
-      <circle cx="0" cy="0" r="20" fill="url(#navfig-ball)"/>
-      <path d="M 0 -20 C -14 -15, -14 15, 0 20" fill="none" stroke="#ffffff" stroke-width="2.2" opacity="0.85"/>
-      <path d="M 0 -20 C 14 -15, 14 15, 0 20" fill="none" stroke="#ffffff" stroke-width="2.2" opacity="0.85"/>
+      <circle cx="0" cy="0" r="11" fill="url(#navfig-ball)"/>
+      <path d="M 0 -11 C -8 -8, -8 8, 0 11" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.85"/>
+      <path d="M 0 -11 C 8 -8, 8 8, 0 11" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.85"/>
+    </g>
+    <!-- Four flat-colour action poses — a head, a thick torso stroke, limb
+         strokes with round caps, and an open-ring racket (no fill, just a
+         stroked circle) at the swinging hand. Legs start slightly inside
+         the torso's own bottom so its round cap doesn't peek out as a
+         bump at the hip. -->
+    <g id="navfig-serve">
+      <circle cx="0" cy="-85" r="9"/>
+      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
+      <line x1="0" y1="-24" x2="-10" y2="55" stroke-width="13"/>
+      <line x1="0" y1="-24" x2="10" y2="55" stroke-width="13"/>
+      <line x1="0" y1="-65" x2="28" y2="-95" stroke-width="11"/>
+      <line x1="0" y1="-65" x2="-22" y2="-90" stroke-width="11"/>
+      <circle cx="34" cy="-100" r="12" fill="none" stroke-width="5"/>
+    </g>
+    <g id="navfig-forehand-high">
+      <circle cx="0" cy="-85" r="9"/>
+      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
+      <line x1="0" y1="-24" x2="-35" y2="50" stroke-width="13"/>
+      <line x1="0" y1="-24" x2="30" y2="50" stroke-width="13"/>
+      <line x1="0" y1="-65" x2="45" y2="-72" stroke-width="11"/>
+      <line x1="0" y1="-65" x2="-35" y2="-60" stroke-width="11"/>
+      <circle cx="54" cy="-74" r="12" fill="none" stroke-width="5"/>
+    </g>
+    <g id="navfig-forehand-low">
+      <circle cx="0" cy="-85" r="9"/>
+      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
+      <line x1="0" y1="-24" x2="-30" y2="50" stroke-width="13"/>
+      <line x1="0" y1="-24" x2="35" y2="50" stroke-width="13"/>
+      <line x1="0" y1="-65" x2="40" y2="-35" stroke-width="11"/>
+      <line x1="0" y1="-65" x2="-30" y2="-70" stroke-width="11"/>
+      <circle cx="48" cy="-30" r="12" fill="none" stroke-width="5"/>
+    </g>
+    <g id="navfig-jump-smash">
+      <circle cx="0" cy="-85" r="9"/>
+      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
+      <line x1="0" y1="-24" x2="-18" y2="-2" stroke-width="13"/>
+      <line x1="-18" y1="-2" x2="-9" y2="24" stroke-width="12"/>
+      <line x1="0" y1="-24" x2="16" y2="-6" stroke-width="13"/>
+      <line x1="16" y1="-6" x2="8" y2="20" stroke-width="12"/>
+      <line x1="0" y1="-65" x2="22" y2="-98" stroke-width="11"/>
+      <line x1="0" y1="-65" x2="-18" y2="-92" stroke-width="11"/>
+      <circle cx="28" cy="-104" r="12" fill="none" stroke-width="5"/>
     </g>
   </defs>
-  <use href="#navfig-ball-icon" transform="translate(70,100)"/>
-  <g transform="translate(230,120) scale(0.78)"><use href="#navfig-male-serve" fill="url(#navfig-g1)"/></g>
-  <use href="#navfig-ball-icon" transform="translate(430,62) scale(0.85)"/>
-  <g transform="translate(590,120) scale(-0.74,0.74)"><use href="#navfig-female-serve" fill="url(#navfig-g2)"/></g>
-  <use href="#navfig-ball-icon" transform="translate(800,138)"/>
-  <g transform="translate(960,120) scale(0.78)"><use href="#navfig-male-smash" fill="url(#navfig-g3)"/></g>
+  <g stroke-linecap="round">
+    <use href="#navfig-ball-icon" transform="translate(60,70)"/>
+    <g transform="translate(190,134)" fill="#f2b84b" stroke="#f2b84b"><use href="#navfig-serve"/></g>
+    <use href="#navfig-ball-icon" transform="translate(360,140)"/>
+    <g transform="translate(500,134)" fill="#ff8a5c" stroke="#ff8a5c"><use href="#navfig-forehand-high"/></g>
+    <use href="#navfig-ball-icon" transform="translate(680,50)"/>
+    <g transform="translate(820,134) scale(-1,1)" fill="#7fd9b6" stroke="#7fd9b6"><use href="#navfig-forehand-low"/></g>
+    <use href="#navfig-ball-icon" transform="translate(1000,160)"/>
+    <g transform="translate(1140,118)" fill="#b9a3e3" stroke="#b9a3e3"><use href="#navfig-jump-smash"/></g>
+    <use href="#navfig-ball-icon" transform="translate(1320,90)"/>
+  </g>
 </svg>`;
 
 const navStripStyle = {
@@ -174,7 +174,7 @@ const navStripStyle = {
   backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(NAV_STRIP_SVG)}")`,
   backgroundRepeat: 'repeat-x',
   backgroundPosition: 'left bottom',
-  backgroundSize: 'auto 84px',
+  backgroundSize: 'auto 100px',
 };
 
 const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
@@ -291,7 +291,7 @@ function Nav() {
         )}
       </div>
       </div>
-      <div className="h-[84px]" style={navStripStyle} aria-hidden="true" />
+      <div className="h-[100px]" style={navStripStyle} aria-hidden="true" />
     </nav>
   );
 }
