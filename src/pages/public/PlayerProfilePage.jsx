@@ -167,7 +167,8 @@ export default function PlayerProfilePage({ seasonId, playerId }) {
             <p className="text-xs text-gray-500 mb-3">
               This season's average rating (of {ratingSummary.count}) and skill tally, given by opposing captains after each tie.
             </p>
-            <table className="w-full text-sm border rounded overflow-hidden">
+            <div className="overflow-x-auto rounded border">
+            <table className="w-full text-sm">
               <thead className="bg-teal-900 text-teal-50">
                 <tr>
                   <th className="p-2 font-bold uppercase text-xs tracking-wide">Avg</th>
@@ -187,6 +188,7 @@ export default function PlayerProfilePage({ seasonId, playerId }) {
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         )}
 

@@ -143,7 +143,8 @@ export default function StandingsPage() {
       {!rows ? (
         <p className="text-gray-500 text-sm">Loading standings…</p>
       ) : (
-      <table className="w-full text-sm border rounded overflow-hidden shadow">
+      <div className="overflow-x-auto rounded shadow">
+      <table className="w-full text-sm border">
         <thead className="bg-teal-900 text-teal-50">
           <tr>
             <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Team</th>
@@ -215,6 +216,7 @@ export default function StandingsPage() {
           })}
         </tbody>
       </table>
+      </div>
       )}
       {rows && (
         <p className="text-xs text-gray-500 mt-2">

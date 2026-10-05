@@ -417,7 +417,8 @@ function ReadOnlyRatings({ title, playerIds, roster, ratings }) {
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-wide text-teal-900 mb-2">{title}</p>
-      <table className="w-full text-sm border rounded overflow-hidden">
+      <div className="overflow-x-auto rounded border">
+      <table className="w-full text-sm">
         <thead className="bg-teal-50">
           <tr>
             <th className="text-left p-2">Player</th>
@@ -440,6 +441,7 @@ function ReadOnlyRatings({ title, playerIds, roster, ratings }) {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

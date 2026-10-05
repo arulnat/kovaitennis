@@ -206,7 +206,8 @@ export default function RisingStarsPage({ seasonId }) {
       ) : shownRows.length === 0 ? (
         <p className="text-gray-500 text-sm">{search ? `No ${kind} players matching "${nameSearch}".` : `No ${kind} results yet.`}</p>
       ) : (
-        <table className="w-full text-sm border rounded overflow-hidden shadow">
+        <div className="overflow-x-auto rounded shadow">
+        <table className="w-full text-sm border">
           <thead className="bg-teal-900 text-teal-50">
             <tr>
               <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Player</th>
@@ -242,6 +243,7 @@ export default function RisingStarsPage({ seasonId }) {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

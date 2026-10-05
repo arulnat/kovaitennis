@@ -299,7 +299,8 @@ export default function TeamProfilePage({ seasonId, teamId }) {
               <p className="text-xs text-gray-500 mb-3">
                 This season's average rating and skill tally, given by the opposing captain after each tie — see Score Entry's Performance tab.
               </p>
-              <table className="w-full text-sm border rounded overflow-hidden">
+              <div className="overflow-x-auto rounded border">
+              <table className="w-full text-sm">
                 <thead className="bg-teal-900 text-teal-50">
                   <tr>
                     <th className="text-left p-2 font-bold uppercase text-xs tracking-wide">Player</th>
@@ -326,6 +327,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
