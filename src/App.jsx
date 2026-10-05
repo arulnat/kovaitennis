@@ -212,7 +212,7 @@ function NavDropdown({ label, items }) {
 function Nav() {
   const { role, signOut } = useAuth();
   return (
-    <nav className="no-print relative overflow-hidden bg-teal-900 border-b-4 border-accent-500 shadow-md">
+    <nav className="no-print relative bg-teal-900 border-b-4 border-accent-500 shadow-md">
       <PlayerSilhouettes className="absolute inset-0 w-full h-full opacity-50 pointer-events-none" />
       <div className="relative px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 items-center text-sm">
       <Link to="/standings" className="flex flex-col leading-none mr-1">
