@@ -91,11 +91,14 @@ const dropdownLinkClass = 'block px-4 py-2 text-teal-100 hover:text-white hover:
 // Seasons -> Divisions -> Bulk Upload -> Manage Teams -> Team Logins is
 // the order an admin actually sets a season up in (teams exist only
 // once uploaded, and logins are only worth circulating once team
-// details are confirmed), so grouping them under one "Setup" menu, in
-// that order, keeps the one-time setup steps together and out of the
-// way of the day-to-day admin links, instead of each sitting as its
-// own top-level nav item.
-function SetupMenu() {
+// details are confirmed), so grouping them under one "Setup" dropdown,
+// in that order, keeps the one-time setup steps together and out of
+// the way of the day-to-day admin links, instead of each sitting as
+// its own top-level nav item. Grouping+Fixtures (scheduling) and
+// Update Scores+Final Results (score entry) are the same idea applied
+// to two more pairs of closely related pages — see their AdminDropdown
+// calls in Nav() below.
+function AdminDropdown({ label, items }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -114,18 +117,16 @@ function SetupMenu() {
         onClick={() => setOpen((o) => !o)}
         className={`${navLinkClass} flex items-center gap-1`}
       >
-        Setup <span className="text-[9px]">▾</span>
+        {label} <span className="text-[9px]">▾</span>
       </button>
       {open && (
         <div
           onClick={() => setOpen(false)}
           className="absolute left-0 top-full mt-2 bg-teal-900 border-2 border-accent-500 rounded shadow-lg py-1 z-10"
         >
-          <Link to="/admin/seasons" className={dropdownLinkClass}>Seasons</Link>
-          <Link to="/admin/divisions" className={dropdownLinkClass}>Divisions</Link>
-          <Link to="/admin/bulk-upload" className={dropdownLinkClass}>Bulk Upload</Link>
-          <Link to="/admin/teams" className={dropdownLinkClass}>Manage Teams</Link>
-          <Link to="/admin/login-credentials" className={dropdownLinkClass}>Team Logins</Link>
+          {items.map((item) => (
+            <Link key={item.to} to={item.to} className={dropdownLinkClass}>{item.label}</Link>
+          ))}
         </div>
       )}
     </div>
@@ -149,12 +150,31 @@ function Nav() {
       )}
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
-          <SetupMenu />
-          <Link to="/admin/grouping" className={navLinkClass}>Grouping</Link>
-          <Link to="/admin/fixtures" className={navLinkClass}>Fixtures</Link>
-          <Link to="/admin/update-scores" className={navLinkClass}>Update Scores</Link>
+          <AdminDropdown
+            label="Setup"
+            items={[
+              { to: '/admin/seasons', label: 'Seasons' },
+              { to: '/admin/divisions', label: 'Divisions' },
+              { to: '/admin/bulk-upload', label: 'Bulk Upload' },
+              { to: '/admin/teams', label: 'Manage Teams' },
+              { to: '/admin/login-credentials', label: 'Team Logins' },
+            ]}
+          />
+          <AdminDropdown
+            label="Grouping"
+            items={[
+              { to: '/admin/grouping', label: 'Grouping' },
+              { to: '/admin/fixtures', label: 'Fixtures' },
+            ]}
+          />
+          <AdminDropdown
+            label="Scores"
+            items={[
+              { to: '/admin/update-scores', label: 'Update Scores' },
+              { to: '/admin/final-results', label: 'Final Results' },
+            ]}
+          />
           <Link to="/admin/missing-scores" className={navLinkClass}>Missing Scores</Link>
-          <Link to="/admin/final-results" className={navLinkClass}>Final Results</Link>
           <Link to="/admin/content" className={navLinkClass}>Content</Link>
           <Link to="/admin/messages" className={navLinkClass}>Messages</Link>
           <Link to="/about" className={navLinkClass}>About</Link>
