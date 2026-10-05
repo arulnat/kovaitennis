@@ -41,6 +41,12 @@
 // on the Seasons admin page) — shown live as soon as a date of birth is
 // picked, in both the view and edit states, and re-checked server-side
 // (the real enforcement; this client check is just immediate feedback).
+//
+// Fee notice (captain's own view only, not isAdminView): the season's
+// entry fee plus its per-player fee (seasons.registration_fee/
+// player_fee — previously schema-only, Req 2.5), recalculated live as
+// players are added so the captain can see the running total. Display
+// only — no payment tracking here.
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth.jsx';
@@ -79,6 +85,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
   const [players, setPlayers] = useState(null); // null = loading
   const [teamSeason, setTeamSeason] = useState(null); // { roster_submitted, roster_submitted_at } | null
   const [ageCutoffDate, setAgeCutoffDate] = useState(null);
+  const [seasonFees, setSeasonFees] = useState(null); // { registrationFee, playerFee }
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -98,11 +105,12 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
         .eq('season_id', seasonId)
         .eq('team_id', teamId)
         .maybeSingle(),
-      supabase.from('seasons').select('age_cutoff_date').eq('id', seasonId).maybeSingle(),
+      supabase.from('seasons').select('age_cutoff_date, registration_fee, player_fee').eq('id', seasonId).maybeSingle(),
     ]);
     setPlayers((data || []).map((r) => r.players).filter(Boolean));
     setTeamSeason(tsRow || null);
     setAgeCutoffDate(seasonRow?.age_cutoff_date ?? null);
+    setSeasonFees(seasonRow ? { registrationFee: seasonRow.registration_fee, playerFee: seasonRow.player_fee } : null);
   }, [teamId, seasonId]);
 
   useEffect(() => { load(); }, [load]);
@@ -163,6 +171,15 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
           + (ageCutoffDate ? ` Every player must be ${MIN_AGE}+ as of ${ageCutoffDate}.` : '')
         }
       />
+
+      {!isAdminView && seasonFees && players !== null && (
+        <p className="text-sm text-teal-900 bg-teal-50 border border-teal-200 rounded p-2 mb-3">
+          Entry fee: ₹{seasonFees.registrationFee.toLocaleString('en-IN')} + ₹{seasonFees.playerFee.toLocaleString('en-IN')} per player
+          {players.length > 0 && (
+            <> — {players.length} player{players.length === 1 ? '' : 's'} so far = <strong>₹{(seasonFees.registrationFee + players.length * seasonFees.playerFee).toLocaleString('en-IN')}</strong> total</>
+          )}
+        </p>
+      )}
 
       {teamSeason?.roster_submitted && (
         <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-2 mb-3">

@@ -28,6 +28,13 @@
 // on their own team, letting an admin edit/add/remove any player on any
 // team's roster too.
 //
+// Fees is read-only here — the season's entry fee plus its per-player
+// fee times the team's current roster size (seasons.registration_fee/
+// player_fee), the same figure My Team shows a captain while they add
+// players. Status is a single letter (A = assigned to a division, U =
+// unassigned) rather than a full word, to keep the row compact — the
+// title attribute spells it out on hover.
+//
 // Delete (single, via the per-row button, or several at once via the
 // checkboxes + "Delete selected") is only offered for a team unassigned
 // in this season (matching what's visible right here) — the checkbox
@@ -53,6 +60,7 @@ export default function TeamsPage({ seasonId }) {
   const { isAdmin } = useAuth();
   const [rows, setRows] = useState([]);
   const [orphanTeams, setOrphanTeams] = useState([]); // teams in NO season at all — invisible otherwise, e.g. after a purge
+  const [seasonFees, setSeasonFees] = useState(null); // { registrationFee, playerFee } for this season
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(new Set()); // team_seasons row ids
 
@@ -66,6 +74,7 @@ export default function TeamsPage({ seasonId }) {
     if (!seasonId) {
       setRows([]);
       setSelected(new Set());
+      setSeasonFees(null);
     } else {
       const { data: teamSeasons, error } = await supabase
         .from('team_seasons')
@@ -89,6 +98,9 @@ export default function TeamsPage({ seasonId }) {
 
       setRows((teamSeasons || []).map((ts) => ({ ...ts, playerCount: playerCounts[ts.team_id] || 0 })));
       setSelected(new Set());
+
+      const { data: seasonRow } = await supabase.from('seasons').select('registration_fee, player_fee').eq('id', seasonId).maybeSingle();
+      setSeasonFees(seasonRow ? { registrationFee: seasonRow.registration_fee, playerFee: seasonRow.player_fee } : null);
     }
 
     // Teams with no team_seasons row in ANY season — e.g. left behind by
@@ -200,7 +212,13 @@ export default function TeamsPage({ seasonId }) {
     load();
   }
 
-  const columnCount = 7 + (isAdmin ? 1 : 0); // checkbox, team, captain, phone, club, players, delete [+ status]
+  const columnCount = 8 + (isAdmin ? 1 : 0); // checkbox, team, captain, phone, club, players, fees, delete [+ status]
+
+  /** Entry fee + per-head fee, from the season's own settings (seasons.registration_fee/player_fee). */
+  function feeFor(playerCount) {
+    if (!seasonFees) return null;
+    return seasonFees.registrationFee + playerCount * seasonFees.playerFee;
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -272,6 +290,7 @@ export default function TeamsPage({ seasonId }) {
                 <th className="text-left p-2">Phone</th>
                 <th className="text-left p-2">Club</th>
                 <th className="p-2">Roster</th>
+                <th className="p-2">Fees</th>
                 {isAdmin && <th className="text-left p-2">Status</th>}
                 <th className="p-2">Delete</th>
               </tr>
@@ -315,12 +334,15 @@ export default function TeamsPage({ seasonId }) {
                           {r.playerCount}
                         </Link>
                       </td>
+                      <td className="p-2 text-center">
+                        {feeFor(r.playerCount) != null ? `₹${feeFor(r.playerCount).toLocaleString('en-IN')}` : '—'}
+                      </td>
                       {isAdmin && (
                         <td className="p-2">
                           {r.division_id ? (
-                            <span className="text-green-700">Assigned</span>
+                            <span className="text-green-700 font-bold" title="Assigned to a division">A</span>
                           ) : (
-                            <span className="text-amber-700">Unassigned</span>
+                            <span className="text-amber-700 font-bold" title="Unassigned — not yet placed in a division">U</span>
                           )}
                         </td>
                       )}
