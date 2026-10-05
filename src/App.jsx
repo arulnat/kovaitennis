@@ -107,82 +107,124 @@ const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400
       <stop offset="0" stop-color="#eaff7a"/>
       <stop offset="1" stop-color="#9ad028"/>
     </radialGradient>
-    <!-- Vivid multi-hue blends (head to feet), not a single flat colour —
-         userSpaceOnUse so the colour flows smoothly across each figure's
-         separate limb strokes instead of each one computing its own
-         gradient independently. -->
-    <linearGradient id="navfig-gradA" x1="0" y1="-115" x2="0" y2="55" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3b5fe0"/>
-      <stop offset="0.35" stop-color="#9345d6"/>
-      <stop offset="0.65" stop-color="#e94f9c"/>
-      <stop offset="1" stop-color="#ffb23e"/>
-    </linearGradient>
-    <linearGradient id="navfig-gradB" x1="0" y1="-115" x2="0" y2="55" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7c3fe0"/>
-      <stop offset="0.4" stop-color="#e94f6a"/>
-      <stop offset="0.7" stop-color="#ff8a3d"/>
-      <stop offset="1" stop-color="#ffd54a"/>
-    </linearGradient>
     <g id="navfig-ball-icon">
       <circle cx="0" cy="0" r="11" fill="url(#navfig-ball)"/>
-      <path d="M 0 -11 C -8 -8, -8 8, 0 11" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.85"/>
-      <path d="M 0 -11 C 8 -8, 8 8, 0 11" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.85"/>
-    </g>
-    <!-- Four flat-colour action poses — a head, a thick torso stroke, limb
-         strokes with round caps, and an open-ring racket (no fill, just a
-         stroked circle) at the swinging hand. Legs start slightly inside
-         the torso's own bottom so its round cap doesn't peek out as a
-         bump at the hip. -->
-    <g id="navfig-serve">
-      <circle cx="0" cy="-85" r="9"/>
-      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
-      <line x1="0" y1="-24" x2="-10" y2="55" stroke-width="13"/>
-      <line x1="0" y1="-24" x2="10" y2="55" stroke-width="13"/>
-      <line x1="0" y1="-65" x2="28" y2="-95" stroke-width="11"/>
-      <line x1="0" y1="-65" x2="-22" y2="-90" stroke-width="11"/>
-      <circle cx="34" cy="-100" r="12" fill="none" stroke-width="5"/>
-    </g>
-    <g id="navfig-forehand-high">
-      <circle cx="0" cy="-85" r="9"/>
-      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
-      <line x1="0" y1="-24" x2="-35" y2="50" stroke-width="13"/>
-      <line x1="0" y1="-24" x2="30" y2="50" stroke-width="13"/>
-      <line x1="0" y1="-65" x2="45" y2="-72" stroke-width="11"/>
-      <line x1="0" y1="-65" x2="-35" y2="-60" stroke-width="11"/>
-      <circle cx="54" cy="-74" r="12" fill="none" stroke-width="5"/>
-    </g>
-    <g id="navfig-forehand-low">
-      <circle cx="0" cy="-85" r="9"/>
-      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
-      <line x1="0" y1="-24" x2="-30" y2="50" stroke-width="13"/>
-      <line x1="0" y1="-24" x2="35" y2="50" stroke-width="13"/>
-      <line x1="0" y1="-65" x2="40" y2="-35" stroke-width="11"/>
-      <line x1="0" y1="-65" x2="-30" y2="-70" stroke-width="11"/>
-      <circle cx="48" cy="-30" r="12" fill="none" stroke-width="5"/>
-    </g>
-    <g id="navfig-jump-smash">
-      <circle cx="0" cy="-85" r="9"/>
-      <line x1="0" y1="-74" x2="0" y2="-22" stroke-width="16"/>
-      <line x1="0" y1="-24" x2="-18" y2="-2" stroke-width="13"/>
-      <line x1="-18" y1="-2" x2="-9" y2="24" stroke-width="12"/>
-      <line x1="0" y1="-24" x2="16" y2="-6" stroke-width="13"/>
-      <line x1="16" y1="-6" x2="8" y2="20" stroke-width="12"/>
-      <line x1="0" y1="-65" x2="22" y2="-98" stroke-width="11"/>
-      <line x1="0" y1="-65" x2="-18" y2="-92" stroke-width="11"/>
-      <circle cx="28" cy="-104" r="12" fill="none" stroke-width="5"/>
+      <path d="M -9 1 Q 0 8 9 1" fill="none" stroke="#5a8a2f" stroke-width="1.4"/>
     </g>
   </defs>
-  <g stroke-linecap="round">
-    <use href="#navfig-ball-icon" transform="translate(60,70)"/>
-    <g transform="translate(190,134)" fill="url(#navfig-gradA)" stroke="url(#navfig-gradA)"><use href="#navfig-serve"/></g>
-    <use href="#navfig-ball-icon" transform="translate(360,140)"/>
-    <g transform="translate(500,134)" fill="url(#navfig-gradB)" stroke="url(#navfig-gradB)"><use href="#navfig-forehand-high"/></g>
-    <use href="#navfig-ball-icon" transform="translate(680,50)"/>
-    <g transform="translate(820,134) scale(-1,1)" fill="url(#navfig-gradA)" stroke="url(#navfig-gradA)"><use href="#navfig-forehand-low"/></g>
-    <use href="#navfig-ball-icon" transform="translate(1000,160)"/>
-    <g transform="translate(1140,118)" fill="url(#navfig-gradB)" stroke="url(#navfig-gradB)"><use href="#navfig-jump-smash"/></g>
-    <use href="#navfig-ball-icon" transform="translate(1320,90)"/>
+  <line x1="0" y1="189" x2="1400" y2="189" stroke="#143a34" stroke-width="2"/>
+  <ellipse cx="190" cy="189" rx="28" ry="4" fill="#0a221e" opacity="0.6"/>
+  <ellipse cx="500" cy="189" rx="30" ry="4" fill="#0a221e" opacity="0.6"/>
+  <ellipse cx="820" cy="189" rx="30" ry="4" fill="#0a221e" opacity="0.6"/>
+  <ellipse cx="1140" cy="189" rx="30" ry="4" fill="#0a221e" opacity="0.6"/>
+
+  <use href="#navfig-ball-icon" transform="translate(60,70)"/>
+  <!-- Serve: gold shirt, white shorts, red cap/racket -->
+  <g transform="translate(190,134)" stroke-linecap="round">
+    <line x1="0" y1="-24" x2="-10" y2="55" stroke="#e8b48a" stroke-width="13"/>
+    <line x1="0" y1="-24" x2="10" y2="55" stroke="#e8b48a" stroke-width="13"/>
+    <ellipse cx="-11" cy="56" rx="8" ry="4.5" fill="#ffffff"/>
+    <ellipse cx="11" cy="56" rx="8" ry="4.5" fill="#ffffff"/>
+    <line x1="0" y1="-24" x2="-5" y2="8" stroke="#ffffff" stroke-width="15"/>
+    <line x1="0" y1="-24" x2="5" y2="8" stroke="#ffffff" stroke-width="15"/>
+    <line x1="0" y1="-74" x2="0" y2="-22" stroke="#f2b84b" stroke-width="16"/>
+    <line x1="0" y1="-65" x2="28" y2="-95" stroke="#e8b48a" stroke-width="10"/>
+    <line x1="0" y1="-65" x2="-22" y2="-90" stroke="#e8b48a" stroke-width="10"/>
+    <circle cx="0" cy="-85" r="9" fill="#e8b48a"/>
+    <path d="M -8 -90 Q 0 -98 9 -90 L 9 -87 Q 0 -93 -8 -87 Z" fill="#e0493f"/>
+    <line x1="28" y1="-95" x2="34" y2="-104" stroke="#2a2a2a" stroke-width="3"/>
+    <ellipse cx="40" cy="-115" rx="9" ry="13" transform="rotate(25 40 -115)" fill="none" stroke="#e0493f" stroke-width="2.6"/>
+    <g transform="rotate(25 40 -115)" stroke="#dfe8e6" stroke-width="0.8" opacity="0.9">
+      <line x1="33" y1="-115" x2="47" y2="-115"/>
+      <line x1="33" y1="-110" x2="47" y2="-110"/>
+      <line x1="33" y1="-120" x2="47" y2="-120"/>
+      <line x1="40" y1="-126" x2="40" y2="-104"/>
+      <line x1="36" y1="-126" x2="36" y2="-104"/>
+      <line x1="44" y1="-126" x2="44" y2="-104"/>
+    </g>
   </g>
+
+  <use href="#navfig-ball-icon" transform="translate(360,140)"/>
+  <!-- Forehand reach: orange shirt, dark shorts/cap/racket -->
+  <g transform="translate(500,134)" stroke-linecap="round">
+    <line x1="0" y1="-24" x2="-35" y2="50" stroke="#c98a5a" stroke-width="13"/>
+    <line x1="0" y1="-24" x2="30" y2="50" stroke="#c98a5a" stroke-width="13"/>
+    <ellipse cx="-36" cy="51" rx="8" ry="4.5" fill="#ffffff"/>
+    <ellipse cx="31" cy="51" rx="8" ry="4.5" fill="#ffffff"/>
+    <line x1="0" y1="-24" x2="-18" y2="15" stroke="#2a2a2a" stroke-width="15"/>
+    <line x1="0" y1="-24" x2="15" y2="15" stroke="#2a2a2a" stroke-width="15"/>
+    <line x1="0" y1="-74" x2="0" y2="-22" stroke="#ff8a5c" stroke-width="16"/>
+    <line x1="0" y1="-65" x2="45" y2="-72" stroke="#c98a5a" stroke-width="10"/>
+    <line x1="0" y1="-65" x2="-35" y2="-60" stroke="#c98a5a" stroke-width="10"/>
+    <circle cx="0" cy="-85" r="9" fill="#c98a5a"/>
+    <path d="M -8 -90 Q 0 -98 9 -90 L 9 -87 Q 0 -93 -8 -87 Z" fill="#2a2a2a"/>
+    <line x1="45" y1="-72" x2="52" y2="-79" stroke="#2a2a2a" stroke-width="3"/>
+    <ellipse cx="59" cy="-87" rx="9" ry="13" transform="rotate(20 59 -87)" fill="none" stroke="#2a2a2a" stroke-width="2.6"/>
+    <g transform="rotate(20 59 -87)" stroke="#dfe8e6" stroke-width="0.8" opacity="0.9">
+      <line x1="52" y1="-87" x2="66" y2="-87"/>
+      <line x1="52" y1="-82" x2="66" y2="-82"/>
+      <line x1="52" y1="-92" x2="66" y2="-92"/>
+      <line x1="59" y1="-98" x2="59" y2="-76"/>
+      <line x1="55" y1="-98" x2="55" y2="-76"/>
+      <line x1="63" y1="-98" x2="63" y2="-76"/>
+    </g>
+  </g>
+
+  <use href="#navfig-ball-icon" transform="translate(680,50)"/>
+  <!-- Forehand low: teal shirt, dark-green shorts, white cap, blue racket -->
+  <g transform="translate(820,134) scale(-1,1)" stroke-linecap="round">
+    <line x1="0" y1="-24" x2="-30" y2="50" stroke="#e8b48a" stroke-width="13"/>
+    <line x1="0" y1="-24" x2="35" y2="50" stroke="#e8b48a" stroke-width="13"/>
+    <ellipse cx="-31" cy="51" rx="8" ry="4.5" fill="#ffffff"/>
+    <ellipse cx="36" cy="51" rx="8" ry="4.5" fill="#ffffff"/>
+    <line x1="0" y1="-24" x2="-15" y2="12" stroke="#1c4a3e" stroke-width="15"/>
+    <line x1="0" y1="-24" x2="18" y2="12" stroke="#1c4a3e" stroke-width="15"/>
+    <line x1="0" y1="-74" x2="0" y2="-22" stroke="#4fc79a" stroke-width="16"/>
+    <line x1="0" y1="-65" x2="40" y2="-35" stroke="#e8b48a" stroke-width="10"/>
+    <line x1="0" y1="-65" x2="-30" y2="-70" stroke="#e8b48a" stroke-width="10"/>
+    <circle cx="0" cy="-85" r="9" fill="#e8b48a"/>
+    <path d="M -8 -90 Q 0 -98 9 -90 L 9 -87 Q 0 -93 -8 -87 Z" fill="#ffffff"/>
+    <line x1="40" y1="-35" x2="46" y2="-29" stroke="#2a2a2a" stroke-width="3"/>
+    <ellipse cx="52" cy="-21" rx="9" ry="13" transform="rotate(-20 52 -21)" fill="none" stroke="#3a7bd6" stroke-width="2.6"/>
+    <g transform="rotate(-20 52 -21)" stroke="#dfe8e6" stroke-width="0.8" opacity="0.9">
+      <line x1="45" y1="-21" x2="59" y2="-21"/>
+      <line x1="45" y1="-16" x2="59" y2="-16"/>
+      <line x1="45" y1="-26" x2="59" y2="-26"/>
+      <line x1="52" y1="-32" x2="52" y2="-10"/>
+      <line x1="48" y1="-32" x2="48" y2="-10"/>
+      <line x1="56" y1="-32" x2="56" y2="-10"/>
+    </g>
+  </g>
+
+  <use href="#navfig-ball-icon" transform="translate(1000,160)"/>
+  <!-- Two-handed backhand: both arms converge on one grip (not two separate
+       hands at two different points), head stays centred over the torso
+       instead of floating off to one side, weight on a forward lunge —
+       purple shirt, dark-purple shorts, gold cap/racket -->
+  <g transform="translate(1140,134)" stroke-linecap="round">
+    <line x1="0" y1="-24" x2="-28" y2="50" stroke="#d9a06b" stroke-width="13"/>
+    <line x1="0" y1="-24" x2="32" y2="50" stroke="#d9a06b" stroke-width="13"/>
+    <ellipse cx="-29" cy="51" rx="8" ry="4.5" fill="#ffffff"/>
+    <ellipse cx="33" cy="51" rx="8" ry="4.5" fill="#ffffff"/>
+    <line x1="0" y1="-24" x2="-14" y2="10" stroke="#3d2f5c" stroke-width="15"/>
+    <line x1="0" y1="-24" x2="16" y2="10" stroke="#3d2f5c" stroke-width="15"/>
+    <line x1="0" y1="-74" x2="0" y2="-22" stroke="#a78bdb" stroke-width="16"/>
+    <line x1="-4" y1="-65" x2="34" y2="-80" stroke="#d9a06b" stroke-width="10"/>
+    <line x1="4" y1="-65" x2="34" y2="-80" stroke="#d9a06b" stroke-width="9"/>
+    <circle cx="0" cy="-85" r="9" fill="#d9a06b"/>
+    <path d="M -8 -90 Q 0 -98 9 -90 L 9 -87 Q 0 -93 -8 -87 Z" fill="#f2b84b"/>
+    <line x1="34" y1="-80" x2="40" y2="-86" stroke="#2a2a2a" stroke-width="3"/>
+    <ellipse cx="46" cy="-93" rx="9" ry="13" transform="rotate(20 46 -93)" fill="none" stroke="#f2b84b" stroke-width="2.6"/>
+    <g transform="rotate(20 46 -93)" stroke="#dfe8e6" stroke-width="0.8" opacity="0.9">
+      <line x1="39" y1="-93" x2="53" y2="-93"/>
+      <line x1="39" y1="-88" x2="53" y2="-88"/>
+      <line x1="39" y1="-98" x2="53" y2="-98"/>
+      <line x1="46" y1="-104" x2="46" y2="-82"/>
+      <line x1="42" y1="-104" x2="42" y2="-82"/>
+      <line x1="50" y1="-104" x2="50" y2="-82"/>
+    </g>
+  </g>
+  <use href="#navfig-ball-icon" transform="translate(1320,90)"/>
 </svg>`;
 
 const navStripStyle = {
@@ -190,7 +232,7 @@ const navStripStyle = {
   backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(NAV_STRIP_SVG)}")`,
   backgroundRepeat: 'repeat-x',
   backgroundPosition: 'left bottom',
-  backgroundSize: 'auto 64px',
+  backgroundSize: 'auto 76px',
 };
 
 const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
@@ -307,7 +349,7 @@ function Nav() {
         )}
       </div>
       </div>
-      <div className="h-[64px]" style={navStripStyle} aria-hidden="true" />
+      <div className="h-[76px]" style={navStripStyle} aria-hidden="true" />
     </nav>
   );
 }
