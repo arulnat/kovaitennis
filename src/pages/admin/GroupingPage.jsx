@@ -230,9 +230,19 @@ export default function GroupingPage({ seasonId }) {
 
     const clubIdByTeamId = Object.fromEntries(pool.map((ts) => [ts.id, ts.teams?.club_id ?? null]));
 
+    // Auto-generate only ever fills the existing (unlocked) divisions' own
+    // remaining spots — it never creates new divisions on its own. All or
+    // nothing: if there isn't room for every unassigned team, stop here
+    // and assign no one, rather than silently leaving some teams behind.
+    // Create more room (a new division on the Divisions page, or unlock
+    // one) and try again.
     const totalCapacity = divisionsWithCounts.reduce((n, d) => n + Math.max(0, size - d.currentCount), 0);
-    if (totalCapacity === 0) {
-      alert('Every unlocked division is already full (or there are no unlocked divisions). Create a new division on the Divisions page, or unlock one, then try again.');
+    if (totalCapacity < pool.length) {
+      alert(
+        `${pool.length} team(s) are unassigned, but unlocked divisions only have room for ${totalCapacity} ` +
+        `at ${size} per group. No teams were assigned — create another division (or unlock one) first so ` +
+        `there's room for all of them, then try again.`
+      );
       return;
     }
 
@@ -245,17 +255,10 @@ export default function GroupingPage({ seasonId }) {
       clubIdByTeamId,
     });
 
-    // Auto-generate only ever fills the existing (unlocked) divisions' own
-    // remaining spots — it never creates new divisions on its own. If the
-    // pool is bigger than that total capacity, the leftover teams simply
-    // stay in the unassigned pool; create more divisions on the Divisions
-    // page first if you want auto-generate to reach all of them.
-    const leftover = pool.length - plan.assignments.reduce((n, a) => n + a.teamIds.length, 0);
     if (!confirm(
-      `Randomly draw ${pool.length} unassigned team(s) into groups of ${size}, filling the highest ` +
+      `Randomly draw all ${pool.length} unassigned team(s) into groups of ${size}, filling the highest ` +
       `unlocked division's remaining spots first and working down` +
-      `${avoidSameClub ? ', avoiding same-club teams in one division where possible' : ''}` +
-      `${leftover > 0 ? `. Only enough room for ${pool.length - leftover} of them — the other ${leftover} will stay unassigned.` : '.'}`
+      `${avoidSameClub ? ', avoiding same-club teams in one division where possible' : ''}?`
     )) return;
 
     for (const { divisionId, teamIds } of plan.assignments) {
@@ -413,9 +416,10 @@ export default function GroupingPage({ seasonId }) {
         <p className="text-sm text-gray-600 mb-2">
           Randomly draws the {unassigned.length} unassigned team(s) into the highest unlocked division's
           remaining spots first and working down, up to this many teams per division. It only ever fills
-          existing divisions — it never creates a new one; if there isn't enough room, the rest stay
-          unassigned (create another division on the Divisions page first if you need one). With "avoid
-          same club" on, each division is steered away from seating two teams from the same club together —
+          existing divisions — it never creates a new one. All or nothing: if there isn't room for every
+          unassigned team, it assigns no one and tells you how many slots are missing — create another
+          division on the Divisions page (or unlock one) first. With "avoid same club" on, each division
+          is steered away from seating two teams from the same club together —
           but if a club has more teams than there are divisions to spread them across, it's fine for some to
           share a division anyway.
         </p>
