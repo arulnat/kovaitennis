@@ -91,15 +91,17 @@ export default function App() {
 // stock photo. Pure SVG shapes, no image asset. Absolutely positioned
 // behind the nav content (see Nav()), at partial opacity so the colors
 // stay vivid without fighting the white/gold text on top of it.
-// Small, fixed-size SVG tile (not stretched to the nav's width) that
-// CSS repeats horizontally via background-image. Unlike a viewBox
-// scaled with preserveAspectRatio="slice" to the nav's full box, the
-// tile's on-screen size is pinned by background-size, so it renders
-// the same way regardless of how wide the browser window is. Each
-// figure's gradient uses userSpaceOnUse with coordinates matching its
-// own path geometry, so the colour flows smoothly across the whole
+// Decorative tennis strip along the bottom of the nav bar, below the
+// menu row rather than behind it — so it never competes with the
+// clickable text above. A fixed-size SVG tile repeated via CSS
+// background-image (so its on-screen size is pinned, not stretched to
+// the browser's width like a viewBox+slice SVG would be), with only a
+// few, larger figures and tennis balls per tile — sparser than a
+// densely-packed row, which read as visual noise at full page width.
+// Figure gradients use userSpaceOnUse with coordinates matching each
+// path's own geometry, so colour flows smoothly across the whole
 // silhouette instead of being computed per separate shape.
-const NAV_SILHOUETTE_TILE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160">
+const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 160">
   <defs>
     <linearGradient id="navfig-g1" x1="0" y1="-120" x2="0" y2="40" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffd54a"/>
@@ -114,6 +116,10 @@ const NAV_SILHOUETTE_TILE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox
       <stop offset="0" stop-color="#f5c344"/>
       <stop offset="1" stop-color="#ffffff"/>
     </linearGradient>
+    <radialGradient id="navfig-ball" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#eaff7a"/>
+      <stop offset="1" stop-color="#9ad028"/>
+    </radialGradient>
     <g id="navfig-male-serve">
       <circle cx="0" cy="-92" r="10"/>
       <path d="M -9 -78 Q 0 -86 9 -78 L 13 -40 Q 14 -30 6 -28 L 6 -4 L 16 38 L 8 40 L -1 -2 L -8 40 L -16 38 L -8 -4 L -8 -28 Q -16 -30 -13 -40 Z"/>
@@ -138,19 +144,25 @@ const NAV_SILHOUETTE_TILE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox
       <path d="M 8 -82 L 14 -112 L 20 -110 L 16 -78 Z"/>
       <ellipse cx="24" cy="-120" rx="4" ry="15" transform="rotate(15 24 -120)"/>
     </g>
+    <g id="navfig-ball-icon">
+      <circle cx="0" cy="0" r="20" fill="url(#navfig-ball)"/>
+      <path d="M 0 -20 C -14 -15, -14 15, 0 20" fill="none" stroke="#ffffff" stroke-width="2.2" opacity="0.85"/>
+      <path d="M 0 -20 C 14 -15, 14 15, 0 20" fill="none" stroke="#ffffff" stroke-width="2.2" opacity="0.85"/>
+    </g>
   </defs>
-  <g transform="translate(60,120) scale(0.72)"><use href="#navfig-male-serve" fill="url(#navfig-g1)"/></g>
-  <g transform="translate(160,120) scale(-0.68,0.68)"><use href="#navfig-female-serve" fill="url(#navfig-g2)"/></g>
-  <g transform="translate(280,120) scale(0.72)"><use href="#navfig-male-smash" fill="url(#navfig-g3)"/></g>
-  <g transform="translate(390,120) scale(-0.68,0.68)"><use href="#navfig-female-serve" fill="url(#navfig-g1)"/></g>
-  <g transform="translate(480,120) scale(0.68)"><use href="#navfig-male-serve" fill="url(#navfig-g2)"/></g>
+  <use href="#navfig-ball-icon" transform="translate(70,128)"/>
+  <g transform="translate(230,120) scale(0.78)"><use href="#navfig-male-serve" fill="url(#navfig-g1)"/></g>
+  <use href="#navfig-ball-icon" transform="translate(430,132) scale(0.85)"/>
+  <g transform="translate(590,120) scale(-0.74,0.74)"><use href="#navfig-female-serve" fill="url(#navfig-g2)"/></g>
+  <use href="#navfig-ball-icon" transform="translate(800,128)"/>
+  <g transform="translate(960,120) scale(0.78)"><use href="#navfig-male-smash" fill="url(#navfig-g3)"/></g>
 </svg>`;
 
-const navSilhouetteStyle = {
-  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(NAV_SILHOUETTE_TILE_SVG)}")`,
+const navStripStyle = {
+  backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(NAV_STRIP_SVG)}")`,
   backgroundRepeat: 'repeat-x',
   backgroundPosition: 'left bottom',
-  backgroundSize: 'auto 40px',
+  backgroundSize: 'auto 84px',
 };
 
 const navLinkClass = 'text-teal-100 hover:text-white font-semibold uppercase text-xs tracking-wide border-b-2 border-transparent hover:border-accent-400 transition-colors pb-0.5';
@@ -201,9 +213,8 @@ function NavDropdown({ label, items }) {
 function Nav() {
   const { role, signOut } = useAuth();
   return (
-    <nav className="no-print relative bg-teal-900 border-b-4 border-accent-500 shadow-md">
-      <div className="absolute inset-0 opacity-50 pointer-events-none" style={navSilhouetteStyle} aria-hidden="true" />
-      <div className="relative px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 items-center text-sm">
+    <nav className="no-print bg-teal-900 border-b-4 border-accent-500 shadow-md">
+      <div className="px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 items-center text-sm">
       <Link to="/standings" className="flex flex-col leading-none mr-1">
         <span className="hidden sm:block text-accent-400 text-[9px] font-bold uppercase tracking-wide">Kovai Tennis League Association Trust</span>
         <span className="font-extrabold uppercase text-white text-lg tracking-wide">Kovai Legends 40+</span>
@@ -268,6 +279,7 @@ function Nav() {
         )}
       </div>
       </div>
+      <div className="h-[84px] bg-teal-950" style={navStripStyle} aria-hidden="true" />
     </nav>
   );
 }
