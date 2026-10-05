@@ -165,10 +165,9 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
       <PageHeader
         title={isAdminView ? 'Team Roster' : 'My Team'}
         subtitle={
-          (isAdminView
-            ? 'Edit, add, or remove any player on this team\'s roster.'
-            : 'Fill in real details for every placeholder player, and manage your team\'s roster here.')
-          + (ageCutoffDate ? ` Every player must be ${MIN_AGE}+ as of ${ageCutoffDate}.` : '')
+          isAdminView
+            ? 'Edit, add, or remove any player on this team\'s roster.' + (ageCutoffDate ? ` Every player must be ${MIN_AGE}+ as of ${ageCutoffDate}.` : '')
+            : undefined
         }
       />
 

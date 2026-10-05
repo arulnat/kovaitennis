@@ -122,7 +122,7 @@ export default function StandingsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <PageHeader title="Standings" subtitle="Click a team to see its completed matches, rubber by rubber." />
+      <PageHeader title="Standings" />
 
       {divisions.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-4">
@@ -217,11 +217,6 @@ export default function StandingsPage() {
         </tbody>
       </table>
       </div>
-      )}
-      {rows && (
-        <p className="text-xs text-gray-500 mt-2">
-          Top 2 (gold) and bottom 2 (red) marked with a colored edge. Teams tied after every tiebreak level share the same rank.
-        </p>
       )}
     </div>
   );
