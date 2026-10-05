@@ -48,7 +48,7 @@ export default function ResultsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <PageHeader title="Results" subtitle={tab === 'league' ? 'Every completed tie, rubber by rubber.' : "The final week's single-set semifinals and final."} />
+      <PageHeader title="Results" subtitle={tab === 'final' ? "The final week's single-set semifinals and final." : undefined} />
 
       <div className="flex border-b-2 border-accent-500 mb-4">
         {[{ key: 'league', label: 'League' }, { key: 'final', label: 'Final Results' }].map((t) => (

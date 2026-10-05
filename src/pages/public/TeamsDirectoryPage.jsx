@@ -41,10 +41,7 @@ export default function TeamsDirectoryPage({ seasonId }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <PageHeader
-        title="Teams"
-        subtitle="Every team that has submitted its roster this season — click a team to see its full member list and statistics."
-      />
+      <PageHeader title="Teams" />
 
       {teams === null ? (
         <p className="text-gray-500 text-sm">Loading…</p>

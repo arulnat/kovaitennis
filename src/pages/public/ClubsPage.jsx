@@ -43,10 +43,7 @@ export default function ClubsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <PageHeader
-        title="Clubs"
-        subtitle="Several teams often share the same club and court — a club's page shows every one of its teams' matches for a week at a glance, so home matches (the ones needing the court) are easy to spot."
-      />
+      <PageHeader title="Clubs" />
 
       {!activeSeason?.published ? (
         <p className="text-slate-500 text-sm">The season hasn't been published yet.</p>
