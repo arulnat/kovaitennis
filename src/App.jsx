@@ -38,6 +38,7 @@ export default function App() {
     <AuthProvider>
       <SeasonProvider>
         <BrowserRouter>
+          <SiteHeader />
           <Nav />
           <Routes>
             <Route path="/" element={<Navigate to="/standings" replace />} />
@@ -82,6 +83,26 @@ export default function App() {
         </BrowserRouter>
       </SeasonProvider>
     </AuthProvider>
+  );
+}
+
+// Letterhead-style branding, shown above the nav on every page — the
+// trust name, the league's actual name, and its motto, matching the
+// org's own branded header exactly (not just "Tennis League" in the
+// nav bar, which stays as a short link label).
+function SiteHeader() {
+  return (
+    <div className="no-print bg-white text-center px-4 py-4 border-b border-slate-100">
+      <p className="text-teal-700 font-bold uppercase tracking-wide text-xs sm:text-sm">
+        Kovai Tennis League Association Trust
+      </p>
+      <h1 className="text-teal-950 font-extrabold uppercase text-2xl sm:text-4xl tracking-tight leading-tight mt-1">
+        Kovai Legends 40+ League
+      </h1>
+      <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px] sm:text-xs mt-1.5">
+        Fun . Friendship . Fitness
+      </p>
+    </div>
   );
 }
 
@@ -135,7 +156,7 @@ function Nav() {
   return (
     <nav className="no-print bg-teal-900 border-b-4 border-accent-500 px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm items-center shadow-md">
       <Link to="/standings" className="font-extrabold uppercase text-white text-lg tracking-wide mr-1">
-        Tennis League
+        Kovai Legends 40+
       </Link>
       <Link to="/results" className={navLinkClass}>Results</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
