@@ -120,11 +120,23 @@ const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050
       <stop offset="0" stop-color="#eaff7a"/>
       <stop offset="1" stop-color="#9ad028"/>
     </radialGradient>
+    <!-- Racket: a ring (outer disc with a background-colour hole punched
+         out of it) plus white cross-strings and a handle, so it reads as
+         an actual racket rather than a stray stick. Colour comes from
+         whichever figure's <use> instances it — only the hole and
+         strings set an explicit colour, everything else inherits. -->
+    <g id="navfig-racket">
+      <circle cx="0" cy="-18" r="11"/>
+      <circle cx="0" cy="-18" r="7" fill="#0d2a26"/>
+      <line x1="0" y1="-25" x2="0" y2="-11" stroke="#ffffff" stroke-width="1.6" opacity="0.9"/>
+      <line x1="-7" y1="-18" x2="7" y2="-18" stroke="#ffffff" stroke-width="1.6" opacity="0.9"/>
+      <rect x="-2" y="-7" width="4" height="22" rx="2"/>
+    </g>
     <g id="navfig-male-serve">
       <circle cx="0" cy="-92" r="10"/>
       <path d="M -9 -78 Q 0 -86 9 -78 L 13 -40 Q 14 -30 6 -28 L 6 -4 L 16 38 L 8 40 L -1 -2 L -8 40 L -16 38 L -8 -4 L -8 -28 Q -16 -30 -13 -40 Z"/>
       <path d="M 9 -78 L 30 -100 L 36 -96 L 20 -70 Z"/>
-      <ellipse cx="38" cy="-104" rx="4" ry="16" transform="rotate(35 38 -104)"/>
+      <use href="#navfig-racket" transform="translate(38,-104) rotate(35)"/>
       <path d="M -9 -78 L -26 -64 L -22 -58 L -4 -70 Z"/>
     </g>
     <g id="navfig-female-serve">
@@ -133,7 +145,7 @@ const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050
       <path d="M -9 -78 Q 0 -86 9 -78 L 12 -44 Q 20 -39 13 -35 L -13 -35 Q -20 -39 -12 -44 Z"/>
       <path d="M -8 -35 L -14 36 L -7 38 L 0 -6 L 7 38 L 14 36 L 8 -35 Z"/>
       <path d="M 9 -78 L 30 -100 L 36 -96 L 20 -70 Z"/>
-      <ellipse cx="38" cy="-104" rx="4" ry="16" transform="rotate(35 38 -104)"/>
+      <use href="#navfig-racket" transform="translate(38,-104) rotate(35)"/>
       <path d="M -9 -78 L -26 -64 L -22 -58 L -4 -70 Z"/>
     </g>
     <g id="navfig-male-smash">
@@ -141,8 +153,7 @@ const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050
       <path d="M -8 -82 Q 0 -90 8 -82 L 10 -38 L -10 -38 Z"/>
       <path d="M -7 -38 L -12 36 L -4 38 L 0 -2 L 4 38 L 12 36 L 7 -38 Z"/>
       <path d="M -8 -82 L -22 -70 L -18 -64 L -4 -74 Z"/>
-      <path d="M 8 -82 L 14 -112 L 20 -110 L 16 -78 Z"/>
-      <ellipse cx="24" cy="-120" rx="4" ry="15" transform="rotate(15 24 -120)"/>
+      <use href="#navfig-racket" transform="translate(22,-116) rotate(12)"/>
     </g>
     <g id="navfig-ball-icon">
       <circle cx="0" cy="0" r="20" fill="url(#navfig-ball)"/>
@@ -150,15 +161,16 @@ const NAV_STRIP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050
       <path d="M 0 -20 C 14 -15, 14 15, 0 20" fill="none" stroke="#ffffff" stroke-width="2.2" opacity="0.85"/>
     </g>
   </defs>
-  <use href="#navfig-ball-icon" transform="translate(70,128)"/>
+  <use href="#navfig-ball-icon" transform="translate(70,100)"/>
   <g transform="translate(230,120) scale(0.78)"><use href="#navfig-male-serve" fill="url(#navfig-g1)"/></g>
-  <use href="#navfig-ball-icon" transform="translate(430,132) scale(0.85)"/>
+  <use href="#navfig-ball-icon" transform="translate(430,62) scale(0.85)"/>
   <g transform="translate(590,120) scale(-0.74,0.74)"><use href="#navfig-female-serve" fill="url(#navfig-g2)"/></g>
-  <use href="#navfig-ball-icon" transform="translate(800,128)"/>
+  <use href="#navfig-ball-icon" transform="translate(800,138)"/>
   <g transform="translate(960,120) scale(0.78)"><use href="#navfig-male-smash" fill="url(#navfig-g3)"/></g>
 </svg>`;
 
 const navStripStyle = {
+  backgroundColor: '#0d2a26',
   backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(NAV_STRIP_SVG)}")`,
   backgroundRepeat: 'repeat-x',
   backgroundPosition: 'left bottom',
@@ -279,7 +291,7 @@ function Nav() {
         )}
       </div>
       </div>
-      <div className="h-[84px] bg-teal-950" style={navStripStyle} aria-hidden="true" />
+      <div className="h-[84px]" style={navStripStyle} aria-hidden="true" />
     </nav>
   );
 }
