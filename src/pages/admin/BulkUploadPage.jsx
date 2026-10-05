@@ -25,12 +25,17 @@ import PageHeader from '../../components/PageHeader.jsx';
 
 export default function BulkUploadPage({ seasonId }) {
   const [status, setStatus] = useState('idle'); // idle | parsing | error | preview | importing | done
+  const [file, setFile] = useState(null);
   const [errors, setErrors] = useState([]);
   const [teams, setTeams] = useState([]);
   const [importResult, setImportResult] = useState(null);
 
-  async function handleFile(e) {
-    const file = e.target.files?.[0];
+  function handleFileChosen(e) {
+    setFile(e.target.files?.[0] ?? null);
+    setErrors([]);
+  }
+
+  async function handleUpload() {
     if (!file) return;
     setStatus('parsing');
     setErrors([]);
@@ -92,7 +97,16 @@ export default function BulkUploadPage({ seasonId }) {
       </button>
 
       {status === 'idle' || status === 'parsing' || status === 'error' ? (
-        <input type="file" accept=".csv" onChange={handleFile} disabled={status === 'parsing'} />
+        <div className="flex items-center gap-3">
+          <input type="file" accept=".csv" onChange={handleFileChosen} disabled={status === 'parsing'} />
+          <button
+            onClick={handleUpload}
+            disabled={!file || status === 'parsing'}
+            className="px-4 py-1.5 rounded bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Upload
+          </button>
+        </div>
       ) : null}
 
       {status === 'parsing' && <p className="mt-3 text-gray-500">Reading file…</p>}
