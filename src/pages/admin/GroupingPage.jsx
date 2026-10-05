@@ -230,6 +230,12 @@ export default function GroupingPage({ seasonId }) {
 
     const clubIdByTeamId = Object.fromEntries(pool.map((ts) => [ts.id, ts.teams?.club_id ?? null]));
 
+    const totalCapacity = divisionsWithCounts.reduce((n, d) => n + Math.max(0, size - d.currentCount), 0);
+    if (totalCapacity === 0) {
+      alert('Every unlocked division is already full (or there are no unlocked divisions). Create a new division on the Divisions page, or unlock one, then try again.');
+      return;
+    }
+
     const plan = planAutoGroup({
       poolIds: pool.map((ts) => ts.id),
       divisions: divisionsWithCounts,
@@ -239,10 +245,17 @@ export default function GroupingPage({ seasonId }) {
       clubIdByTeamId,
     });
 
+    // Auto-generate only ever fills the existing (unlocked) divisions' own
+    // remaining spots — it never creates new divisions on its own. If the
+    // pool is bigger than that total capacity, the leftover teams simply
+    // stay in the unassigned pool; create more divisions on the Divisions
+    // page first if you want auto-generate to reach all of them.
+    const leftover = pool.length - plan.assignments.reduce((n, a) => n + a.teamIds.length, 0);
     if (!confirm(
-      `Randomly draw ${pool.length} unassigned team(s) into groups of ${size} (seed ${seedValue}), filling the ` +
-      `highest unlocked division down first${plan.newGroups.length > 0 ? `, creating ${plan.newGroups.length} new division(s) for the rest` : ''}` +
-      `${avoidSameClub ? ', avoiding same-club teams in one division where possible' : ''}?`
+      `Randomly draw ${pool.length} unassigned team(s) into groups of ${size}, filling the highest ` +
+      `unlocked division's remaining spots first and working down` +
+      `${avoidSameClub ? ', avoiding same-club teams in one division where possible' : ''}` +
+      `${leftover > 0 ? `. Only enough room for ${pool.length - leftover} of them — the other ${leftover} will stay unassigned.` : '.'}`
     )) return;
 
     for (const { divisionId, teamIds } of plan.assignments) {
@@ -255,41 +268,6 @@ export default function GroupingPage({ seasonId }) {
           .update({ division_id: divisionId, order_index: baseOrder + i })
           .eq('id', teamIds[i]);
         if (error) { alert(error.message); return; }
-      }
-    }
-
-    const existingNames = new Set(divisions.map((d) => d.name));
-    let letterIndex = 0;
-    const nextName = () => {
-      let name;
-      do {
-        const letter = String.fromCharCode(65 + (letterIndex % 26));
-        const cycle = Math.floor(letterIndex / 26);
-        name = `Division ${letter}${cycle > 0 ? cycle + 1 : ''}`;
-        letterIndex++;
-      } while (existingNames.has(name));
-      existingNames.add(name);
-      return name;
-    };
-    // New divisions rank below every existing one — they're only created
-    // once all existing (unlocked) divisions are already full.
-    let nextOrderIndex = divisions.length > 0 ? Math.max(...divisions.map((d) => d.order_index)) + 1 : 0;
-
-    for (const chunk of plan.newGroups) {
-      const { data: newDivision, error: divErr } = await supabase
-        .from('divisions')
-        .insert({ season_id: seasonId, name: nextName(), order_index: nextOrderIndex })
-        .select()
-        .single();
-      if (divErr) { alert(divErr.message); return; }
-      nextOrderIndex++;
-
-      for (let i = 0; i < chunk.length; i++) {
-        const { error: assignErr } = await supabase
-          .from('team_seasons')
-          .update({ division_id: newDivision.id, order_index: i })
-          .eq('id', chunk[i]);
-        if (assignErr) { alert(assignErr.message); return; }
       }
     }
 
@@ -433,12 +411,13 @@ export default function GroupingPage({ seasonId }) {
       <div className="border rounded p-4 mb-6 bg-gray-50">
         <h2 className="font-medium mb-2">Auto-generate groups</h2>
         <p className="text-sm text-gray-600 mb-2">
-          Randomly draws the {unassigned.length} unassigned team(s) into groups of this size, filling the
-          highest unlocked division's remaining spots first and working down, before creating any new
-          (lower-ranked) division for what's left — the last group may have fewer. With "avoid same club"
-          on, each division is steered away from seating two teams from the same club together — but if a
-          club has more teams than there are divisions to spread them across, it's fine for some to share
-          a division anyway.
+          Randomly draws the {unassigned.length} unassigned team(s) into the highest unlocked division's
+          remaining spots first and working down, up to this many teams per division. It only ever fills
+          existing divisions — it never creates a new one; if there isn't enough room, the rest stay
+          unassigned (create another division on the Divisions page first if you need one). With "avoid
+          same club" on, each division is steered away from seating two teams from the same club together —
+          but if a club has more teams than there are divisions to spread them across, it's fine for some to
+          share a division anyway.
         </p>
         <div className="flex gap-2 items-center flex-wrap">
           <label className="text-xs text-gray-600">
