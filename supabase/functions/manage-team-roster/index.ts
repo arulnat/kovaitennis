@@ -3,10 +3,15 @@
 // Roster management for My Team (a team login, own roster only) and for
 // admins (any team, via an explicit teamId — the Teams admin page links
 // to the same UI with a teamId override): add a player (full details
-// required — name, gender, date of birth, coach yes/no, and an optional
-// photo), edit any existing player the same way (including the captain's
-// own row, which can also update the team's captain phone), delete a
-// player, or submit the roster as complete for a season.
+// required — name, gender, date of birth, and an optional photo), edit
+// any existing player the same way (including the captain's own row,
+// which can also update the team's captain phone and an address-proof
+// photo), delete a player, or submit the roster as complete for a
+// season. There's no player/coach role anymore — isCoach is accepted if
+// an old caller still sends it but is otherwise ignored and always
+// stored false (players.is_coach itself, and its one-coach-per-team
+// index, are unused now rather than dropped, to avoid a destructive
+// migration for a column nothing reads).
 //
 // A team caller's team_id always comes from their own app_users row,
 // never from the request body, so a team can only ever act on its own
@@ -22,14 +27,11 @@
 // Function — using the service_role key — is the one sanctioned way a
 // team login can touch its own roster.
 //
-// "Only one coach per team" is enforced twice: proactively here (setting
-// a new coach clears the previous one first, so nobody has to manually
-// un-mark someone) and at the DB level via a partial unique index
-// (players_one_coach_per_team, migration 0024) as a backstop.
-//
-// Photos go straight to the "player-photos" Storage bucket (migration
-// 0025, public) using the service_role key, which bypasses Storage RLS
-// entirely — the client sends the file as a data: URL, capped at 100KB.
+// Photos (both the regular one and the captain's address-proof one, see
+// migration 0032) go straight to the "player-photos" Storage bucket
+// (migration 0025, public) using the service_role key, which bypasses
+// Storage RLS entirely — the client sends the file as a data: URL,
+// capped at 100KB, same rule for both.
 //
 // "submit" (My Team's Submit button, migration 0026's
 // team_seasons.roster_submitted) requires every player currently on the
@@ -56,8 +58,8 @@
 //
 // Deploy: supabase functions deploy manage-team-roster
 // Call from the client with:
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, isCoach, photoBase64?, teamId? } })
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'edit', playerId, seasonId, name, gender, dateOfBirth, isCoach, photoBase64?, removePhoto?, captainPhone?, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, photoBase64?, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'edit', playerId, seasonId, name, gender, dateOfBirth, photoBase64?, removePhoto?, captainPhone?, addressProofBase64?, removeAddressProof?, teamId? } })
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'delete', playerId, seasonId, teamId? } })
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'submit', seasonId, teamId? } })
 // teamId is only honored for an admin caller; a team login's own
@@ -95,7 +97,7 @@ function calculateAge(dateOfBirth, asOfDate) {
   return age;
 }
 
-/** Validates the shared required fields (name/gender/dateOfBirth/isCoach) for both add and edit, plus age eligibility when ageCutoffDate is known. Returns a trimmed/normalized copy, or throws with a user-facing message. */
+/** Validates the shared required fields (name/gender/dateOfBirth) for both add and edit, plus age eligibility when ageCutoffDate is known. Returns a trimmed/normalized copy, or throws with a user-facing message. No player/coach role anymore — isCoach is never required, and always stored false regardless of what (if anything) a caller sends. */
 function validatePlayerFields(body, ageCutoffDate) {
   const name = String(body.name ?? '').trim();
   if (!name) throw new Error('Name is required');
@@ -106,8 +108,6 @@ function validatePlayerFields(body, ageCutoffDate) {
   const dateOfBirth = String(body.dateOfBirth ?? '').trim();
   if (!dateOfBirth || Number.isNaN(Date.parse(dateOfBirth))) throw new Error('Date of birth is required');
 
-  if (typeof body.isCoach !== 'boolean') throw new Error('Coach status is required');
-
   if (ageCutoffDate) {
     const age = calculateAge(dateOfBirth, ageCutoffDate);
     if (age < MIN_AGE) {
@@ -115,7 +115,7 @@ function validatePlayerFields(body, ageCutoffDate) {
     }
   }
 
-  return { name, gender, dateOfBirth, isCoach: body.isCoach };
+  return { name, gender, dateOfBirth, isCoach: false };
 }
 
 function decodeDataUrl(dataUrl) {
@@ -126,27 +126,19 @@ function decodeDataUrl(dataUrl) {
   return { contentType, bytes };
 }
 
-async function uploadPhoto(admin, teamId, playerId, photoBase64) {
+async function uploadPhoto(admin, teamId, playerId, photoBase64, kind = 'photo') {
   const { contentType, bytes } = decodeDataUrl(photoBase64);
   if (bytes.length > MAX_PHOTO_BYTES) {
     throw new Error(`Photo is ${Math.ceil(bytes.length / 1024)}KB — must be under 100KB`);
   }
   const ext = contentType.split('/')[1]?.split('+')[0] ?? 'jpg';
-  const path = `${teamId}/${playerId}-${Date.now()}.${ext}`;
+  const path = `${teamId}/${playerId}-${kind}-${Date.now()}.${ext}`;
   const { error: uploadErr } = await admin.storage.from('player-photos').upload(path, bytes, { contentType, upsert: true });
   if (uploadErr) throw uploadErr;
   const { data } = admin.storage.from('player-photos').getPublicUrl(path);
   return data.publicUrl;
 }
 
-/** If isCoach is true, clears any other player on the team currently marked coach (excludeId keeps a player from un-setting itself mid-update). */
-async function ensureSingleCoach(admin, teamId, isCoach, excludeId) {
-  if (!isCoach) return;
-  let query = admin.from('players').update({ is_coach: false }).eq('team_id', teamId).eq('is_coach', true);
-  if (excludeId) query = query.neq('id', excludeId);
-  const { error } = await query;
-  if (error) throw error;
-}
 
 /** Once a team has submitted its roster for a season, the CAPTAIN can no longer add/edit/delete — only an admin can, from here on (isAdminCaller bypasses this entirely). */
 async function rosterIsSubmitted(admin, teamId, seasonId) {
@@ -218,8 +210,6 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!teamSeason) return json({ error: 'Your team is not registered for this season' }, 404);
 
-      await ensureSingleCoach(admin, teamId, fields.isCoach, null);
-
       const { data: newPlayer, error: playerErr } = await admin
         .from('players')
         .insert({
@@ -260,7 +250,6 @@ Deno.serve(async (req) => {
       }
 
       const fields = validatePlayerFields(body, await getAgeCutoffDate(admin, seasonId));
-      await ensureSingleCoach(admin, teamId, fields.isCoach, playerId);
 
       const { error: updateErr } = await admin
         .from('players')
@@ -289,6 +278,18 @@ Deno.serve(async (req) => {
       } else if (body.removePhoto) {
         const { error: photoErr } = await admin.from('players').update({ photo_url: null }).eq('id', playerId);
         if (photoErr) throw photoErr;
+      }
+
+      // Address proof — captain-only in the UI, but not enforced here
+      // beyond that (same spirit as photo_url: whatever the caller is
+      // allowed to edit, they're allowed to attach this to).
+      if (body.addressProofBase64) {
+        const proofUrl = await uploadPhoto(admin, teamId, playerId, body.addressProofBase64, 'address-proof');
+        const { error: proofErr } = await admin.from('players').update({ address_proof_url: proofUrl }).eq('id', playerId);
+        if (proofErr) throw proofErr;
+      } else if (body.removeAddressProof) {
+        const { error: proofErr } = await admin.from('players').update({ address_proof_url: null }).eq('id', playerId);
+        if (proofErr) throw proofErr;
       }
 
       return json({ ok: true });

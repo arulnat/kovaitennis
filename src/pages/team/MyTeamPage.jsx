@@ -9,24 +9,27 @@
 // Team" form instead fills the roster with 3 placeholder players —
 // "Player 1"/"Player 2"/"Player 3" — meeting the same minimum until
 // they're renamed. Either way, this is where the captain (or an admin)
-// fills in real details (name, gender, date of birth, coach or not, a
-// photo) and manages the roster from here on, via the
-// manage-team-roster Edge Function — players/team_players/team_seasons
-// are admin-only tables under RLS, so a team login can't write to them
-// directly (0001_init.sql).
+// fills in real details (name, gender, date of birth, a photo) and
+// manages the roster from here on, via the manage-team-roster Edge
+// Function — players/team_players/team_seasons are admin-only tables
+// under RLS, so a team login can't write to them directly
+// (0001_init.sql). There's no player/coach role distinction anymore —
+// every roster entry is just a player.
 //
 // The captain is always shown first, and — along with the first 4
 // players overall (the ones present since the team was created) — can't
 // be deleted by the CAPTAIN, only edited; anyone added after that can be
 // deleted. An admin can remove any of those first 4 too (but never the
-// captain themselves, either way — see the Edge Function). Only one
-// player on the team can be marked coach at a time
-// (players_one_coach_per_team, migration 0024) — marking a new one
-// automatically un-marks the previous one, handled server-side.
+// captain themselves, either way — see the Edge Function).
 //
 // Editing the captain's own row also offers the team's phone number
-// (teams.captain_phone), since that's the one piece of "player" contact
-// info that doesn't actually live on the players table.
+// (teams.captain_phone, since that's the one piece of "player" contact
+// info that doesn't actually live on the players table) and an address
+// proof photo (players.address_proof_url, migration 0032) — same
+// <100KB upload rule as the regular photo, proving where the team/club
+// is actually based. Captain-only in this UI (the team's address is a
+// single fact, and the captain is the one identity that always exists
+// on a team), not required to submit the roster.
 //
 // Submit (migration 0026's team_seasons.roster_submitted) requires every
 // player to have name/gender/date of birth/photo filled in — re-checked
@@ -97,7 +100,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
     const [{ data }, { data: tsRow }, { data: seasonRow }] = await Promise.all([
       supabase
         .from('team_players')
-        .select('player_id, players(id, name, gender, date_of_birth, is_coach, is_captain, photo_url, created_at)')
+        .select('player_id, players(id, name, gender, date_of_birth, is_captain, photo_url, address_proof_url, created_at)')
         .eq('season_id', seasonId)
         .eq('team_id', teamId),
       supabase
@@ -266,13 +269,15 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
 function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave, onDelete, onCancel }) {
   const [editing, setEditing] = useState(!!isNew);
   const [showPhoto, setShowPhoto] = useState(false);
+  const [showAddressProof, setShowAddressProof] = useState(false);
   const [name, setName] = useState(player?.name ?? '');
   const [gender, setGender] = useState(player?.gender ?? '');
   const [dateOfBirth, setDateOfBirth] = useState(player?.date_of_birth ?? '');
-  const [isCoach, setIsCoach] = useState(player?.is_coach ?? false);
   const [captainPhone, setCaptainPhone] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const [removePhoto, setRemovePhoto] = useState(false);
+  const [addressProofFile, setAddressProofFile] = useState(null);
+  const [removeAddressProof, setRemoveAddressProof] = useState(false);
   const [fieldError, setFieldError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -280,10 +285,11 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
     setName(player?.name ?? '');
     setGender(player?.gender ?? '');
     setDateOfBirth(player?.date_of_birth ?? '');
-    setIsCoach(player?.is_coach ?? false);
     setCaptainPhone('');
     setPhotoFile(null);
     setRemovePhoto(false);
+    setAddressProofFile(null);
+    setRemoveAddressProof(false);
     setFieldError('');
   }
 
@@ -300,6 +306,19 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
     setRemovePhoto(false);
   }
 
+  function handleAddressProofChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) { setAddressProofFile(null); return; }
+    if (file.size >= MAX_PHOTO_BYTES) {
+      setFieldError(`Address proof is ${Math.ceil(file.size / 1024)}KB — must be under 100KB.`);
+      e.target.value = '';
+      return;
+    }
+    setFieldError('');
+    setAddressProofFile(file);
+    setRemoveAddressProof(false);
+  }
+
   async function save() {
     setFieldError('');
     if (!name.trim()) { setFieldError('Name is required.'); return; }
@@ -311,19 +330,24 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
     }
 
     setSaving(true);
-    let photoBase64;
+    let photoBase64, addressProofBase64;
     try {
       if (photoFile) photoBase64 = await readFileAsDataUrl(photoFile);
+      if (addressProofFile) addressProofBase64 = await readFileAsDataUrl(addressProofFile);
     } catch {
       setSaving(false);
       setFieldError('Could not read the selected photo — try a different file.');
       return;
     }
 
-    const fields = { name: name.trim(), gender, dateOfBirth, isCoach };
+    const fields = { name: name.trim(), gender, dateOfBirth };
     if (photoBase64) fields.photoBase64 = photoBase64;
     else if (removePhoto) fields.removePhoto = true;
     if (player?.is_captain && captainPhone.trim()) fields.captainPhone = captainPhone.trim();
+    if (player?.is_captain) {
+      if (addressProofBase64) fields.addressProofBase64 = addressProofBase64;
+      else if (removeAddressProof) fields.removeAddressProof = true;
+    }
 
     const ok = await onSave(fields);
     setSaving(false);
@@ -331,6 +355,8 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
       setEditing(false);
       setPhotoFile(null);
       setRemovePhoto(false);
+      setAddressProofFile(null);
+      setRemoveAddressProof(false);
     }
   }
 
@@ -342,7 +368,6 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
           <div>
             <span className="font-semibold">{player.name}</span>
             {player.is_captain && <span className="ml-2 text-xs font-bold uppercase text-teal-700">Captain</span>}
-            {player.is_coach && <span className="ml-2 text-xs font-bold uppercase text-accent-600">Coach</span>}
             {!complete && <span className="ml-2 text-xs font-bold uppercase text-amber-600">Incomplete</span>}
             <div className="text-xs text-gray-500 mt-0.5">
               {genderLabel(player.gender)}
@@ -356,6 +381,11 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
             {player.photo_url && (
               <button onClick={() => setShowPhoto((v) => !v)} className="text-teal-700 underline text-xs">
                 {showPhoto ? 'Hide' : 'View'}
+              </button>
+            )}
+            {player.is_captain && player.address_proof_url && (
+              <button onClick={() => setShowAddressProof((v) => !v)} className="text-teal-700 underline text-xs">
+                {showAddressProof ? 'Hide proof' : 'View proof'}
               </button>
             )}
             {!readOnly && (
@@ -372,6 +402,9 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
         </div>
         {showPhoto && player.photo_url && (
           <img src={player.photo_url} alt={player.name} className="mt-2 w-16 h-16 object-cover rounded border" />
+        )}
+        {showAddressProof && player.address_proof_url && (
+          <img src={player.address_proof_url} alt="Address proof" className="mt-2 w-16 h-16 object-cover rounded border" />
         )}
       </div>
     );
@@ -406,17 +439,6 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
           )}
         </div>
         <div>
-          <label className="block text-xs text-gray-600 mb-0.5">Role</label>
-          <div className="flex gap-3 text-sm pt-1">
-            <label className="flex items-center gap-1">
-              <input type="radio" checked={!isCoach} onChange={() => setIsCoach(false)} /> Player
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="radio" checked={isCoach} onChange={() => setIsCoach(true)} /> Coach
-            </label>
-          </div>
-        </div>
-        <div>
           <label className="block text-xs text-gray-600 mb-0.5">Photo (under 100KB{isNew ? ', optional for now — required to submit' : ''})</label>
           <input type="file" accept="image/*" onChange={handlePhotoChange} className="text-xs w-full" />
           {player?.photo_url && !photoFile && (
@@ -429,6 +451,17 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
           <div className="col-span-2">
             <label className="block text-xs text-gray-600 mb-0.5">Team phone number (leave blank to keep as-is)</label>
             <input value={captainPhone} onChange={(e) => setCaptainPhone(e.target.value)} placeholder="10-digit mobile number" className="border rounded px-2 py-1 text-sm w-full" />
+          </div>
+        )}
+        {player?.is_captain && (
+          <div className="col-span-2">
+            <label className="block text-xs text-gray-600 mb-0.5">Address proof (under 100KB) — a document showing the club/team's address</label>
+            <input type="file" accept="image/*" onChange={handleAddressProofChange} className="text-xs w-full" />
+            {player?.address_proof_url && !addressProofFile && (
+              <label className="flex items-center gap-1 text-xs text-gray-600 mt-1">
+                <input type="checkbox" checked={removeAddressProof} onChange={(e) => setRemoveAddressProof(e.target.checked)} /> Remove current address proof
+              </label>
+            )}
           </div>
         )}
       </div>

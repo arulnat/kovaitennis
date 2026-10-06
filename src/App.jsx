@@ -8,6 +8,7 @@ import BulkUploadPage from './pages/admin/BulkUploadPage.jsx';
 import LoginCredentialsPage from './pages/admin/LoginCredentialsPage.jsx';
 import TeamsPage from './pages/admin/TeamsPage.jsx';
 import DivisionsPage from './pages/admin/DivisionsPage.jsx';
+import ClubsAdminPage from './pages/admin/ClubsAdminPage.jsx';
 import GroupingPage from './pages/admin/GroupingPage.jsx';
 import FixtureGenerationPage from './pages/admin/FixtureGenerationPage.jsx';
 import MissingScoresReportPage from './pages/admin/MissingScoresReportPage.jsx';
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="/admin/teams" element={<RequireRole roles={['tournament_admin', 'super_admin']}><TeamsRouteWrapper /></RequireRole>} />
             <Route path="/admin/teams/:teamId/roster" element={<RequireRole roles={['tournament_admin', 'super_admin']}><AdminTeamRosterRouteWrapper /></RequireRole>} />
             <Route path="/admin/divisions" element={<RequireRole roles={['tournament_admin', 'super_admin']}><DivisionsPage /></RequireRole>} />
+            <Route path="/admin/clubs" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ClubsAdminPage /></RequireRole>} />
             <Route path="/admin/grouping" element={<RequireRole roles={['tournament_admin', 'super_admin']}><GroupingRouteWrapper /></RequireRole>} />
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
             <Route path="/admin/update-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><UpdateScoresRouteWrapper /></RequireRole>} />
@@ -320,6 +322,7 @@ function Nav() {
               { to: '/admin/divisions', label: 'Divisions' },
               { to: '/admin/bulk-upload', label: 'Bulk Upload' },
               { to: '/admin/teams', label: 'Manage Teams' },
+              { to: '/admin/clubs', label: 'Clubs' },
               { to: '/admin/login-credentials', label: 'Team Logins' },
             ]}
           />

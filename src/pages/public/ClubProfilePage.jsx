@@ -19,6 +19,7 @@ import Dropdown from '../../components/Dropdown.jsx';
 import TeamLink from '../../components/TeamLink.jsx';
 
 const ALL_WEEKS = '__all__';
+const COURT_TYPE_LABEL = { synthetic: 'Synthetic', clay: 'Clay', both: 'Synthetic and Clay' };
 
 function formatWeekDate(dateStr) {
   return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
@@ -36,7 +37,7 @@ export default function ClubProfilePage({ clubId }) {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const { data: clubRow } = await supabase.from('clubs').select('id, name').eq('id', clubId).maybeSingle();
+      const { data: clubRow } = await supabase.from('clubs').select('id, name, location, address, number_of_courts, court_type').eq('id', clubId).maybeSingle();
       if (cancelled) return;
       if (!clubRow) { setClub(false); return; }
       setClub(clubRow);
@@ -95,6 +96,22 @@ export default function ClubProfilePage({ clubId }) {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader title={club.name} subtitle="This club's teams and their matches, week by week — home matches are the ones needing the shared court." />
+
+      {(club.location || club.address || club.number_of_courts || club.court_type) && (
+        <div className="mb-4 rounded-lg overflow-hidden shadow-lg">
+          {[
+            ...(club.location ? [{ label: 'Location', value: club.location }] : []),
+            ...(club.address ? [{ label: 'Address', value: club.address }] : []),
+            ...(club.number_of_courts ? [{ label: 'Courts', value: club.number_of_courts }] : []),
+            ...(club.court_type ? [{ label: 'Court Type', value: COURT_TYPE_LABEL[club.court_type] ?? club.court_type }] : []),
+          ].map((r, i) => (
+            <div key={r.label} className={`flex items-center justify-between px-4 py-2.5 ${i % 2 === 0 ? 'bg-teal-900 text-teal-50' : 'bg-teal-800 text-teal-50'}`}>
+              <span className="text-xs font-bold uppercase tracking-wider">{r.label}</span>
+              <span className="text-base font-extrabold text-right">{r.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {teams.length > 0 && (
         <div className="mb-4">

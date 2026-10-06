@@ -28,6 +28,8 @@ import RubberRow from '../../components/RubberRow.jsx';
 
 const RUBBER_ORDER = ['singles', 'doubles1', 'doubles2'];
 
+const COURT_TYPE_LABEL = { synthetic: 'Synthetic', clay: 'Clay', both: 'Synthetic and Clay' };
+
 const SKILLS = [
   { key: 'serve', label: 'Serve' },
   { key: 'forehand', label: 'Forehand' },
@@ -83,7 +85,7 @@ export default function TeamProfilePage({ seasonId, teamId }) {
 
       const { data: teamRow, error: teamErr } = await supabase
         .from('teams')
-        .select('id, name, captain_name, captain_phone, alternate_contact_phone, club_id, clubs(id, name)')
+        .select('id, name, captain_name, captain_phone, alternate_contact_phone, club_id, clubs(id, name, location, address, number_of_courts, court_type)')
         .eq('id', teamId)
         .maybeSingle();
       if (cancelled) return;
@@ -215,6 +217,10 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       label: 'Club',
       value: <Link to={`/club/${team.clubs.id}`} className="hover:underline">{team.clubs.name.toUpperCase()}</Link>,
     }] : []),
+    ...(team.clubs?.location ? [{ label: 'Location', value: team.clubs.location }] : []),
+    ...(team.clubs?.address ? [{ label: 'Address', value: team.clubs.address }] : []),
+    ...(team.clubs?.number_of_courts ? [{ label: 'Courts', value: team.clubs.number_of_courts }] : []),
+    ...(team.clubs?.court_type ? [{ label: 'Court Type', value: COURT_TYPE_LABEL[team.clubs.court_type] ?? team.clubs.court_type }] : []),
     { label: 'Captain', value: team.captain_name || '—' },
     ...(team.captain_phone ? [{ label: 'Phone', value: team.captain_phone }] : []),
     ...(teamSeason?.divisions?.name ? [{ label: 'Division', value: teamSeason.divisions.name, highlight: true }] : []),
