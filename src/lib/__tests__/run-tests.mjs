@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   generateRoundRobin, assignHomeAway, homeAwayBalanceReport,
   buildPriorMeetingMap, buildFixtureRows, computeMatchWeekends, pairKey,
+  balanceClubHomeByWeek, buildAllFixtureRows,
 } from '../scheduler.js';
 import {
   winnerFromSets, isValidSinglesSet, isValidDoublesRegularSet,
@@ -157,6 +158,108 @@ test('buildFixtureRows: 5 teams -> correct row count, week dates 7 days apart, o
     assert.equal(r.home_team_id, null);
     assert.notEqual(r.away_team_id, null);
   }
+});
+
+test('balanceClubHomeByWeek: breaks a club having every one of its teams home the same week', () => {
+  // teamA and teamB are both clubX, in different divisions, both
+  // scheduled home the same week — should end up mixed, not both home.
+  const ties = [
+    { divisionId: 'D1', home: 'teamA', away: 'opp1', weekDate: '2026-01-03', swapped: false },
+    { divisionId: 'D2', home: 'teamB', away: 'opp2', weekDate: '2026-01-03', swapped: false },
+  ];
+  const teamClubId = { teamA: 'clubX', teamB: 'clubX', opp1: 'clubY', opp2: 'clubZ' };
+  balanceClubHomeByWeek(ties, teamClubId);
+  const clubXHomeCount = ties.filter((t) => t.home === 'teamA' || t.home === 'teamB').length;
+  assert.equal(clubXHomeCount, 1, 'exactly one of clubX\'s two teams should end up home, not zero or both');
+});
+
+test('balanceClubHomeByWeek: never touches a Req 4.9 forced swap', () => {
+  const ties = [
+    { divisionId: 'D1', home: 'teamA', away: 'opp1', weekDate: '2026-01-03', swapped: true },
+    { divisionId: 'D2', home: 'teamB', away: 'opp2', weekDate: '2026-01-03', swapped: true },
+  ];
+  const teamClubId = { teamA: 'clubX', teamB: 'clubX' };
+  balanceClubHomeByWeek(ties, teamClubId);
+  // both forced -> nothing it's allowed to flip -> left exactly as-is
+  assert.deepEqual(ties.map((t) => [t.home, t.away]), [['teamA', 'opp1'], ['teamB', 'opp2']]);
+});
+
+test('balanceClubHomeByWeek: skips the fix rather than pushing either side past the ±1 season window', () => {
+  // Both teamA and teamB come into this week already at +3 home bias
+  // from earlier weeks -- flipping either one to fix the clash would
+  // push it to +2, so the pass should leave both exactly as scheduled.
+  const ties = [
+    { divisionId: 'D1', home: 'teamA', away: 'x1', weekDate: '2026-01-03', swapped: false },
+    { divisionId: 'D1', home: 'teamA', away: 'x2', weekDate: '2026-01-10', swapped: false },
+    { divisionId: 'D1', home: 'teamA', away: 'x3', weekDate: '2026-01-17', swapped: false },
+    { divisionId: 'D2', home: 'teamB', away: 'y1', weekDate: '2026-01-03', swapped: false },
+    { divisionId: 'D2', home: 'teamB', away: 'y2', weekDate: '2026-01-10', swapped: false },
+    { divisionId: 'D2', home: 'teamB', away: 'y3', weekDate: '2026-01-17', swapped: false },
+    { divisionId: 'D1', home: 'teamA', away: 'opp1', weekDate: '2026-01-24', swapped: false },
+    { divisionId: 'D2', home: 'teamB', away: 'opp2', weekDate: '2026-01-24', swapped: false },
+  ];
+  const teamClubId = { teamA: 'clubX', teamB: 'clubX' };
+  balanceClubHomeByWeek(ties, teamClubId);
+  const lastWeek = ties.filter((t) => t.weekDate === '2026-01-24');
+  assert.deepEqual(lastWeek.map((t) => t.home).sort(), ['teamA', 'teamB']); // unchanged -- still both home
+});
+
+test('buildAllFixtureRows: generates every division at once, same week_date per round across them', () => {
+  const rows = buildAllFixtureRows({
+    seasonId: 'S1',
+    divisions: [
+      { divisionId: 'D1', teamIds: ['A', 'B', 'C', 'D'] },
+      { divisionId: 'D2', teamIds: ['E', 'F', 'G'] },
+    ],
+    startWeekend: '2026-01-03',
+  });
+  // D1: 4 teams -> 3 rounds x 2 ties = 6 rows. D2: 3 teams -> 3 rounds x (1 tie + 1 bye) = 6 rows.
+  assert.equal(rows.filter((r) => r.division_id === 'D1').length, 6);
+  assert.equal(rows.filter((r) => r.division_id === 'D2').length, 6);
+  for (const r of rows) assert.equal(r.season_id, 'S1');
+
+  // Round 1 lands on the same calendar week in both divisions.
+  const round1Dates = new Set(rows.filter((r) => r.round_number === 1).map((r) => r.week_date));
+  assert.equal(round1Dates.size, 1);
+  assert.equal([...round1Dates][0], '2026-01-03');
+});
+
+test('buildAllFixtureRows: never leaves MORE same-week clashes for a club than before balancing', () => {
+  // Whether every clash is fixable depends on each team's own season-
+  // long home/away split at that exact tie (see the dedicated
+  // balanceClubHomeByWeek tests above for the fixable and the provably-
+  // unsafe-to-fix cases) -- this just confirms wiring it into
+  // buildAllFixtureRows for real multi-division generation never makes
+  // a club's week-clash count worse than generating without it, and
+  // every pairing/row is still structurally correct either way.
+  const countBothHome = (rows) => {
+    const byWeek = new Map();
+    for (const r of rows.filter((r) => !r.is_bye)) {
+      if (!byWeek.has(r.week_date)) byWeek.set(r.week_date, {});
+      if (r.home_team_id === 'A') byWeek.get(r.week_date).A = true;
+      if (r.home_team_id === 'G') byWeek.get(r.week_date).G = true;
+    }
+    return [...byWeek.values()].filter((w) => w.A && w.G).length;
+  };
+
+  const divisions = [
+    { divisionId: 'D1', teamIds: ['A', 'B', 'C', 'D', 'E', 'F'] },
+    { divisionId: 'D2', teamIds: ['G', 'H', 'I', 'J', 'K', 'L'] },
+  ];
+  const withoutClub = buildAllFixtureRows({ seasonId: 'S1', divisions, startWeekend: '2026-01-03' });
+  const withClub = buildAllFixtureRows({ seasonId: 'S1', divisions, startWeekend: '2026-01-03', teamClubId: { A: 'clubX', G: 'clubX' } });
+
+  assert.ok(countBothHome(withClub) <= countBothHome(withoutClub));
+
+  // Every team still plays every other team in its own division exactly
+  // once (club balancing only swapped which side of an existing tie is
+  // home, never changed who plays whom).
+  const pairingsOf = (rows, divisionId) => rows
+    .filter((r) => r.division_id === divisionId && !r.is_bye)
+    .map((r) => pairKey(r.home_team_id, r.away_team_id))
+    .sort();
+  assert.deepEqual(pairingsOf(withClub, 'D1'), pairingsOf(withoutClub, 'D1'));
+  assert.deepEqual(pairingsOf(withClub, 'D2'), pairingsOf(withoutClub, 'D2'));
 });
 
 test('computeMatchWeekends: no holidays -> plain weekly cadence', () => {

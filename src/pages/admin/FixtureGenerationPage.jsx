@@ -1,10 +1,11 @@
 // src/pages/admin/FixtureGenerationPage.jsx
 //
 // Req 4.1–4.12: a viewer for fixtures already generated on the Grouping
-// page (that's where "Generate Fixtures" lives — a division is ready the
-// moment its grouping is settled, and assignHomeAway guarantees the Req
-// 4.6 home/away balance algorithmically, so there's no preview/override
-// step at generation time). Two tabs, admin-only Schedule/Balance switch
+// page (that's where "Generate All Fixtures" lives — one action across
+// every unlocked division at once, not per division, and assignHomeAway
+// guarantees the Req 4.6 home/away balance algorithmically, so there's
+// no preview/override step at generation time). Two tabs, admin-only
+// Schedule/Balance switch
 // (a non-admin only ever sees Schedule, no tab bar at all): Schedule
 // picks one division from the list box (if it has no generated fixtures
 // yet, nothing is shown); Home/Away Balance shows every division's
@@ -176,7 +177,7 @@ export default function FixtureGenerationPage({ seasonId }) {
     const divisionsWithFixtures = new Set((allFixtures || []).map((f) => f.division_id));
     const missing = divisions.filter((d) => !divisionsWithFixtures.has(d.id));
     if (missing.length > 0) {
-      alert(`Fixtures haven't been generated yet for: ${missing.map((d) => d.name).join(', ')}. Generate fixtures for every division under Grouping first.`);
+      alert(`Fixtures haven't been generated yet for: ${missing.map((d) => d.name).join(', ')}. Use Generate All Fixtures under Grouping first.`);
       return;
     }
 

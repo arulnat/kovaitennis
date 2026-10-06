@@ -449,3 +449,154 @@ export function buildFixtureRows({
     return rows;
   });
 }
+
+/**
+ * Nudges a set of already-scheduled ties (mutated in place — each tie's
+ * `home`/`away` may swap) so a club's teams don't all land home the same
+ * week (more matches than its courts can cover) or all land away the
+ * same week (courts sitting idle when they didn't have to) — grouped by
+ * week_date alone, across every division at once, since a club's teams
+ * can be split across divisions. Only ever swaps a tie that:
+ *   - isn't a Req 4.9 forced rematch swap (`swapped: true` is sacred —
+ *     reverting it would just repeat last season's exact home team), and
+ *   - keeps BOTH sides of the swap within the season's ±1 home/away
+ *     window (Req 4.6) — this is a best-effort spread, not a reason to
+ *     trade one guarantee for another, so a club/week clash with no safe
+ *     swap available is simply left as-is (same philosophy as
+ *     repairForcedBias's "leave it, rare pathological case" fallback).
+ *
+ * @param {{home:string, away:string, swapped:boolean, weekDate:string}[]} ties
+ * @param {Record<string, string|null|undefined>} teamClubId
+ */
+export function balanceClubHomeByWeek(ties, teamClubId) {
+  const clubOf = (teamId) => teamClubId[teamId] ?? null;
+
+  // Running season home-minus-away count per team, mirrors
+  // assignHomeAway's own `diff` bookkeeping — seeded from the ties as
+  // they stand now, then kept in sync with every swap this makes.
+  const diff = new Map();
+  const bump = (teamId, delta) => diff.set(teamId, (diff.get(teamId) ?? 0) + delta);
+  for (const t of ties) { bump(t.home, 1); bump(t.away, -1); }
+
+  function wouldStayBalanced(t) {
+    return Math.abs(diff.get(t.home) - 2) <= 1 && Math.abs(diff.get(t.away) + 2) <= 1;
+  }
+
+  function swap(t) {
+    bump(t.home, -2);
+    bump(t.away, 2);
+    [t.home, t.away] = [t.away, t.home];
+  }
+
+  const weeks = [...new Set(ties.map((t) => t.weekDate))].sort();
+
+  for (const weekDate of weeks) {
+    const weekTies = ties.filter((t) => t.weekDate === weekDate);
+
+    // Which club each playing team belongs to this week — a tie where
+    // both sides share a club is skipped for that club (already one
+    // home, one away, nothing to fix). isHome is always read live off
+    // the tie itself (never cached) since an earlier club's fix this
+    // same week may have already flipped it.
+    const byClub = new Map();
+    for (const t of weekTies) {
+      const homeClub = clubOf(t.home);
+      const awayClub = clubOf(t.away);
+      if (homeClub && homeClub !== awayClub) {
+        if (!byClub.has(homeClub)) byClub.set(homeClub, []);
+        byClub.get(homeClub).push({ teamId: t.home, tie: t });
+      }
+      if (awayClub && awayClub !== homeClub) {
+        if (!byClub.has(awayClub)) byClub.set(awayClub, []);
+        byClub.get(awayClub).push({ teamId: t.away, tie: t });
+      }
+    }
+
+    for (const entries of byClub.values()) {
+      if (entries.length < 2) continue;
+      const isHomeNow = (e) => e.tie.home === e.teamId;
+      const allHome = entries.every(isHomeNow);
+      const allAway = entries.every((e) => !isHomeNow(e));
+      if (!allHome && !allAway) continue;
+
+      const safeSwap = entries.map((e) => e.tie).find((t) => !t.swapped && wouldStayBalanced(t));
+      if (safeSwap) swap(safeSwap); // one swap always breaks "all the same" for 2+ entries
+    }
+  }
+}
+
+/**
+ * Like buildFixtureRows, but for every division at once (Req: "one
+ * generate fixtures common to all", not one division at a time) — every
+ * division shares the same season start date and holiday list, so round
+ * N always lands on the same calendar week_date in every division,
+ * which is what lets balanceClubHomeByWeek compare "who's home this
+ * week" across divisions at all. Each division's own round-robin pairing
+ * and ±1 season home/away balance is computed exactly as buildFixtureRows
+ * already did — this only adjusts which already-balanced side of a tie
+ * is called home, in service of spreading a club's home weeks out.
+ *
+ * @param {object} opts
+ * @param {string} opts.seasonId
+ * @param {{divisionId: string, teamIds: string[]}[]} opts.divisions
+ * @param {string} opts.startWeekend
+ * @param {string[]} [opts.holidays]
+ * @param {Map<string,string>} [opts.priorMeetingHomeTeam]
+ * @param {Record<string, string|null|undefined>} [opts.teamClubId]
+ * @param {string} [opts.releasedAt]
+ * @returns {object[]} rows shaped for `fixtures` table insert, across every division
+ */
+export function buildAllFixtureRows({
+  seasonId, divisions, startWeekend, holidays = [],
+  priorMeetingHomeTeam = new Map(), teamClubId = {}, releasedAt = new Date().toISOString(),
+}) {
+  const perDivision = divisions.map(({ divisionId, teamIds }) => ({
+    divisionId,
+    scheduled: assignHomeAway(generateRoundRobin(teamIds), priorMeetingHomeTeam),
+  }));
+
+  const maxRounds = Math.max(0, ...perDivision.map((d) => d.scheduled.length));
+  const weekends = computeMatchWeekends(startWeekend, maxRounds, holidays);
+
+  const ties = [];
+  for (const { divisionId, scheduled } of perDivision) {
+    for (const { round, ties: roundTies } of scheduled) {
+      for (const tie of roundTies) {
+        ties.push({ divisionId, round, weekDate: weekends[round - 1], home: tie.home, away: tie.away, swapped: tie.swapped });
+      }
+    }
+  }
+
+  balanceClubHomeByWeek(ties, teamClubId);
+
+  const rows = ties.map((t) => ({
+    season_id: seasonId,
+    division_id: t.divisionId,
+    round_number: t.round,
+    week_date: t.weekDate,
+    home_team_id: t.home,
+    away_team_id: t.away,
+    is_bye: false,
+    status: 'released',
+    released_at: releasedAt,
+  }));
+
+  for (const { divisionId, scheduled } of perDivision) {
+    for (const { round, bye } of scheduled) {
+      if (!bye) continue;
+      rows.push({
+        season_id: seasonId,
+        division_id: divisionId,
+        round_number: round,
+        week_date: weekends[round - 1],
+        home_team_id: null,
+        away_team_id: bye,
+        is_bye: true,
+        status: 'released',
+        released_at: releasedAt,
+      });
+    }
+  }
+
+  return rows;
+}

@@ -5,10 +5,10 @@
 // division (divisions.order_index ranks divisions themselves highest-first
 // — see DivisionsPage — NOT alphabetical), manual move/remove/rank per
 // team, auto-grouping of whatever's left unassigned via a seeded random
-// draw (see grouping.js), and a "Generate Fixtures" action per division
-// once a tournament start date is set. Every action writes straight to
-// Supabase (no local-only draft state) so the admin can leave and come
-// back to exactly where they left off.
+// draw (see grouping.js), and a single "Generate All Fixtures" action
+// (not one per division) once a tournament start date is set. Every
+// action writes straight to Supabase (no local-only draft state) so the
+// admin can leave and come back to exactly where they left off.
 //
 // Fixture generation lives here (not on the Fixtures page, which is a
 // read-only viewer — see FixtureGenerationPage.jsx) because a division is
@@ -17,33 +17,43 @@
 // home/away balance algorithmically instead of needing a manual swap-to-
 // fix-imbalance pass.
 //
+// Generation is one action across every unlocked division at once
+// (buildAllFixtureRows, scheduler.js), not per division — this is what
+// lets balanceClubHomeByWeek see every division's ties for the same
+// calendar week together and spread a club's home matches across them
+// when the club has teams split across more than one division, instead
+// of each division being generated in isolation with no idea what
+// another division scheduled that same week. A club otherwise has only
+// as many courts as it has, regardless of which division is playing on
+// them — generating one division at a time couldn't account for that.
+//
 // Each division also has its own grouping_locked flag: once locked, its
 // roster (which teams belong to it) and each team's order_index (rank
-// within the division, e.g. for seeding) are frozen, and Generate
-// Fixtures refuses to run. Successfully generating fixtures locks the
-// division automatically — the intended flow is arrange teams, set
-// ranking, generate fixtures (auto-locks), and it stays that way unless
-// an admin deliberately unlocks it again (e.g. to add a late team).
-// While unlocked, Generate Fixtures becomes Regenerate Fixtures if a
-// schedule already exists: it deletes the old one and builds a fresh
-// one from the current roster, then re-locks. Blocked while the season
-// is published (seasons.published) as an extra safety net, though in
-// practice a published season already has every division grouping_locked
-// too.
+// within the division, e.g. for seeding) are frozen, and it's skipped
+// entirely by Generate All Fixtures. Successfully generating fixtures
+// locks every division it touched automatically — the intended flow is
+// arrange teams, set ranking, Generate All Fixtures (auto-locks
+// everything it generated), and it stays that way unless an admin
+// deliberately unlocks a division again (e.g. to add a late team) — the
+// next Generate All Fixtures then picks that one back up too, replacing
+// its existing schedule while leaving every still-locked division alone.
+// Blocked while the season is published (seasons.published) as an extra
+// safety net, though in practice a published season already has every
+// division grouping_locked too.
 //
 // Holiday weekends (season_holidays) are dates with no matches — set up
-// front, or added later for a rain-out. Generate Fixtures always uses the
-// current list (computeMatchWeekends, scheduler.js) to skip them.
-// Whenever the list changes, every division that already has fixtures
-// gets its week_dates recomputed from the same season start date and the
-// new holiday list — round_number/pairings/scores are never touched,
-// only which calendar weekend each round falls on shifts.
+// front, or added later for a rain-out. Generate All Fixtures always
+// uses the current list (computeMatchWeekends, scheduler.js) to skip
+// them. Whenever the list changes, every division that already has
+// fixtures gets its week_dates recomputed from the same season start
+// date and the new holiday list — round_number/pairings/scores are
+// never touched, only which calendar weekend each round falls on shifts.
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { planAutoGroup } from '../../lib/grouping.js';
-import { buildFixtureRows, buildPriorMeetingMap, computeMatchWeekends } from '../../lib/scheduler.js';
+import { buildAllFixtureRows, buildPriorMeetingMap, computeMatchWeekends } from '../../lib/scheduler.js';
 import TeamLink from '../../components/TeamLink.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import Dropdown from '../../components/Dropdown.jsx';
@@ -367,59 +377,81 @@ export default function GroupingPage({ seasonId }) {
     await rescheduleAroundHolidays(remaining.map((h) => h.holiday_date));
   }
 
-  async function generateFixtures(division) {
-    if (division.grouping_locked) { alert(`"${division.name}" is locked. Unlock it first to generate (or regenerate) fixtures.`); return; }
-    if (activeSeason?.published) { alert(`The season is published — unpublish it first (Fixtures page) before regenerating.`); return; }
+  /**
+   * One combined action for every unlocked division at once (Req:
+   * fixture generation is no longer per-division) — this is what lets
+   * balanceClubHomeByWeek (scheduler.js) see every division's ties for
+   * the same calendar week together and spread a club's home matches
+   * across them, instead of each division being generated in isolation
+   * with no idea what any other division scheduled that same week.
+   * Locked divisions are left completely untouched; everything else
+   * with at least 2 teams is (re)generated and locked together.
+   */
+  async function generateAllFixtures() {
+    if (activeSeason?.published) { alert('The season is published — unpublish it first (Fixtures page) before regenerating.'); return; }
     if (!activeSeason?.start_weekend) { alert('Set the tournament start date above first.'); return; }
-    const teamIds = teamSeasons
-      .filter((ts) => ts.division_id === division.id)
-      .sort((a, b) => a.order_index - b.order_index)
-      .map((ts) => ts.teams.id);
-    if (teamIds.length < 2) { alert('This division needs at least 2 teams first.'); return; }
 
-    // Regenerating (roster changed after an unlock) replaces the whole
-    // schedule from scratch — safe as long as it's not frozen, since
-    // scores can only ever be entered once frozen (Update Scores), so
-    // there's nothing real to lose here.
-    const alreadyGenerated = divisionsWithFixtures.has(division.id);
-    const verb = alreadyGenerated ? 'Regenerate' : 'Generate';
+    const candidates = divisions
+      .filter((d) => !d.grouping_locked)
+      .map((division) => ({
+        division,
+        teamIds: teamSeasons
+          .filter((ts) => ts.division_id === division.id)
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((ts) => ts.teams.id),
+      }))
+      .filter((c) => c.teamIds.length >= 2);
+
+    if (candidates.length === 0) {
+      alert('No unlocked division has at least 2 teams to generate fixtures for.');
+      return;
+    }
+
+    const alreadyGenerated = candidates.filter((c) => divisionsWithFixtures.has(c.division.id));
+    const lockedCount = divisions.length - divisions.filter((d) => !d.grouping_locked).length;
     if (!confirm(
-      `${verb} fixtures for "${division.name}" (${teamIds.length} teams)?` +
-      (alreadyGenerated ? ' This replaces the existing schedule entirely.' : '') +
-      ' Home/away is automatically balanced, and the division will be locked afterward.'
+      `Generate fixtures for all ${candidates.length} unlocked division(s) at once (${candidates.map((c) => c.division.name).join(', ')})?` +
+      (alreadyGenerated.length > 0 ? ` This replaces the existing schedule for ${alreadyGenerated.length} of them entirely.` : '') +
+      (lockedCount > 0 ? ` ${lockedCount} locked division(s) are left untouched.` : '') +
+      ' Home/away is automatically balanced — including spreading a club\'s home matches across weeks when it has teams in more than one division — and every division generated here will be locked afterward.'
     )) return;
 
-    if (alreadyGenerated) {
+    for (const { division } of alreadyGenerated) {
       const { error: deleteErr } = await supabase.from('fixtures').delete().eq('season_id', seasonId).eq('division_id', division.id);
       if (deleteErr) { alert(deleteErr.message); return; }
     }
 
+    const allTeamIds = candidates.flatMap((c) => c.teamIds);
     // Req 4.9: pull last season's fixtures (any division) to detect
     // rematches and auto-swap home/away.
     const { data: priorFixtures } = await supabase
       .from('fixtures')
       .select('home_team_id, away_team_id')
-      .in('home_team_id', teamIds)
-      .in('away_team_id', teamIds); // simplified — production query should scope to "prior season" explicitly
+      .in('home_team_id', allTeamIds)
+      .in('away_team_id', allTeamIds); // simplified — production query should scope to "prior season" explicitly
 
-    const rows = buildFixtureRows({
+    const teamClubId = Object.fromEntries(teamSeasons.map((ts) => [ts.teams.id, ts.teams?.club_id ?? null]));
+
+    const rows = buildAllFixtureRows({
       seasonId,
-      divisionId: division.id,
-      teamIds,
+      divisions: candidates.map((c) => ({ divisionId: c.division.id, teamIds: c.teamIds })),
       startWeekend: activeSeason.start_weekend,
       holidays: holidays.map((h) => h.holiday_date),
       priorMeetingHomeTeam: buildPriorMeetingMap(priorFixtures || []),
+      teamClubId,
     });
 
     const { error } = await supabase.from('fixtures').insert(rows);
     if (error) { alert(error.message); return; }
 
-    // Once fixtures exist, the division locks automatically (Req: "once
-    // fixture is generated, that division goes to locked state") — an
-    // admin can still manually unlock it later (e.g. to add a team),
-    // which is exactly what makes regenerating possible above.
-    const { error: lockErr } = await supabase.from('divisions').update({ grouping_locked: true }).eq('id', division.id);
-    if (lockErr) { alert(lockErr.message); return; }
+    // Once fixtures exist, each included division locks automatically
+    // (Req: "once fixture is generated, that division goes to locked
+    // state") — an admin can still manually unlock one later (e.g. to
+    // add a team), which is exactly what makes regenerating possible.
+    for (const { division } of candidates) {
+      const { error: lockErr } = await supabase.from('divisions').update({ grouping_locked: true }).eq('id', division.id);
+      if (lockErr) { alert(lockErr.message); return; }
+    }
 
     await Promise.all([load(), refreshDivisions()]);
   }
@@ -546,6 +578,25 @@ export default function GroupingPage({ seasonId }) {
         </div>
       </div>
 
+      <div className="border rounded p-4 mb-6 bg-gray-50">
+        <h2 className="font-medium mb-2">Generate Fixtures</h2>
+        <p className="text-sm text-gray-600 mb-2">
+          One action for every unlocked division at once — not one at a time — so home/away balancing can see
+          every division's matches for the same week together and spread a club's home matches across them when
+          it has teams in more than one division, instead of each division being generated blind to what any
+          other scheduled that week. Locked divisions are left untouched; everything else with at least 2 teams
+          is (re)generated and locked together.
+        </p>
+        <button
+          onClick={generateAllFixtures}
+          disabled={!activeSeason?.start_weekend || !!activeSeason?.published}
+          title={!activeSeason?.start_weekend ? 'Set the tournament start date above first' : activeSeason?.published ? 'Unpublish the season first (Fixtures page)' : undefined}
+          className="px-4 py-2 rounded bg-teal-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Generate All Fixtures
+        </button>
+      </div>
+
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${divisions.length + 1}, minmax(220px, 1fr))` }}>
         <GroupColumn
           title="Unassigned pool"
@@ -571,7 +622,6 @@ export default function GroupingPage({ seasonId }) {
             locked={d.grouping_locked}
             onToggleLock={() => toggleGroupingLock(d)}
             hasFixtures={divisionsWithFixtures.has(d.id)}
-            onGenerateFixtures={() => generateFixtures(d)}
             selectable
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
@@ -587,7 +637,7 @@ export default function GroupingPage({ seasonId }) {
 
 function GroupColumn({
   title, teams, divisions, currentDivisionId, onMove, onMoveRank,
-  locked, onToggleLock, hasFixtures, onGenerateFixtures,
+  locked, onToggleLock, hasFixtures,
   selectable, selectedIds, onToggleSelect, bulkMoveTarget, onBulkMoveTargetChange, onBulkMove,
 }) {
   const isDivision = currentDivisionId != null;
@@ -637,19 +687,10 @@ function GroupColumn({
         </div>
       )}
 
-      {onGenerateFixtures && (
-        hasFixtures && locked ? (
-          <p className="w-full text-xs text-gray-500 text-center py-1 border-b bg-gray-50">Fixtures generated ✓</p>
-        ) : (
-          <button
-            onClick={onGenerateFixtures}
-            disabled={locked}
-            title={locked ? 'Unlock this division first' : undefined}
-            className="w-full text-xs text-teal-700 underline py-1 border-b disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
-          >
-            {hasFixtures ? 'Regenerate Fixtures' : 'Generate Fixtures'}
-          </button>
-        )
+      {isDivision && (
+        <p className={`w-full text-xs text-center py-1 border-b ${hasFixtures ? 'text-teal-700 bg-teal-50' : 'text-gray-400 bg-gray-50'}`}>
+          {hasFixtures ? 'Fixtures generated ✓' : 'No fixtures yet'}
+        </p>
       )}
 
       <div className="divide-y">
