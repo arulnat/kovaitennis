@@ -366,7 +366,9 @@ function RoundsTable({ rounds, teamName, onSwap }) {
               {bye && (
                 <tr className="border-t bg-gray-50">
                   <td className="p-2 font-medium"><TeamLink teamId={bye}>{teamName(bye)}</TeamLink></td>
-                  <td className="p-2 text-gray-500 italic" colSpan={2}>Rest</td>
+                  <td className="p-2" colSpan={2}>
+                    <span className="inline-block bg-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded">Rest</span>
+                  </td>
                 </tr>
               )}
             </tbody>

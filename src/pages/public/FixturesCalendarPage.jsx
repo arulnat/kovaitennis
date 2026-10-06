@@ -199,7 +199,7 @@ export default function FixturesCalendarPage({ seasonId }) {
                               return (
                                 <td key={r} className="py-0.5 px-2 text-center border-t border-slate-200 whitespace-nowrap">
                                   {cell === 'bye' ? (
-                                    <span className="text-slate-400 italic text-xs">Rest</span>
+                                    <span className="inline-block bg-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded">Rest</span>
                                   ) : cell ? (
                                     <TeamLink
                                       teamId={cell.opponentId}

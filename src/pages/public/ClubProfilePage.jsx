@@ -146,7 +146,7 @@ export default function ClubProfilePage({ clubId }) {
                       return (
                         <div key={f.id} className="px-4 py-3 flex items-center justify-between text-sm">
                           <span className="font-semibold text-slate-700">{restingName}</span>
-                          <span className="text-gray-400 italic">Rest (bye)</span>
+                          <span className="inline-block bg-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded">Rest</span>
                         </div>
                       );
                     }

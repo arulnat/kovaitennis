@@ -363,7 +363,9 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                       return (
                         <tr key={f.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                           <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
-                          <td className="p-2 text-gray-500 italic border-t" colSpan={2}>Rest (bye)</td>
+                          <td className="p-2 border-t" colSpan={2}>
+                            <span className="inline-block bg-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded">Rest</span>
+                          </td>
                         </tr>
                       );
                     }
