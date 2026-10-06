@@ -3,15 +3,15 @@
 // Roster management for My Team (a team login, own roster only) and for
 // admins (any team, via an explicit teamId — the Teams admin page links
 // to the same UI with a teamId override): add a player (full details
-// required — name, gender, date of birth, and an optional photo), edit
-// any existing player the same way (including the captain's own row,
-// which can also update the team's captain phone and an address-proof
-// photo), delete a player, or submit the roster as complete for a
-// season. There's no player/coach role anymore — isCoach is accepted if
-// an old caller still sends it but is otherwise ignored and always
-// stored false (players.is_coach itself, and its one-coach-per-team
-// index, are unused now rather than dropped, to avoid a destructive
-// migration for a column nothing reads).
+// required — name, gender, date of birth, and an optional photo plus
+// an optional address-proof photo), edit any existing player the same
+// way (including the captain's own row, which can also update the
+// team's captain phone), delete a player, or submit the roster as
+// complete for a season. There's no player/coach role anymore —
+// isCoach is accepted if an old caller still sends it but is otherwise
+// ignored and always stored false (players.is_coach itself, and its
+// one-coach-per-team index, are unused now rather than dropped, to
+// avoid a destructive migration for a column nothing reads).
 //
 // A team caller's team_id always comes from their own app_users row,
 // never from the request body, so a team can only ever act on its own
@@ -58,7 +58,7 @@
 //
 // Deploy: supabase functions deploy manage-team-roster
 // Call from the client with:
-//   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, photoBase64?, teamId? } })
+//   supabase.functions.invoke('manage-team-roster', { body: { action: 'add', seasonId, name, gender, dateOfBirth, photoBase64?, addressProofBase64?, teamId? } })
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'edit', playerId, seasonId, name, gender, dateOfBirth, photoBase64?, removePhoto?, captainPhone?, addressProofBase64?, removeAddressProof?, teamId? } })
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'delete', playerId, seasonId, teamId? } })
 //   supabase.functions.invoke('manage-team-roster', { body: { action: 'submit', seasonId, teamId? } })
@@ -234,6 +234,12 @@ Deno.serve(async (req) => {
         if (photoErr) throw photoErr;
       }
 
+      if (body.addressProofBase64) {
+        const proofUrl = await uploadPhoto(admin, teamId, newPlayer.id, body.addressProofBase64, 'address-proof');
+        const { error: proofErr } = await admin.from('players').update({ address_proof_url: proofUrl }).eq('id', newPlayer.id);
+        if (proofErr) throw proofErr;
+      }
+
       return json({ ok: true });
     }
 
@@ -280,9 +286,7 @@ Deno.serve(async (req) => {
         if (photoErr) throw photoErr;
       }
 
-      // Address proof — captain-only in the UI, but not enforced here
-      // beyond that (same spirit as photo_url: whatever the caller is
-      // allowed to edit, they're allowed to attach this to).
+      // Address proof — every player can have one, same as photo_url.
       if (body.addressProofBase64) {
         const proofUrl = await uploadPhoto(admin, teamId, playerId, body.addressProofBase64, 'address-proof');
         const { error: proofErr } = await admin.from('players').update({ address_proof_url: proofUrl }).eq('id', playerId);

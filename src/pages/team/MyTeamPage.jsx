@@ -22,14 +22,13 @@
 // deleted. An admin can remove any of those first 4 too (but never the
 // captain themselves, either way — see the Edge Function).
 //
-// Editing the captain's own row also offers the team's phone number
-// (teams.captain_phone, since that's the one piece of "player" contact
-// info that doesn't actually live on the players table) and an address
-// proof photo (players.address_proof_url, migration 0032) — same
-// <100KB upload rule as the regular photo, proving where the team/club
-// is actually based. Captain-only in this UI (the team's address is a
-// single fact, and the captain is the one identity that always exists
-// on a team), not required to submit the roster.
+// Every player — not just the captain — can have an address proof
+// photo (players.address_proof_url, migration 0032) alongside their
+// regular photo, same <100KB upload/view/remove rule either way; not
+// required to submit the roster. Editing the captain's own row also
+// offers the team's phone number (teams.captain_phone), since that's
+// the one piece of "player" contact info that doesn't actually live on
+// the players table.
 //
 // Submit (migration 0026's team_seasons.roster_submitted) requires every
 // player to have name/gender/date of birth/photo filled in — re-checked
@@ -344,10 +343,8 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
     if (photoBase64) fields.photoBase64 = photoBase64;
     else if (removePhoto) fields.removePhoto = true;
     if (player?.is_captain && captainPhone.trim()) fields.captainPhone = captainPhone.trim();
-    if (player?.is_captain) {
-      if (addressProofBase64) fields.addressProofBase64 = addressProofBase64;
-      else if (removeAddressProof) fields.removeAddressProof = true;
-    }
+    if (addressProofBase64) fields.addressProofBase64 = addressProofBase64;
+    else if (removeAddressProof) fields.removeAddressProof = true;
 
     const ok = await onSave(fields);
     setSaving(false);
@@ -383,7 +380,7 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
                 {showPhoto ? 'Hide' : 'View'}
               </button>
             )}
-            {player.is_captain && player.address_proof_url && (
+            {player.address_proof_url && (
               <button onClick={() => setShowAddressProof((v) => !v)} className="text-teal-700 underline text-xs">
                 {showAddressProof ? 'Hide proof' : 'View proof'}
               </button>
@@ -447,21 +444,19 @@ function PlayerCard({ player, isNew, deletable, readOnly, ageCutoffDate, onSave,
             </label>
           )}
         </div>
+        <div>
+          <label className="block text-xs text-gray-600 mb-0.5">Address proof (under 100KB)</label>
+          <input type="file" accept="image/*" onChange={handleAddressProofChange} className="text-xs w-full" />
+          {player?.address_proof_url && !addressProofFile && (
+            <label className="flex items-center gap-1 text-xs text-gray-600 mt-1">
+              <input type="checkbox" checked={removeAddressProof} onChange={(e) => setRemoveAddressProof(e.target.checked)} /> Remove current address proof
+            </label>
+          )}
+        </div>
         {player?.is_captain && (
           <div className="col-span-2">
             <label className="block text-xs text-gray-600 mb-0.5">Team phone number (leave blank to keep as-is)</label>
             <input value={captainPhone} onChange={(e) => setCaptainPhone(e.target.value)} placeholder="10-digit mobile number" className="border rounded px-2 py-1 text-sm w-full" />
-          </div>
-        )}
-        {player?.is_captain && (
-          <div className="col-span-2">
-            <label className="block text-xs text-gray-600 mb-0.5">Address proof (under 100KB) — a document showing the club/team's address</label>
-            <input type="file" accept="image/*" onChange={handleAddressProofChange} className="text-xs w-full" />
-            {player?.address_proof_url && !addressProofFile && (
-              <label className="flex items-center gap-1 text-xs text-gray-600 mt-1">
-                <input type="checkbox" checked={removeAddressProof} onChange={(e) => setRemoveAddressProof(e.target.checked)} /> Remove current address proof
-              </label>
-            )}
           </div>
         )}
       </div>
