@@ -42,6 +42,12 @@
 // then on. add/edit/delete all take a seasonId for exactly this check
 // (edit/delete don't otherwise need one).
 //
+// seasons.roster_additions_disabled (migration 0030, Seasons admin
+// page, default false) is a separate, admin-set freeze on roster SIZE
+// specifically: when true, a CAPTAIN can no longer add or delete a
+// player this season at all (rosterAdditionsDisabled below) — edit is
+// unaffected, and admin always bypasses this too.
+//
 // Age eligibility (Req): every player must be MIN_AGE (40) or older as
 // of their season's fixed age_cutoff_date (seasons.age_cutoff_date,
 // migration 0027, set per season on the Seasons admin page — "today"
@@ -149,6 +155,13 @@ async function rosterIsSubmitted(admin, teamId, seasonId) {
   return !!data?.roster_submitted;
 }
 
+/** Admin-set, season-wide (Seasons page): freezes roster size for every team this season — a CAPTAIN can no longer add or delete a player (editing an existing one is unaffected); isAdminCaller bypasses this entirely. */
+async function rosterAdditionsDisabled(admin, seasonId) {
+  if (!seasonId) return false;
+  const { data } = await admin.from('seasons').select('roster_additions_disabled').eq('id', seasonId).maybeSingle();
+  return !!data?.roster_additions_disabled;
+}
+
 async function getAgeCutoffDate(admin, seasonId) {
   if (!seasonId) return null;
   const { data } = await admin.from('seasons').select('age_cutoff_date').eq('id', seasonId).maybeSingle();
@@ -191,6 +204,9 @@ Deno.serve(async (req) => {
       if (!seasonId) return json({ error: 'seasonId is required' }, 400);
       if (!isAdminCaller && await rosterIsSubmitted(admin, teamId, seasonId)) {
         return json({ error: 'Roster already submitted — ask an admin to make further changes' }, 403);
+      }
+      if (!isAdminCaller && await rosterAdditionsDisabled(admin, seasonId)) {
+        return json({ error: 'Adding players is currently disabled for this season — ask an admin' }, 403);
       }
       const fields = validatePlayerFields(body, await getAgeCutoffDate(admin, seasonId));
 
@@ -283,6 +299,9 @@ Deno.serve(async (req) => {
       if (!playerId) return json({ error: 'playerId is required' }, 400);
       if (!isAdminCaller && await rosterIsSubmitted(admin, teamId, seasonId)) {
         return json({ error: 'Roster already submitted — ask an admin to make further changes' }, 403);
+      }
+      if (!isAdminCaller && await rosterAdditionsDisabled(admin, seasonId)) {
+        return json({ error: 'Removing players is currently disabled for this season — ask an admin' }, 403);
       }
 
       const { data: player } = await admin.from('players').select('id, team_id, is_captain').eq('id', playerId).maybeSingle();

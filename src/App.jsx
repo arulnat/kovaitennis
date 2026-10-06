@@ -12,6 +12,7 @@ import GroupingPage from './pages/admin/GroupingPage.jsx';
 import FixtureGenerationPage from './pages/admin/FixtureGenerationPage.jsx';
 import MissingScoresReportPage from './pages/admin/MissingScoresReportPage.jsx';
 import UpdateScoresPage from './pages/admin/UpdateScoresPage.jsx';
+import ManageScoresPage from './pages/admin/ManageScoresPage.jsx';
 import ContentManagementPage from './pages/admin/ContentManagementPage.jsx';
 import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import FinalResultsAdminPage from './pages/admin/FinalResultsAdminPage.jsx';
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="/admin/grouping" element={<RequireRole roles={['tournament_admin', 'super_admin']}><GroupingRouteWrapper /></RequireRole>} />
             <Route path="/admin/fixtures" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FixtureRouteWrapper /></RequireRole>} />
             <Route path="/admin/update-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><UpdateScoresRouteWrapper /></RequireRole>} />
+            <Route path="/admin/manage-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ManageScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/missing-scores" element={<RequireRole roles={['tournament_admin', 'super_admin']}><MissingScoresRouteWrapper /></RequireRole>} />
             <Route path="/admin/final-results" element={<RequireRole roles={['tournament_admin', 'super_admin']}><FinalResultsAdminPage /></RequireRole>} />
             <Route path="/admin/content" element={<RequireRole roles={['tournament_admin', 'super_admin']}><ContentRouteWrapper /></RequireRole>} />
@@ -243,8 +245,9 @@ const dropdownLinkClass = 'block px-4 py-2 text-teal-100 hover:text-white hover:
 // item: public Teams/Fixtures Calendar/Clubs, and, admin-only, Setup
 // (Seasons -> Divisions -> Bulk Upload -> Manage Teams -> Team Logins,
 // the order an admin actually sets a season up in), Grouping+Fixtures
-// (scheduling), Update Scores+Final Results (score entry), and
-// Content+Messages+About. See the NavDropdown calls in Nav() below.
+// (scheduling), Update Scores+Manage Scores+Missing Scores+Final
+// Results (score entry), and Content+Messages+About. See the
+// NavDropdown calls in Nav() below.
 function NavDropdown({ label, items }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -326,6 +329,7 @@ function Nav() {
             label="Scores"
             items={[
               { to: '/admin/update-scores', label: 'Update Scores' },
+              { to: '/admin/manage-scores', label: 'Manage Scores' },
               { to: '/admin/missing-scores', label: 'Missing Scores' },
               { to: '/admin/final-results', label: 'Final Results' },
             ]}
@@ -475,6 +479,14 @@ function UpdateScoresRouteWrapper() {
   return (
     <NeedsSeason>
       <UpdateScoresPage seasonId={seasonId} />
+    </NeedsSeason>
+  );
+}
+function ManageScoresRouteWrapper() {
+  const { seasonId } = useSeason();
+  return (
+    <NeedsSeason>
+      <ManageScoresPage seasonId={seasonId} />
     </NeedsSeason>
   );
 }

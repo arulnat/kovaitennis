@@ -17,6 +17,7 @@ import { useSeason } from '../../lib/seasonContext.jsx';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import PageHeader from '../../components/PageHeader.jsx';
+import ToggleSwitch from '../../components/ToggleSwitch.jsx';
 import { extractFunctionErrorMessage } from '../../lib/functionsError.js';
 
 export default function SeasonsPage() {
@@ -60,6 +61,13 @@ export default function SeasonsPage() {
     refresh();
   }
 
+  /** Freezes every team's roster size for this season — a captain can no longer add or delete a player (editing an existing one is unaffected); admin always can. Default off. */
+  async function toggleRosterAdditions(season) {
+    const { error } = await supabase.from('seasons').update({ roster_additions_disabled: !season.roster_additions_disabled }).eq('id', season.id);
+    if (error) { alert(error.message); return; }
+    refresh();
+  }
+
   async function purge(season) {
     if (season.purge_locked) {
       alert('This season is locked. Unlock it first before purging.');
@@ -99,7 +107,7 @@ export default function SeasonsPage() {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader
         title="Seasons"
-        subtitle="Create and manage seasons. Purge Data permanently deletes a season and everything under it — including its teams' logins, unless a team is also placed in another season — locked by default, so you must deliberately unlock a season before it can be purged."
+        subtitle="Create and manage seasons. Purge Data permanently deletes a season and everything under it — including its teams' logins, unless a team is also placed in another season — locked by default, so you must deliberately unlock a season before it can be purged. Add Player controls whether a captain can add or delete a player on their own roster this season — enabled by default."
       />
 
       <div className="border rounded p-4 mb-4">
@@ -130,6 +138,7 @@ export default function SeasonsPage() {
             <th className="text-left p-2">Start Weekend</th>
             <th className="text-left p-2">Age Cutoff (40+ as of)</th>
             <th className="p-2">Purge Lock</th>
+            <th className="p-2">Add Player</th>
             <th className="p-2"></th>
           </tr>
         </thead>
@@ -155,6 +164,13 @@ export default function SeasonsPage() {
                     {s.purge_locked ? 'Unlock' : 'Lock'}
                   </button>
                 </div>
+              </td>
+              <td className="p-2 text-center">
+                <ToggleSwitch
+                  checked={!s.roster_additions_disabled}
+                  onChange={() => toggleRosterAdditions(s)}
+                  label={s.roster_additions_disabled ? 'Disabled' : 'Enabled'}
+                />
               </td>
               <td className="p-2 text-right">
                 <button

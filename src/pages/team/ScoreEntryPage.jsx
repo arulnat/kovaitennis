@@ -67,6 +67,7 @@ export default function ScoreEntryPage({ fixtureId }) {
   const [roster, setRoster] = useState({ home: [], away: [] });
   const [teamNames, setTeamNames] = useState({ home: '', away: '' });
   const [ratings, setRatings] = useState([]); // tie_player_ratings rows for this fixture
+  const [weekOverride, setWeekOverride] = useState(false); // admin has re-opened this fixture's week (Manage Scores)
   const [activeTab, setActiveTab] = useState('singles');
 
   const reloadFixture = () => supabase.from('fixtures').select('*').eq('id', fixtureId).single().then(({ data }) => setFixture(data));
@@ -104,6 +105,20 @@ export default function ScoreEntryPage({ fixtureId }) {
     supabase.from('seasons').select('published').eq('id', fixture.season_id).single().then(({ data }) => setSeason(data));
   }, [fixture?.season_id]);
 
+  // Has admin re-opened this fixture's week for early scoring (Manage
+  // Scores)? Only matters for a future week — see isFutureWeek below —
+  // but harmless to fetch regardless.
+  useEffect(() => {
+    if (!fixture?.season_id || !fixture?.week_date) { setWeekOverride(false); return; }
+    supabase
+      .from('score_entry_week_overrides')
+      .select('week_date')
+      .eq('season_id', fixture.season_id)
+      .eq('week_date', fixture.week_date)
+      .maybeSingle()
+      .then(({ data }) => setWeekOverride(!!data));
+  }, [fixture?.season_id, fixture?.week_date]);
+
   useEffect(() => {
     if (!fixture) return;
     Promise.all([
@@ -120,9 +135,14 @@ export default function ScoreEntryPage({ fixtureId }) {
   const tieComplete = RUBBER_TYPES.every((t) => rubbers[t]?.winner_side);
   const isFinalized = !!fixture?.finalized_at;
   const isPublished = !!season?.published;
+  // A captain can't score a week that hasn't arrived yet unless admin
+  // has specifically re-opened it (Manage Scores) — admin itself is
+  // never subject to this, same as every other restriction here.
+  const isFutureWeek = !!fixture?.week_date && fixture.week_date > new Date().toISOString().slice(0, 10);
+  const weekAllowed = !isFutureWeek || weekOverride;
   // Either captain can edit scores — Req 5.2 — until the tie finalizes;
   // admin can still edit scores after that (never ratings — see below).
-  const canEdit = isPublished && (isAdmin || !isFinalized);
+  const canEdit = isPublished && (isAdmin || (!isFinalized && weekAllowed));
   const mySide = teamId && fixture ? (teamId === fixture.home_team_id ? 'home' : teamId === fixture.away_team_id ? 'away' : null) : null;
 
   // already-selected players across the tie, for eligibility filtering
@@ -239,6 +259,13 @@ export default function ScoreEntryPage({ fixtureId }) {
         </p>
       )}
 
+      {isPublished && isFutureWeek && !weekOverride && !isAdmin && (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
+          This tie's week ({fixture.week_date}) hasn't arrived yet — scores and ratings can't be entered for it
+          early. Ask an admin to open this week on Manage Scores if it needs to be scored ahead of schedule.
+        </p>
+      )}
+
       <p className="text-sm text-gray-600 mb-4">
         Either captain can save or edit any rubber's score, in any order — Save stores it as a draft; it only counts
         toward the tie score and standings once Update is clicked.{' '}
@@ -249,7 +276,8 @@ export default function ScoreEntryPage({ fixtureId }) {
         ) : (
           <span className="text-teal-700">It stays open until all 3 rubbers are updated — then it locks for good.</span>
         )}{' '}
-        Rating the opposing players who played (Performance tab) is optional and never locks — give one whenever you like, before or after the tie finalizes.
+        Rating the opposing players who played (Performance tab) is optional and never locks once its week has
+        arrived — give one whenever you like, before or after the tie finalizes.
       </p>
 
       {RUBBER_TYPES.some((t) => rubbers[t]?.confirmed_at) && (
@@ -317,6 +345,7 @@ export default function ScoreEntryPage({ fixtureId }) {
           tieComplete={tieComplete}
           isAdmin={isAdmin}
           mySide={mySide}
+          ratingAllowed={weekAllowed}
           onSave={saveRating}
         />
       </div>
@@ -358,7 +387,7 @@ function playersWhoPlayed(rubbers, side) {
  * only the opposing captain can write here (see tie_player_ratings
  * RLS) — admin never can, only ever a read-only view.
  */
-function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieComplete, isAdmin, mySide, onSave }) {
+function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieComplete, isAdmin, mySide, ratingAllowed, onSave }) {
   if (!tieComplete) {
     return <p className="text-sm text-gray-500 p-4">Enter and save all 3 rubbers' scores first — ratings open once the tie is complete.</p>;
   }
@@ -391,8 +420,13 @@ function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieCompl
   return (
     <div>
       <p className="text-sm text-gray-600 mb-3">
-        Rate {teamNames[opponentSide]}'s players who played this tie — optional, a scouting aid for whoever plays them next. Give it whenever you like, it's never locked.
+        Rate {teamNames[opponentSide]}'s players who played this tie — optional, a scouting aid for whoever plays them next. Give it whenever you like, it's never locked{ratingAllowed ? '' : ' once its week arrives'}.
       </p>
+      {!ratingAllowed && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-3">
+          This tie's week hasn't arrived yet — ratings open once it has (or once an admin opens it early on Manage Scores).
+        </p>
+      )}
       {opponentPlayers.length === 0 ? (
         <p className="text-sm text-gray-500">No opposing players recorded yet.</p>
       ) : (
@@ -403,6 +437,7 @@ function PerformanceTab({ fixture, rubbers, roster, teamNames, ratings, tieCompl
               playerId={playerId}
               playerName={opponentRoster.find((p) => p.id === playerId)?.name ?? '—'}
               existing={ratingFor(playerId)}
+              disabled={!ratingAllowed}
               onSave={(payload) => onSave(playerId, myTeamId, payload)}
             />
           ))}
@@ -446,7 +481,7 @@ function ReadOnlyRatings({ title, playerIds, roster, ratings }) {
   );
 }
 
-function PlayerRatingRow({ playerId, playerName, existing, onSave }) {
+function PlayerRatingRow({ playerId, playerName, existing, disabled, onSave }) {
   const [overallRating, setOverallRating] = useState(existing?.overall_rating ?? '');
   const [skills, setSkills] = useState(Object.fromEntries(SKILLS.map((s) => [s.key, existing?.[s.key] ?? null])));
   const [saving, setSaving] = useState(false);
@@ -470,9 +505,9 @@ function PlayerRatingRow({ playerId, playerName, existing, onSave }) {
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-500">Overall (5–10)</label>
           <input
-            type="number" min="5" max="10" value={overallRating}
+            type="number" min="5" max="10" value={overallRating} disabled={disabled}
             onChange={(e) => setOverallRating(e.target.value)}
-            className="border rounded px-2 py-1 w-16 text-center text-sm"
+            className="border rounded px-2 py-1 w-16 text-center text-sm disabled:opacity-50"
           />
         </div>
       </div>
@@ -484,8 +519,9 @@ function PlayerRatingRow({ playerId, playerName, existing, onSave }) {
               <button
                 key={v}
                 type="button"
+                disabled={disabled}
                 onClick={() => toggleSkill(s.key, v)}
-                className={`px-2 py-0.5 rounded uppercase font-bold text-[10px] ${
+                className={`px-2 py-0.5 rounded uppercase font-bold text-[10px] disabled:opacity-50 disabled:cursor-not-allowed ${
                   skills[s.key] === v
                     ? v === 'strong' ? 'bg-teal-700 text-white' : 'bg-amber-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'

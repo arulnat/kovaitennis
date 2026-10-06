@@ -86,6 +86,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
   const [teamSeason, setTeamSeason] = useState(null); // { roster_submitted, roster_submitted_at } | null
   const [ageCutoffDate, setAgeCutoffDate] = useState(null);
   const [seasonFees, setSeasonFees] = useState(null); // { registrationFee, playerFee }
+  const [additionsDisabled, setAdditionsDisabled] = useState(false); // admin-set, season-wide — Seasons page
   const [adding, setAdding] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -105,12 +106,13 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
         .eq('season_id', seasonId)
         .eq('team_id', teamId)
         .maybeSingle(),
-      supabase.from('seasons').select('age_cutoff_date, registration_fee, player_fee').eq('id', seasonId).maybeSingle(),
+      supabase.from('seasons').select('age_cutoff_date, registration_fee, player_fee, roster_additions_disabled').eq('id', seasonId).maybeSingle(),
     ]);
     setPlayers((data || []).map((r) => r.players).filter(Boolean));
     setTeamSeason(tsRow || null);
     setAgeCutoffDate(seasonRow?.age_cutoff_date ?? null);
     setSeasonFees(seasonRow ? { registrationFee: seasonRow.registration_fee, playerFee: seasonRow.player_fee } : null);
+    setAdditionsDisabled(!!seasonRow?.roster_additions_disabled);
   }, [teamId, seasonId]);
 
   useEffect(() => { load(); }, [load]);
@@ -159,6 +161,11 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
   // Once the captain has submitted, they can no longer add/edit/delete —
   // only an admin (isAdminView) can, from here on (enforced server-side too).
   const locked = !isAdminView && !!teamSeason?.roster_submitted;
+  // Admin-set, season-wide (Seasons page): freezes roster size for every
+  // captain — no add, and (since a delete just makes room to add one
+  // right back) no delete either. Editing an existing player is
+  // unaffected. Admin itself is never subject to this.
+  const additionsLocked = !isAdminView && additionsDisabled;
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -187,6 +194,12 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
         </p>
       )}
 
+      {additionsLocked && !locked && (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-3">
+          Adding or removing players is currently disabled for this season — contact an admin if your roster needs to change size. Editing an existing player's details is still fine.
+        </p>
+      )}
+
       {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
 
       {players === null ? (
@@ -201,7 +214,7 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
               player={p}
               ageCutoffDate={ageCutoffDate}
               readOnly={locked}
-              deletable={!p.is_captain && (isAdminView || !protectedIds.has(p.id))}
+              deletable={!p.is_captain && !additionsLocked && (isAdminView || !protectedIds.has(p.id))}
               onSave={(fields) => callRoster({ action: 'edit', playerId: p.id, seasonId, ...fields })}
               onDelete={() => deletePlayer(p)}
             />
@@ -222,12 +235,14 @@ export default function MyTeamPage({ teamId: teamIdProp, isAdminView = false }) 
         />
       ) : (
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setAdding(true)}
-            className="px-4 py-2 rounded bg-teal-700 text-white text-sm font-semibold hover:bg-teal-800"
-          >
-            + Add Player
-          </button>
+          {!additionsLocked && (
+            <button
+              onClick={() => setAdding(true)}
+              className="px-4 py-2 rounded bg-teal-700 text-white text-sm font-semibold hover:bg-teal-800"
+            >
+              + Add Player
+            </button>
+          )}
           <button
             onClick={submitRoster}
             disabled={submitting || !allComplete}
