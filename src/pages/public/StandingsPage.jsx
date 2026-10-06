@@ -18,6 +18,7 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
+import { useAuth } from '../../lib/auth.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeTeamStandings, highlightBands } from '../../lib/standings.js';
 import { setsAndGamesFromRow } from '../../lib/scoring.js';
@@ -28,16 +29,38 @@ import RubberRow from '../../components/RubberRow.jsx';
 const RUBBER_ORDER = ['singles', 'doubles1', 'doubles2'];
 
 export default function StandingsPage() {
-  const { seasonId, divisions, divisionId, setDivisionId } = useSeason();
+  const { seasonId, divisions, divisionId: globalDivisionId, setDivisionId } = useSeason();
+  const { role, teamId } = useAuth();
+  const [myDivisionId, setMyDivisionId] = useState(undefined); // undefined = still looking up; null = not placed in one yet
   const [rows, setRows] = useState(null);
   const [teamNames, setTeamNames] = useState({});
   const [matchesByTeam, setMatchesByTeam] = useState({});
   const [nameOf, setNameOf] = useState({});
   const [expanded, setExpanded] = useState(new Set());
 
+  // A team login only ever sees its own division's standings here — no
+  // tabs to switch away, regardless of whatever division is selected
+  // globally (nav bar) for other pages.
+  const isTeamLogin = role === 'team';
+  useEffect(() => {
+    if (!isTeamLogin || !teamId || !seasonId) { setMyDivisionId(undefined); return; }
+    let cancelled = false;
+    supabase
+      .from('team_seasons')
+      .select('division_id')
+      .eq('season_id', seasonId)
+      .eq('team_id', teamId)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setMyDivisionId(data?.division_id ?? null); });
+    return () => { cancelled = true; };
+  }, [isTeamLogin, teamId, seasonId]);
+
+  const divisionId = isTeamLogin ? myDivisionId : globalDivisionId;
+
   useEffect(() => { setExpanded(new Set()); }, [divisionId]);
 
   useEffect(() => {
+    if (!divisionId) { setRows(isTeamLogin ? null : []); return undefined; }
     let cancelled = false;
     async function load() {
       const { data: teamSeasons } = await supabase
@@ -124,7 +147,7 @@ export default function StandingsPage() {
     <div className="max-w-3xl mx-auto p-6">
       <PageHeader title="Standings" />
 
-      {divisions.length > 1 && (
+      {!isTeamLogin && divisions.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-4">
           {divisions.map((d) => (
             <button
@@ -140,7 +163,9 @@ export default function StandingsPage() {
         </div>
       )}
 
-      {!rows ? (
+      {isTeamLogin && myDivisionId === null ? (
+        <p className="text-gray-500 text-sm">Your team isn't placed in a division yet this season.</p>
+      ) : !rows ? (
         <p className="text-gray-500 text-sm">Loading standings…</p>
       ) : (
       <div className="overflow-x-auto rounded shadow">
