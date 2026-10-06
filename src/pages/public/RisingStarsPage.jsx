@@ -223,7 +223,6 @@ export default function RisingStarsPage({ seasonId }) {
               <tr key={r.playerId} className={qualifies ? 'bg-accent-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                 <td className="p-2 font-bold border-t">
                   <PlayerLink playerId={r.playerId}>{r.playerName ?? '—'}</PlayerLink>
-                  {qualifies && <span className="ml-2 text-[10px] font-extrabold uppercase text-accent-600" title="Qualifies for the final week's semifinals/final">Qualified</span>}
                 </td>
                 <td className="p-2 border-t"><TeamLink teamId={r.teamId}>{r.teamName}</TeamLink></td>
                 <td className="p-2 border-t text-gray-600">{r.divisionName}</td>
