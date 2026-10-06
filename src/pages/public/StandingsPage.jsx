@@ -163,6 +163,12 @@ export default function StandingsPage() {
         </div>
       )}
 
+      {isTeamLogin && myDivisionId && (
+        <p className="text-xs font-bold uppercase tracking-wide text-teal-700 mb-4">
+          Your division: {divisions.find((d) => d.id === myDivisionId)?.name ?? '—'}
+        </p>
+      )}
+
       {isTeamLogin && myDivisionId === null ? (
         <p className="text-gray-500 text-sm">Your team isn't placed in a division yet this season.</p>
       ) : !rows ? (

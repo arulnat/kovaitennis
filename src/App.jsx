@@ -18,6 +18,7 @@ import SeasonsPage from './pages/admin/SeasonsPage.jsx';
 import FinalResultsAdminPage from './pages/admin/FinalResultsAdminPage.jsx';
 import ScoreEntryPage from './pages/team/ScoreEntryPage.jsx';
 import MyTeamPage from './pages/team/MyTeamPage.jsx';
+import MyFixturesPage from './pages/team/MyFixturesPage.jsx';
 import StandingsPage from './pages/public/StandingsPage.jsx';
 import ResultsPage from './pages/public/ResultsPage.jsx';
 import FixturesCalendarPage from './pages/public/FixturesCalendarPage.jsx';
@@ -62,6 +63,7 @@ export default function App() {
 
             {/* Self-service team roster editing — captain only, on their own team */}
             <Route path="/my-team" element={<RequireRole roles={['team']}><MyTeamPage /></RequireRole>} />
+            <Route path="/my-fixtures" element={<RequireRole roles={['team']}><MyFixturesPage /></RequireRole>} />
 
             {/* Admin */}
             <Route path="/admin/bulk-upload" element={<RequireRole roles={['tournament_admin', 'super_admin']}><BulkUploadRouteWrapper /></RequireRole>} />
@@ -304,7 +306,10 @@ function Nav() {
         ]}
       />
       {role === 'team' && (
-        <Link to="/my-team" className={navLinkClass}>My Team</Link>
+        <>
+          <Link to="/my-team" className={navLinkClass}>My Team</Link>
+          <Link to="/my-fixtures" className={navLinkClass}>Update Scores</Link>
+        </>
       )}
       {(role === 'tournament_admin' || role === 'super_admin') && (
         <>
