@@ -83,57 +83,102 @@ export default function TeamProfilePage({ seasonId, teamId }) {
     async function load() {
       setLoading(true);
 
-      const { data: teamRow, error: teamErr } = await supabase
+      const teamPromise = supabase
         .from('teams')
         .select('id, name, captain_name, captain_phone, alternate_contact_phone, club_id, clubs(id, name, location, address, number_of_courts, court_type)')
         .eq('id', teamId)
         .maybeSingle();
-      if (cancelled) return;
-      if (teamErr || !teamRow) { setTeam(false); setLoading(false); return; }
-      setTeam(teamRow);
 
-      if (!seasonId) { setLoading(false); return; }
-
-      const { data: tsRow } = await supabase
-        .from('team_seasons')
-        .select('division_id, status, divisions(id, name)')
-        .eq('season_id', seasonId)
-        .eq('team_id', teamId)
-        .maybeSingle();
-      if (cancelled) return;
-      setTeamSeason(tsRow || null);
-
-      const { data: rosterRows } = await supabase
-        .from('team_players')
-        .select('player_id, players(id, name, gender, photo_url, is_captain, is_coach)')
-        .eq('season_id', seasonId)
-        .eq('team_id', teamId);
-      if (cancelled) return;
-      setRoster(rosterRows || []);
-
-      if ((rosterRows || []).length > 0) {
-        const { data: ratingRows } = await supabase
-          .from('tie_player_ratings')
-          .select('rated_player_id, overall_rating, serve, forehand, backhand, volley, fixtures!inner(season_id)')
-          .eq('fixtures.season_id', seasonId)
-          .in('rated_player_id', rosterRows.map((r) => r.player_id));
+      if (!seasonId) {
+        const { data: teamRow, error: teamErr } = await teamPromise;
         if (cancelled) return;
-        const byPlayer = {};
-        for (const r of ratingRows || []) (byPlayer[r.rated_player_id] ??= []).push(r);
-        setRatingsByPlayer(Object.fromEntries(Object.entries(byPlayer).map(([id, rows]) => [id, summarizeRatings(rows)])));
+        setTeam(teamErr || !teamRow ? false : teamRow);
+        setLoading(false);
+        return;
       }
 
-      if (tsRow?.division_id) {
-        const [{ data: divisionTeamSeasons }, { data: divisionFixtures }] = await Promise.all([
-          supabase.from('team_seasons').select('team_id').eq('season_id', seasonId).eq('division_id', tsRow.division_id),
-          // Which ties count is decided below (all 3 rubbers confirmed) — not
-          // fixtures.status, which is a scheduling field nothing ever sets to
-          // 'complete', so filtering on it here silently hid every finished tie.
-          supabase.from('fixtures').select('id, home_team_id, away_team_id, rubbers(*)')
-            .eq('season_id', seasonId).eq('division_id', tsRow.division_id),
-        ]);
-        if (cancelled) return;
+      // These four don't depend on each other — only on seasonId/teamId,
+      // both already known from props — so they fire together instead of
+      // one round-trip at a time. Own-fixtures embeds each rubber's
+      // player names via the players FK (same one query, no follow-up
+      // lookup needed just to label who played).
+      const [
+        { data: teamRow, error: teamErr },
+        { data: tsRow },
+        { data: rosterRows },
+        { data: fixtureRows },
+      ] = await Promise.all([
+        teamPromise,
+        supabase.from('team_seasons').select('division_id, status, divisions(id, name)').eq('season_id', seasonId).eq('team_id', teamId).maybeSingle(),
+        supabase.from('team_players').select('player_id, players(id, name, gender, photo_url, is_captain, is_coach)').eq('season_id', seasonId).eq('team_id', teamId),
+        supabase
+          .from('fixtures')
+          .select(`
+            id, week_date, is_bye, home_team_id, away_team_id,
+            teams_home:teams!fixtures_home_team_id_fkey(id, name),
+            teams_away:teams!fixtures_away_team_id_fkey(id, name),
+            rubbers(
+              *,
+              home_player1:players!rubbers_home_player1_id_fkey(name),
+              home_player2:players!rubbers_home_player2_id_fkey(name),
+              away_player1:players!rubbers_away_player1_id_fkey(name),
+              away_player2:players!rubbers_away_player2_id_fkey(name)
+            )
+          `)
+          .eq('season_id', seasonId)
+          .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+          .order('week_date'),
+      ]);
+      if (cancelled) return;
 
+      if (teamErr || !teamRow) { setTeam(false); setLoading(false); return; }
+      setTeam(teamRow);
+      setTeamSeason(tsRow || null);
+      setRoster(rosterRows || []);
+      setFixtures(fixtureRows || []);
+
+      const playerNameMap = {};
+      for (const f of fixtureRows || []) {
+        for (const r of f.rubbers ?? []) {
+          if (r.home_player1_id) playerNameMap[r.home_player1_id] = r.home_player1?.name;
+          if (r.home_player2_id) playerNameMap[r.home_player2_id] = r.home_player2?.name;
+          if (r.away_player1_id) playerNameMap[r.away_player1_id] = r.away_player1?.name;
+          if (r.away_player2_id) playerNameMap[r.away_player2_id] = r.away_player2?.name;
+        }
+      }
+      setPlayerNameOf(playerNameMap);
+
+      // Second wave — each depends on something from the first (roster's
+      // player ids, tsRow's division_id), but not on each other, so they
+      // still run together rather than one after the other.
+      const ratingsPromise = (rosterRows || []).length > 0
+        ? supabase
+            .from('tie_player_ratings')
+            .select('rated_player_id, overall_rating, serve, forehand, backhand, volley, fixtures!inner(season_id)')
+            .eq('fixtures.season_id', seasonId)
+            .in('rated_player_id', rosterRows.map((r) => r.player_id))
+        : Promise.resolve({ data: [] });
+
+      // Which ties count is decided below (all 3 rubbers confirmed) — not
+      // fixtures.status, which is a scheduling field nothing ever sets to
+      // 'complete', so filtering on it here silently hid every finished tie.
+      const divisionPromise = tsRow?.division_id
+        ? Promise.all([
+            supabase.from('team_seasons').select('team_id').eq('season_id', seasonId).eq('division_id', tsRow.division_id),
+            supabase.from('fixtures').select('id, home_team_id, away_team_id, rubbers(*)')
+              .eq('season_id', seasonId).eq('division_id', tsRow.division_id),
+          ])
+        : Promise.resolve(null);
+
+      const [{ data: ratingRows }, divisionResult] = await Promise.all([ratingsPromise, divisionPromise]);
+      if (cancelled) return;
+
+      const byPlayer = {};
+      for (const r of ratingRows || []) (byPlayer[r.rated_player_id] ??= []).push(r);
+      setRatingsByPlayer(Object.fromEntries(Object.entries(byPlayer).map(([id, rows]) => [id, summarizeRatings(rows)])));
+
+      if (divisionResult) {
+        const [{ data: divisionTeamSeasons }, { data: divisionFixtures }] = divisionResult;
         const teamIds = (divisionTeamSeasons || []).map((r) => r.team_id);
         const ties = (divisionFixtures || [])
           .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at))
@@ -155,34 +200,6 @@ export default function TeamProfilePage({ seasonId, teamId }) {
       } else {
         setStandingRow(null);
       }
-
-      const { data: fixtureRows } = await supabase
-        .from('fixtures')
-        .select(`
-          id, week_date, is_bye, home_team_id, away_team_id,
-          teams_home:teams!fixtures_home_team_id_fkey(id, name),
-          teams_away:teams!fixtures_away_team_id_fkey(id, name),
-          rubbers(*)
-        `)
-        .eq('season_id', seasonId)
-        .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-        .order('week_date');
-      if (cancelled) return;
-      setFixtures(fixtureRows || []);
-
-      const playerIds = new Set();
-      for (const f of fixtureRows || []) {
-        for (const r of f.rubbers ?? []) {
-          for (const pid of [r.home_player1_id, r.home_player2_id, r.away_player1_id, r.away_player2_id]) {
-            if (pid) playerIds.add(pid);
-          }
-        }
-      }
-      const { data: fixturePlayerRows } = playerIds.size > 0
-        ? await supabase.from('players').select('id, name').in('id', [...playerIds])
-        : { data: [] };
-      if (cancelled) return;
-      setPlayerNameOf(Object.fromEntries((fixturePlayerRows || []).map((p) => [p.id, p.name])));
 
       setLoading(false);
     }

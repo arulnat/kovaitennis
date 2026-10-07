@@ -63,23 +63,26 @@ export default function StandingsPage() {
     if (!divisionId) { setRows(isTeamLogin ? null : []); return undefined; }
     let cancelled = false;
     async function load() {
-      const { data: teamSeasons } = await supabase
-        .from('team_seasons')
-        .select('team_id, teams(id, name)')
-        .eq('season_id', seasonId)
-        .eq('division_id', divisionId);
+      // Independent of each other (both scoped by season+division alone)
+      // — fire together rather than one round-trip at a time.
+      const [{ data: teamSeasons }, { data: fixtures }] = await Promise.all([
+        supabase
+          .from('team_seasons')
+          .select('team_id, teams(id, name)')
+          .eq('season_id', seasonId)
+          .eq('division_id', divisionId),
+        // Which ties count is decided below (all 3 rubbers confirmed) — fixtures.status
+        // is a separate scheduling field that's never actually transitioned to 'complete'
+        // anywhere, so filtering on it here silently hid every finished tie.
+        supabase
+          .from('fixtures')
+          .select('id, home_team_id, away_team_id, rubbers(*)')
+          .eq('season_id', seasonId)
+          .eq('division_id', divisionId),
+      ]);
 
       const teamIds = (teamSeasons || []).map((r) => r.team_id);
       const names = Object.fromEntries((teamSeasons || []).map((r) => [r.team_id, r.teams.name]));
-
-      const { data: fixtures } = await supabase
-        .from('fixtures')
-        .select('id, home_team_id, away_team_id, rubbers(*)')
-        .eq('season_id', seasonId)
-        .eq('division_id', divisionId);
-      // Which ties count is decided below (all 3 rubbers confirmed) — fixtures.status
-      // is a separate scheduling field that's never actually transitioned to 'complete'
-      // anywhere, so filtering on it here silently hid every finished tie.
 
       const completed = (fixtures || [])
         .filter((f) => f.rubbers?.length === 3 && f.rubbers.every((r) => r.winner_side && r.confirmed_at));

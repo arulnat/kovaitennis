@@ -19,7 +19,7 @@
 // final), set up from the Final Results admin page and shown on the
 // public Results page's Final Results tab once posted.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSeason } from '../../lib/seasonContext.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
 import { computeIndividualStandings } from '../../lib/standings.js';
@@ -78,17 +78,22 @@ export default function RisingStarsPage({ seasonId }) {
   const [divisionId, setDivisionId] = useState(ALL_DIVISIONS);
   const [teamId, setTeamId] = useState(ALL_TEAMS);
   const [nameSearch, setNameSearch] = useState('');
-  const [rows, setRows] = useState(null); // null = loading
-  const [teamsInScope, setTeamsInScope] = useState([]);
+  const [fixtures, setFixtures] = useState(null); // null = loading; normalized, independent of kind
 
   useEffect(() => { setTeamId(ALL_TEAMS); }, [divisionId]);
 
+  // Fetches once per season/division — NOT per kind, since the raw
+  // fixture/rubber data is identical for singles vs doubles; only the
+  // aggregation below differs, so switching the toggle recomputes from
+  // what's already in memory instead of hitting the network again.
+  // Player names come back embedded via the rubbers->players FK (one
+  // query total) rather than a separate players lookup afterward.
   useEffect(() => {
-    if (!seasonId) { setRows([]); return; }
+    if (!seasonId) { setFixtures([]); return; }
     let cancelled = false;
 
     async function load() {
-      setRows(null);
+      setFixtures(null);
 
       let fixtureQuery = supabase
         .from('fixtures')
@@ -97,7 +102,15 @@ export default function RisingStarsPage({ seasonId }) {
           teams_home:teams!fixtures_home_team_id_fkey(id, name),
           teams_away:teams!fixtures_away_team_id_fkey(id, name),
           divisions(id, name),
-          rubbers(rubber_type, winner_side, confirmed_at, home_player1_id, home_player2_id, away_player1_id, away_player2_id, set1_home, set1_away, set2_home, set2_away, set3_home, set3_away)
+          rubbers(
+            rubber_type, winner_side, confirmed_at,
+            home_player1_id, home_player2_id, away_player1_id, away_player2_id,
+            set1_home, set1_away, set2_home, set2_away, set3_home, set3_away,
+            home_player1:players!rubbers_home_player1_id_fkey(name),
+            home_player2:players!rubbers_home_player2_id_fkey(name),
+            away_player1:players!rubbers_away_player1_id_fkey(name),
+            away_player2:players!rubbers_away_player2_id_fkey(name)
+          )
         `)
         .eq('season_id', seasonId)
         .eq('is_bye', false);
@@ -106,46 +119,36 @@ export default function RisingStarsPage({ seasonId }) {
       const { data: fixtureRows } = await fixtureQuery;
       if (cancelled) return;
 
-      const playerIds = new Set();
-      for (const f of fixtureRows || []) {
-        for (const r of f.rubbers ?? []) {
-          for (const pid of [r.home_player1_id, r.home_player2_id, r.away_player1_id, r.away_player2_id]) {
-            if (pid) playerIds.add(pid);
-          }
-        }
-      }
-      const { data: playerRows } = playerIds.size > 0
-        ? await supabase.from('players').select('id, name').in('id', [...playerIds])
-        : { data: [] };
-      if (cancelled) return;
-      const nameOf = Object.fromEntries((playerRows || []).map((p) => [p.id, p.name]));
-
-      const fixtures = (fixtureRows || []).map((f) => ({
+      const normalized = (fixtureRows || []).map((f) => ({
         ...f,
         homeTeamName: f.teams_home?.name,
         awayTeamName: f.teams_away?.name,
         divisionName: f.divisions?.name,
         rubbers: (f.rubbers ?? []).map((r) => ({
           ...r,
-          homeNames: { [r.home_player1_id]: nameOf[r.home_player1_id], [r.home_player2_id]: nameOf[r.home_player2_id] },
-          awayNames: { [r.away_player1_id]: nameOf[r.away_player1_id], [r.away_player2_id]: nameOf[r.away_player2_id] },
+          homeNames: { [r.home_player1_id]: r.home_player1?.name, [r.home_player2_id]: r.home_player2?.name },
+          awayNames: { [r.away_player1_id]: r.away_player1?.name, [r.away_player2_id]: r.away_player2?.name },
         })),
       }));
-
-      const teamsSeen = new Map();
-      for (const f of fixtures) {
-        if (f.home_team_id) teamsSeen.set(f.home_team_id, f.homeTeamName);
-        if (f.away_team_id) teamsSeen.set(f.away_team_id, f.awayTeamName);
-      }
-      if (!cancelled) setTeamsInScope([...teamsSeen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
-
-      const stats = aggregatePlayerStats(fixtures, kind);
-      const ranked = computeIndividualStandings(stats);
-      if (!cancelled) setRows(ranked);
+      if (!cancelled) setFixtures(normalized);
     }
     load();
     return () => { cancelled = true; };
-  }, [seasonId, kind, divisionId]);
+  }, [seasonId, divisionId]);
+
+  const teamsInScope = useMemo(() => {
+    const teamsSeen = new Map();
+    for (const f of fixtures ?? []) {
+      if (f.home_team_id) teamsSeen.set(f.home_team_id, f.homeTeamName);
+      if (f.away_team_id) teamsSeen.set(f.away_team_id, f.awayTeamName);
+    }
+    return [...teamsSeen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [fixtures]);
+
+  const rows = useMemo(() => {
+    if (fixtures === null) return null;
+    return computeIndividualStandings(aggregatePlayerStats(fixtures, kind));
+  }, [fixtures, kind]);
 
   const teamFiltered = teamId === ALL_TEAMS ? rows : (rows ?? []).filter((r) => r.teamId === teamId);
   const search = nameSearch.trim().toLowerCase();
