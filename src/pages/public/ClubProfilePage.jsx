@@ -7,6 +7,11 @@
 // week is exactly the scheduling clash this page exists to surface, so
 // club officials can coordinate court time before match day, not after.
 //
+// Two filters, same row: which of the club's own teams (default "All
+// teams"), and which week (default "All weeks") — narrowing to one
+// team is for finding a specific team's own fixtures quickly, separate
+// from the all-teams scheduling-clash view the page defaults to.
+//
 // Public, gated on the season being published — same as the Clubs
 // directory and Fixtures Calendar — since there's nothing to coordinate
 // before a schedule exists.
@@ -19,6 +24,7 @@ import Dropdown from '../../components/Dropdown.jsx';
 import TeamLink from '../../components/TeamLink.jsx';
 
 const ALL_WEEKS = '__all__';
+const ALL_TEAMS = '__all__';
 const COURT_TYPE_LABEL = { synthetic: 'Synthetic', clay: 'Clay', both: 'Synthetic and Clay' };
 
 function formatWeekDate(dateStr) {
@@ -31,8 +37,9 @@ export default function ClubProfilePage({ clubId }) {
   const [teams, setTeams] = useState([]);
   const [fixtures, setFixtures] = useState(null); // null = loading
   const [weekDate, setWeekDate] = useState(ALL_WEEKS);
+  const [teamFilter, setTeamFilter] = useState(ALL_TEAMS);
 
-  useEffect(() => { setWeekDate(ALL_WEEKS); }, [clubId]);
+  useEffect(() => { setWeekDate(ALL_WEEKS); setTeamFilter(ALL_TEAMS); }, [clubId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +92,9 @@ export default function ClubProfilePage({ clubId }) {
   if (club === false) return <p className="p-6 text-gray-500">Club not found.</p>;
 
   const weekOptions = [...new Set((fixtures || []).map((f) => f.week_date))].sort();
-  const shownFixtures = weekDate === ALL_WEEKS ? fixtures : (fixtures || []).filter((f) => f.week_date === weekDate);
+  const shownFixtures = (fixtures || [])
+    .filter((f) => weekDate === ALL_WEEKS || f.week_date === weekDate)
+    .filter((f) => teamFilter === ALL_TEAMS || f.home_team_id === teamFilter || f.away_team_id === teamFilter);
 
   const weeks = new Map();
   for (const f of shownFixtures || []) {
@@ -95,7 +104,7 @@ export default function ClubProfilePage({ clubId }) {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <PageHeader title={club.name} subtitle="This club's teams and their matches, week by week — home matches are the ones needing the shared court." />
+      <PageHeader title={club.name} />
 
       {(club.location || club.address || club.number_of_courts || club.court_type) && (
         <div className="mb-4 rounded-lg overflow-hidden shadow-lg">
@@ -136,7 +145,16 @@ export default function ClubProfilePage({ clubId }) {
         <p className="text-gray-500 text-sm">No teams from this club are registered this season.</p>
       ) : (
         <>
-          <div className="mb-4">
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Dropdown
+              value={teamFilter}
+              onChange={setTeamFilter}
+              options={[
+                { value: ALL_TEAMS, label: 'All teams' },
+                ...teams.map((t) => ({ value: t.id, label: t.name })),
+              ]}
+              className="w-56"
+            />
             <Dropdown
               value={weekDate}
               onChange={setWeekDate}
