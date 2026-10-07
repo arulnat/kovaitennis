@@ -388,7 +388,9 @@ export default function TeamProfilePage({ seasonId, teamId }) {
                           <td className="p-2 border-t">{formatWeekDate(f.week_date)}</td>
                           <td className="p-2 border-t">
                             {outcome && <span className="text-gray-400 mr-1 inline-block w-3">{isOpen ? '▾' : '▸'}</span>}
-                            {isHome ? 'vs ' : '@ '}
+                            <span className={`mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide ${isHome ? 'bg-accent-500 text-teal-950' : 'bg-slate-200 text-slate-700'}`}>
+                              {isHome ? 'Home' : 'Away'}
+                            </span>
                             <Link to={`/team/${opponent?.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold hover:underline hover:text-teal-700">
                               {opponent?.name ?? '—'}
                             </Link>

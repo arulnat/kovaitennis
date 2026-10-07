@@ -98,7 +98,9 @@ export default function MyFixturesPage() {
                 <tr key={f.id} className="border-t">
                   <td className="p-2">{formatWeekDate(f.week_date)}</td>
                   <td className="p-2">
-                    {isHome ? 'vs ' : '@ '}
+                    <span className={`mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide ${isHome ? 'bg-accent-500 text-teal-950' : 'bg-slate-200 text-slate-700'}`}>
+                      {isHome ? 'Home' : 'Away'}
+                    </span>
                     <TeamLink teamId={opponent?.id}>{opponent?.name}</TeamLink>
                   </td>
                   <td className={`p-2 font-medium ${statusColor}`}>{status} ({scored}/3)</td>
