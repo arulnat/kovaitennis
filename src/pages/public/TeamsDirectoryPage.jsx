@@ -1,11 +1,14 @@
 // src/pages/public/TeamsDirectoryPage.jsx
 //
-// Public directory of teams — only teams whose captain has clicked
-// Submit on My Team (team_seasons.roster_submitted, migration 0026) are
-// listed here, so an incomplete/placeholder-heavy roster never shows up
-// publicly. Clicking a team goes to its existing public profile
-// (TeamProfilePage.jsx, /team/:teamId), which already shows the full
-// roster (name, photo, gender) and season statistics.
+// Public directory of teams — every team registered for the season,
+// regardless of whether its captain has clicked Submit on My Team
+// (team_seasons.roster_submitted, migration 0026): once fixtures are
+// out, the team names/matchups are already public via Standings/
+// Results/Fixtures Calendar, so there's nothing left to gain by hiding
+// a team here just because its roster isn't fully filled in yet.
+// Clicking a team goes to its existing public profile
+// (TeamProfilePage.jsx, /team/:teamId), which already shows whatever
+// roster exists (name, photo, gender) and season statistics.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -24,9 +27,8 @@ export default function TeamsDirectoryPage({ seasonId }) {
       setTeams(null);
       const { data } = await supabase
         .from('team_seasons')
-        .select('roster_submitted, teams(id, name)')
-        .eq('season_id', seasonId)
-        .eq('roster_submitted', true);
+        .select('teams(id, name)')
+        .eq('season_id', seasonId);
       if (cancelled) return;
       setTeams(
         (data || [])
@@ -46,7 +48,7 @@ export default function TeamsDirectoryPage({ seasonId }) {
       {teams === null ? (
         <p className="text-gray-500 text-sm">Loading…</p>
       ) : teams.length === 0 ? (
-        <p className="text-gray-500 text-sm">No teams have submitted their roster yet this season.</p>
+        <p className="text-gray-500 text-sm">No teams registered this season yet.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {teams.map((t) => (

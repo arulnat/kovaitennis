@@ -246,7 +246,7 @@ const dropdownLinkClass = 'block px-4 py-2 text-teal-100 hover:text-white hover:
 
 // A reusable "label ▾" nav dropdown — used for groups of closely
 // related pages that would otherwise each be their own top-level nav
-// item: public Teams/Fixtures Calendar/Clubs, and, admin-only, Setup
+// item: public Schedule (Teams/Fixtures Calendar/Clubs), and, admin-only, Setup
 // (Seasons -> Divisions -> Bulk Upload -> Manage Teams -> Team Logins,
 // the order an admin actually sets a season up in), Grouping+Fixtures
 // (scheduling), Update Scores+Manage Scores+Missing Scores+Final
@@ -300,7 +300,7 @@ function Nav() {
       <Link to="/results" className={navLinkClass}>Results</Link>
       <Link to="/rising-stars" className={navLinkClass}>Rising Stars</Link>
       <NavDropdown
-        label="Teams"
+        label="Schedule"
         items={[
           { to: '/teams', label: 'Teams' },
           { to: '/fixtures-calendar', label: 'Fixtures Calendar' },
