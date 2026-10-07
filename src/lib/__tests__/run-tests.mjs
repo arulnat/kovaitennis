@@ -21,6 +21,7 @@ import { validateBulkUpload, generateLoginId } from '../bulkUpload.js';
 import { seededShuffle, planAutoGroup } from '../grouping.js';
 import { normalizePhone } from '../phone.js';
 import { calculateAge, isAgeEligible, MIN_AGE } from '../age.js';
+import { toTitleCase } from '../text.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -863,6 +864,33 @@ test('planAutoGroup: avoidSameClub respects a division\'s pre-existing clubs too
   });
   const divAIds = plan.assignments.find((a) => a.divisionId === 'divA')?.teamIds ?? [];
   assert.ok(!divAIds.includes('t1'), 't1 (clubX) should avoid divA, which already has a clubX team');
+});
+
+console.log('\n== text.js ==');
+
+test('toTitleCase: Initial.Name -> capitalizes both the initial and the letter after the dot', () => {
+  assert.equal(toTitleCase('k.ravi'), 'K.Ravi');
+  assert.equal(toTitleCase('v.venkiteswaran'), 'V.Venkiteswaran');
+});
+
+test('toTitleCase: Initial Name (space-separated) capitalizes both', () => {
+  assert.equal(toTitleCase('k ravi'), 'K Ravi');
+});
+
+test('toTitleCase: Name Initial, and Name Initial Initial (two initials) -> every word capitalized', () => {
+  assert.equal(toTitleCase('ravi k'), 'Ravi K');
+  assert.equal(toTitleCase('ravi k s'), 'Ravi K S');
+});
+
+test('toTitleCase: an ordinary multi-word name is capitalized on every word, rest lowercased', () => {
+  assert.equal(toTitleCase('RAVI KUMAR'), 'Ravi Kumar');
+  assert.equal(toTitleCase('ravi KUMAR'), 'Ravi Kumar');
+});
+
+test('toTitleCase: null/undefined/empty is handled without throwing', () => {
+  assert.equal(toTitleCase(null), '');
+  assert.equal(toTitleCase(undefined), '');
+  assert.equal(toTitleCase(''), '');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

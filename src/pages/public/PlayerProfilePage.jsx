@@ -13,6 +13,7 @@ import TeamLink from '../../components/TeamLink.jsx';
 import PlayerLink from '../../components/PlayerLink.jsx';
 import StatPanel from '../../components/StatPanel.jsx';
 import Avatar from '../../components/Avatar.jsx';
+import { toTitleCase } from '../../lib/text.js';
 
 const SKILLS = [
   { key: 'serve', label: 'Serve' },
@@ -205,7 +206,7 @@ export default function PlayerProfilePage({ seasonId, playerId }) {
                   }`}
                 >
                   <Avatar name={t.players?.name} />
-                  <span className="text-xs font-semibold text-slate-800 leading-tight">{t.players?.name}</span>
+                  <span className="text-xs font-semibold text-slate-800 leading-tight">{toTitleCase(t.players?.name)}</span>
                 </div>
               </PlayerLink>
             ))}
